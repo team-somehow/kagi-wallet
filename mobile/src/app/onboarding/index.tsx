@@ -14,7 +14,7 @@ const LADDER: { who: string; what: string }[] = [
 
 export default function Welcome() {
   return (
-    <Screen footer={<Button label="Create wallet" onPress={() => router.push('/onboarding/secure')} />}>
+    <Screen footer={<Button label="Create wallet" onPress={() => router.push('/onboarding/connect')} />}>
       <View style={styles.hero}>
         <Txt size={64} weight="bold" lineHeight={64} style={styles.mark}>
           Leash

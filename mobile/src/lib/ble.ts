@@ -105,9 +105,25 @@ class Ble {
     }, true);
   }
 
+  private scanning = false;
+  private rescanTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Restart the scan: Android only reports a device once per scan, so do this after every disconnect. */
+  private rescan() {
+    if (!this.manager) return;
+    void this.manager.stopDeviceScan().catch(() => undefined);
+    this.scanning = false;
+    this.scan();
+  }
+
   private scan() {
-    // Keep scanning: the vault only shows up while its window is open.
-    this.manager?.startDeviceScan([SERVICE], { allowDuplicates: false }, (err, d) => {
+    if (this.scanning || !this.manager) return;
+    this.scanning = true;
+    // Keep looking while a stick is missing: the vault only shows up while its window is open.
+    if (!this.rescanTimer) this.rescanTimer = setInterval(() => {
+      if (!this.conns.wrist || !this.conns.vault) this.rescan();
+    }, 8000);
+    this.manager.startDeviceScan([SERVICE], { allowDuplicates: false }, (err, d) => {
       if (err || !d) return;
       if (this.connecting.has(d.id) || Object.values(this.conns).some((c) => c?.device.id === d.id)) return;
       // The name may be missing (it rides in the scan response), so the stick's hello decides its role.
@@ -162,11 +178,13 @@ class Ble {
           conn.subs.forEach((s) => s.remove());
           if (role && this.conns[role] === conn) delete this.conns[role];
           this.emitState();
+          this.rescan();
         }),
       );
       await this.write(conn, JSON.stringify({ t: 'hello?' }));
     } catch {
-      // Out of range or busy; the scan will find it again.
+      // Out of range or busy; look again.
+      setTimeout(() => this.rescan(), 1500);
     } finally {
       this.connecting.delete(d.id);
     }

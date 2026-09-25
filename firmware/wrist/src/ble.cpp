@@ -53,9 +53,16 @@ void begin(const String& name, bool advertise) {
   rx->setCallbacks(new RxCallbacks());
   tx = svc->createCharacteristic(TX, NIMBLE_PROPERTY::NOTIFY);
   svc->start();
+  // Flags + a 128-bit service UUID fill most of the 31-byte advertisement, so the name
+  // goes in the scan response.
   NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
-  adv->addServiceUUID(SERVICE);
-  adv->setName(name.c_str());
+  NimBLEAdvertisementData ad;
+  ad.setFlags(BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP);
+  ad.addServiceUUID(NimBLEUUID(SERVICE));
+  adv->setAdvertisementData(ad);
+  NimBLEAdvertisementData sr;
+  sr.setName(name.c_str());
+  adv->setScanResponseData(sr);
   adv->enableScanResponse(true);
   setAdvertising(advertise);
 }

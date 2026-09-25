@@ -36,7 +36,7 @@ static const char* FW = "0.1.0";
 
 // ---- look -----------------------------------------------------------------
 
-static uint16_t C_BG, C_TEXT, C_MUTED, C_FAINT, C_AMBER, C_RED, C_CELL;
+static uint16_t C_BG, C_TEXT, C_MUTED, C_FAINT, C_AMBER, C_RED, C_CELL, C_PANEL;
 static M5Canvas canvas(&M5.Display);
 static const int W = 240, H = 135;
 
@@ -81,10 +81,25 @@ static bool warned80 = false;
 static bool onArm = true;
 static uint32_t lastMotion = 0;
 static float lastA[3] = {0, 0, 0};
+// Wear detection: off unless built with LEASH_WEAR_DETECT. On stage "shard asleep" only confuses.
+#ifdef LEASH_WEAR_DETECT
 static const uint32_t STILL_MS = 120000;
+#else
+static const uint32_t STILL_MS = 0xFFFFFFFF;
+#endif
 
 static uint32_t lastStatus = 0;
 static uint32_t autoAt = 0;
+// UI animation state.
+static uint32_t modeSince = 0;      // when the current screen appeared
+static Mode lastDrawnMode = Mode::Unpaired;
+static uint32_t holdStart = 0;      // A held since
+static float holdProgress = 0;      // 0..1 of the hold
+static bool waitRelease = false;    // a hold just completed; ignore A until it is let go
+enum class Fx { None, Burst, Shake };
+static Fx resultFx = Fx::None;
+// Which edge of the screen the A button sits next to, for the arrows.
+static const bool A_ON_RIGHT = true;
 static bool irQuiet = false;  // bench: stop IMU and display updates  // test firmware only: when to press A by itself
 static String rx;     // USB serial line buffer
 static String rxTcp;  // WiFi line buffer
@@ -260,6 +275,11 @@ static void buzz(int times = 3) {
 }
 
 static void chirp() { beep(1800, 40); }
+static void chime() {
+  beep(1320, 70);
+  beep(1760, 70);
+  beep(2640, 120);
+}
 
 // ---- storage --------------------------------------------------------------
 
@@ -303,163 +323,303 @@ static void bar(int x, int y, int w, int h, double ratio, int cells = 20) {
   canvas.drawFastVLine(mx, y - 3, h + 6, C_AMBER);
 }
 
-static void header(const char* left, uint16_t leftColor) {
+
+// ---- look: animation helpers ---------------------------------------------------
+
+static float t01(uint32_t period) { return (float)(millis() % period) / (float)period; }
+static float since(uint32_t ms) { return std::min(1.0f, (float)(millis() - modeSince) / (float)ms); }
+static float easeOut(float x) { return 1 - (1 - x) * (1 - x) * (1 - x); }
+
+// A thick arc from start to end angle (degrees, 0 = up, clockwise).
+static void arcRing(int cx, int cy, int r, int thick, float from, float to, uint16_t color) {
+  canvas.fillArc(cx, cy, r, r - thick, from - 90, to - 90, color);
+}
+
+// Chevrons sliding toward the A button, with a label.
+static void arrowsToA(int y, const char* label) {
+  float t = t01(900);
+  int dir = A_ON_RIGHT ? 1 : -1;
+  int edge = A_ON_RIGHT ? W - 6 : 6;
+  for (int i = 0; i < 3; i++) {
+    float ph = fmodf(t + i / 3.0f, 1.0f);
+    int x = edge - dir * (int)(46 - ph * 40);
+    uint8_t a = (uint8_t)(255 * (0.25f + 0.75f * ph));
+    uint16_t c = M5.Display.color565(a, (uint8_t)(a * 177 / 255), (uint8_t)(a * 59 / 255));
+    for (int k = 0; k < 3; k++) {
+      canvas.drawLine(x - dir * 7 + k * dir, y - 9, x + k * dir, y, c);
+      canvas.drawLine(x - dir * 7 + k * dir, y + 9, x + k * dir, y, c);
+    }
+  }
+  canvas.setFont(&fonts::FreeSansBold9pt7b);
+  canvas.setTextColor(C_AMBER);
+  canvas.setTextDatum(A_ON_RIGHT ? middle_right : middle_left);
+  canvas.drawString(label, A_ON_RIGHT ? W - 58 : 58, y);
+}
+
+// The ring that fills while A is held, with an "A" in the middle.
+static void holdRing(int cx, int cy, int r) {
+  canvas.drawCircle(cx, cy, r, C_CELL);
+  canvas.drawCircle(cx, cy, r - 1, C_CELL);
+  if (holdProgress > 0) arcRing(cx, cy, r, 6, 0, 360 * holdProgress, C_AMBER);
+  canvas.setFont(&fonts::FreeSansBold12pt7b);
+  canvas.setTextDatum(middle_center);
+  canvas.setTextColor(holdProgress > 0 ? C_AMBER : C_TEXT);
+  canvas.drawString("A", cx, cy + 1);
+}
+
+// Tiny link and battery icons, top right. No words.
+static void statusIcons() {
+  int x = W - 10;
+  int lvl = M5.Power.getBatteryLevel();
+  canvas.drawRect(x - 18, 6, 18, 9, C_MUTED);
+  canvas.fillRect(x, 8, 2, 5, C_MUTED);
+  if (lvl > 0) canvas.fillRect(x - 16, 8, std::max(1, 14 * std::min(lvl, 100) / 100), 5, lvl < 20 ? C_RED : C_TEXT);
+  bool up = ble::connected() || tcpUp();
+  canvas.fillCircle(x - 28, 10, 3, up ? C_TEXT : C_RED);
+}
+
+static void title(const char* t, uint16_t c, int y = 8) {
+  canvas.setFont(&fonts::FreeSansBold9pt7b);
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(c);
+  canvas.drawString(t, 10, y);
+}
+
+static void drawIdle() {
+  // Waiting for a phone: the name, and rings pulsing out like a signal.
+  canvas.setFont(&fonts::FreeSansBold18pt7b);
+  canvas.setTextDatum(middle_left);
+  canvas.setTextColor(C_TEXT);
+  canvas.drawString("Leash", 12, 52);
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextColor(C_MUTED);
+  canvas.drawString("Open the app and", 12, 92);
+  canvas.drawString("tap Create wallet", 12, 112);
+  int cx = 196, cy = 60;
+  for (int i = 0; i < 3; i++) {
+    float ph = fmodf(t01(2400) + i / 3.0f, 1.0f);
+    int r = 6 + (int)(ph * 34);
+    uint8_t a = (uint8_t)(200 * (1 - ph));
+    canvas.drawCircle(cx, cy, r, M5.Display.color565(a, a, a));
+  }
+  canvas.fillCircle(cx, cy, 5, C_AMBER);
+  statusIcons();
+}
+
+static void drawPairHold() {
+  title("Pair with this phone?", C_TEXT);
+  holdRing(A_ON_RIGHT ? 48 : W - 48, 74, 30);
+  arrowsToA(74, "Hold A");
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextDatum(bottom_left);
+  canvas.setTextColor(C_FAINT);
+  canvas.drawString(paired ? "Replaces this stick's wallet" : "B to cancel", 10, H - 6);
+}
+
+// Phone on the left, stick on the right, a leash of dots running between them.
+static void drawKeygen() {
+  title("Creating your key", C_TEXT);
+  int y = 76;
+  canvas.drawRoundRect(22, y - 26, 30, 52, 5, C_TEXT);
+  canvas.fillRect(27, y - 20, 20, 32, C_CELL);
+  canvas.drawRoundRect(W - 58, y - 18, 40, 36, 5, C_TEXT);
+  canvas.fillRect(W - 52, y - 12, 28, 18, C_CELL);
+  int x0 = 58, x1 = W - 64;
+  for (int x = x0; x <= x1; x += 8) canvas.drawPixel(x, y, C_FAINT);
+  float t = t01(1100);
+  for (int i = 0; i < 4; i++) {
+    float ph = fmodf(t + i / 4.0f, 1.0f);
+    int x = x0 + (int)((x1 - x0) * ph);
+    int yy = y - (int)(10 * sinf(ph * 3.14159f));
+    canvas.fillCircle(x, yy, 3, C_AMBER);
+    float ph2 = fmodf(t + i / 4.0f + 0.5f, 1.0f);
+    int xb = x1 - (int)((x1 - x0) * ph2);
+    int yb = y + (int)(10 * sinf(ph2 * 3.14159f));
+    canvas.fillCircle(xb, yb, 2, C_TEXT);
+  }
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextDatum(bottom_center);
+  canvas.setTextColor(C_MUTED);
+  canvas.drawString("Neither side holds the whole key", W / 2, H - 6);
+}
+
+static void drawHome() {
+  bool hot = expCap > 0 && expSpent / expCap >= 0.8;
+  int cx = 52, cy = 72, r = 40;
+  canvas.drawCircle(cx, cy, r, C_CELL);
+  canvas.drawCircle(cx, cy, r - 7, C_CELL);
+  if (expCap > 0) {
+    float left = std::max(0.0, std::min(1.0, expLeft / expCap));
+    // The ring sweeps in when the screen appears.
+    float shown = left * easeOut(since(700));
+    arcRing(cx, cy, r, 8, 0, 360 * shown, hot ? C_AMBER : C_TEXT);
+  }
+  canvas.setFont(&fonts::FreeSansBold9pt7b);
+  canvas.setTextDatum(middle_center);
+  canvas.setTextColor(expCap > 0 ? (hot ? C_AMBER : C_TEXT) : C_FAINT);
+  canvas.drawString(expCap > 0 ? String((int)round(100 * expLeft / expCap)) + "%" : "-", cx, cy);
+  int x = 106;
+  title("WRIST", C_MUTED);
   canvas.setFont(&fonts::FreeSans9pt7b);
   canvas.setTextDatum(top_left);
-  canvas.setTextColor(leftColor);
-  canvas.drawString(left, 8, 6);
-  // Link and wear status, top right.
-  bool phoneUp = millis() - lastPhone < 8000;
-  canvas.setFont(&fonts::Font0);
-  canvas.setTextDatum(top_right);
-  canvas.setTextColor(phoneUp ? C_MUTED : C_RED);
-  const char* via = ble::connected() ? "ble" : relayUp ? "relay" : tcp.connected() ? "wifi" : WiFi.status() == WL_CONNECTED ? "no hub" : "no wifi";
-  String s = String(phoneUp ? via : (tcpUp() ? "no phone" : via)) + "  " + String(M5.Power.getBatteryLevel()) + "%";
-  canvas.drawString(s, W - 8, 10);
+  canvas.setTextColor(C_MUTED);
+  canvas.drawString(expCap > 0 ? "Agents can spend" : "No keys yet", x, 38);
+  canvas.setFont(&fonts::FreeSansBold12pt7b);
+  canvas.setTextColor(expCap == 0 ? C_FAINT : hot ? C_AMBER : C_TEXT);
+  canvas.drawString(dollars(expCap > 0 ? expLeft : 0), x, 60);
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextColor(C_FAINT);
+  canvas.drawString(expCap > 0 ? String(expKeys) + (expKeys == 1 ? " live key" : " live keys") : "Issue one in the app", x, 94);
+  statusIcons();
+}
+
+static void drawPrompt() {
+  // The card slides in from the right.
+  int off = (int)((1 - easeOut(since(260))) * W);
+  canvas.fillRoundRect(4 + off, 4, W - 8, H - 8, 8, C_PANEL);
+  canvas.drawRoundRect(4 + off, 4, W - 8, H - 8, 8, C_AMBER);
+  canvas.setFont(&fonts::FreeSansBold9pt7b);
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(C_AMBER);
+  canvas.drawString(prompt.title, 14 + off, 12);
+  canvas.setFont(&fonts::FreeSansBold18pt7b);
+  canvas.setTextColor(C_TEXT);
+  canvas.drawString(prompt.amount, 14 + off, 34);
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextColor(C_MUTED);
+  canvas.drawString(prompt.line1, 14 + off, 72);
+  if (off == 0) {
+    int ringX = A_ON_RIGHT ? W - 34 : 34;
+    canvas.drawCircle(ringX, 108, 14, C_CELL);
+    if (holdProgress > 0) arcRing(ringX, 108, 14, 4, 0, 360 * holdProgress, C_AMBER);
+    canvas.setFont(&fonts::FreeSansBold9pt7b);
+    canvas.setTextDatum(middle_center);
+    canvas.setTextColor(C_AMBER);
+    canvas.drawString("A", ringX, 109);
+    canvas.setTextDatum(A_ON_RIGHT ? middle_right : middle_left);
+    float bob = 3 * sinf(t01(700) * 6.283f);
+    canvas.drawString("Hold to approve", (A_ON_RIGHT ? ringX - 20 : ringX + 20) + (int)(bob * (A_ON_RIGHT ? 1 : -1)), 109);
+    canvas.setFont(&fonts::Font0);
+    canvas.setTextDatum(middle_left);
+    canvas.setTextColor(C_FAINT);
+    if (A_ON_RIGHT) canvas.drawString("B: no", 14, 109);
+  }
+}
+
+static void drawResult() {
+  float p = since(900);
+  int cx = W / 2, cy = 56;
+  int dx = 0;
+  if (resultFx == Fx::Burst) {
+    float e = easeOut(p);
+    for (int i = 0; i < 12; i++) {
+      float ang = i * 3.14159f / 6;
+      int r0 = (int)(10 + 30 * e), r1 = (int)(18 + 42 * e);
+      uint8_t a = (uint8_t)(255 * (1 - p));
+      canvas.drawLine(cx + cosf(ang) * r0, cy + sinf(ang) * r0, cx + cosf(ang) * r1, cy + sinf(ang) * r1,
+                      M5.Display.color565(a, (uint8_t)(a * 177 / 255), (uint8_t)(a * 59 / 255)));
+    }
+    canvas.fillCircle(cx, cy, (int)(14 * e), resultColor);
+    canvas.fillCircle(cx, cy, (int)(9 * e), C_BG);
+    // a check mark once the burst lands
+    if (p > 0.4f) {
+      canvas.drawLine(cx - 5, cy, cx - 1, cy + 4, resultColor);
+      canvas.drawLine(cx - 1, cy + 4, cx + 6, cy - 4, resultColor);
+      canvas.drawLine(cx - 5, cy + 1, cx - 1, cy + 5, resultColor);
+      canvas.drawLine(cx - 1, cy + 5, cx + 6, cy - 3, resultColor);
+    }
+  } else if (resultFx == Fx::Shake) {
+    dx = (int)(10 * sinf(p * 6.283f * 4) * (1 - p));
+  }
+  canvas.setFont(&fonts::FreeSansBold12pt7b);
+  canvas.setTextDatum(resultFx == Fx::Burst ? middle_center : middle_center);
+  canvas.setTextColor(resultColor);
+  canvas.drawString(resultText, cx + dx, resultFx == Fx::Burst ? 108 : 68);
+}
+
+static void drawRevoked() {
+  title("WRIST", C_MUTED);
+  canvas.setFont(&fonts::FreeSansBold12pt7b);
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(C_RED);
+  canvas.drawString("All keys revoked", 12, 42);
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextColor(C_MUTED);
+  canvas.drawString("No agent can spend until", 12, 78);
+  canvas.drawString("you issue a new key.", 12, 98);
+  statusIcons();
+}
+
+static void drawConfirm(const char* t, const String& line, const char* hold) {
+  title(t, C_AMBER);
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(C_TEXT);
+  canvas.drawString(line, 12, 36);
+  holdRing(A_ON_RIGHT ? 40 : W - 40, 92, 22);
+  arrowsToA(92, hold);
 }
 
 static void drawVault();
 static bool isVaultRole();
 static void draw() {
+  if (mode != lastDrawnMode) {
+    lastDrawnMode = mode;
+    modeSince = millis();
+  }
   canvas.fillSprite(C_BG);
   if (isVaultRole() && (mode == Mode::Home || mode == Mode::Unpaired)) {
     drawVault();
     canvas.pushSprite(0, 0);
     return;
   }
-
-  if (!onArm && mode != Mode::Unpaired && mode != Mode::Pairing) {
-    header("Leash", C_FAINT);
-    canvas.setFont(&fonts::FreeSansBold12pt7b);
-    canvas.setTextDatum(middle_left);
-    canvas.setTextColor(C_MUTED);
-    canvas.drawString("Shard asleep", 8, 62);
-    canvas.setFont(&fonts::FreeSans9pt7b);
-    canvas.setTextColor(C_FAINT);
-    canvas.drawString("Off the arm. Move to wake.", 8, 94);
-    canvas.pushSprite(0, 0);
-    return;
-  }
-
   switch (mode) {
-    case Mode::Unpaired: {
-      header("Leash", C_TEXT);
-      canvas.setFont(&fonts::FreeSansBold12pt7b);
-      canvas.setTextDatum(top_left);
-      canvas.setTextColor(C_TEXT);
-      canvas.drawString("Not paired", 8, 42);
-      canvas.setFont(&fonts::FreeSans9pt7b);
-      canvas.setTextColor(C_MUTED);
-      canvas.drawString("Open Leash on your phone", 8, 78);
-      canvas.drawString("and create a wallet.", 8, 98);
-      break;
-    }
-    case Mode::Pairing: {
-      header("Pairing", C_AMBER);
-      canvas.setFont(&fonts::FreeMonoBold18pt7b);
-      canvas.setTextDatum(top_left);
-      canvas.setTextColor(C_AMBER);
-      canvas.drawString(pairCode, 8, 36);
-      canvas.setFont(&fonts::FreeSans9pt7b);
-      canvas.setTextColor(C_TEXT);
-      canvas.drawString(pairWaitingPhone ? "Now confirm on the phone" : "Same code on the phone?", 8, 84);
-      canvas.setTextColor(C_MUTED);
-      canvas.drawString(pairWaitingPhone ? "" : (paired ? "A: yes, replace wallet   B: no" : "A: yes    B: no"), 8, 108);
-      break;
-    }
-    case Mode::Home: {
-      bool hot = expCap > 0 && expSpent / expCap >= 0.8;
-      header("Leash", C_TEXT);
-      canvas.setFont(&fonts::FreeSans9pt7b);
-      canvas.setTextDatum(top_left);
-      canvas.setTextColor(C_MUTED);
-      canvas.drawString(expCap > 0 ? "Agents can still spend" : "No live keys", 8, 30);
-      canvas.setFont(&fonts::FreeMonoBold18pt7b);
-      canvas.setTextColor(expCap == 0 ? C_FAINT : hot ? C_AMBER : C_TEXT);
-      canvas.drawString(dollars(expCap > 0 ? expLeft : 0), 8, 52);
-      bar(8, 96, W - 16, 10, expCap > 0 ? expSpent / expCap : 0);
-      canvas.setFont(&fonts::Font0);
-      canvas.setTextColor(C_MUTED);
-      canvas.setTextDatum(top_left);
-      canvas.drawString(String(expKeys) + (expKeys == 1 ? " key" : " keys"), 8, 116);
-      canvas.setTextDatum(top_right);
-      canvas.drawString("hold B to revoke all", W - 8, 116);
-      break;
-    }
-    case Mode::Prompt: {
-      header(prompt.title.c_str(), C_AMBER);
-      canvas.setFont(&fonts::FreeMonoBold18pt7b);
-      canvas.setTextDatum(top_left);
-      canvas.setTextColor(C_AMBER);
-      canvas.drawString(prompt.amount, 8, 28);
-      canvas.setFont(&fonts::FreeSans9pt7b);
-      canvas.setTextColor(C_TEXT);
-      canvas.drawString(prompt.line1, 8, 68);
-      canvas.setTextColor(C_MUTED);
-      canvas.drawString(prompt.line2, 8, 88);
-      canvas.setTextColor(C_TEXT);
-      canvas.drawString("A: sign", 8, 112);
-      canvas.setTextDatum(top_right);
-      canvas.setTextColor(C_MUTED);
-      canvas.drawString("B: reject", W - 8, 112);
-      break;
-    }
-    case Mode::Result: {
-      header("Leash", C_TEXT);
-      canvas.setFont(&fonts::FreeSansBold12pt7b);
-      canvas.setTextDatum(middle_left);
-      canvas.setTextColor(resultColor);
-      canvas.drawString(resultText, 8, 70);
-      break;
-    }
-    case Mode::ConfirmWipe: {
-      header("Wipe", C_RED);
-      canvas.setFont(&fonts::FreeSansBold12pt7b);
-      canvas.setTextDatum(top_left);
-      canvas.setTextColor(C_RED);
-      canvas.drawString("Erase this shard?", 8, 40);
-      canvas.setFont(&fonts::FreeSans9pt7b);
-      canvas.setTextColor(C_MUTED);
-      canvas.drawString("The wallet can't sign again.", 8, 78);
-      canvas.setTextColor(C_TEXT);
-      canvas.drawString("A: erase", 8, 108);
-      canvas.setTextDatum(top_right);
-      canvas.setTextColor(C_MUTED);
-      canvas.drawString("B: keep", W - 8, 108);
-      break;
-    }
-    case Mode::ConfirmWifi: {
-      header("WiFi", C_AMBER);
-      canvas.setFont(&fonts::FreeSansBold12pt7b);
-      canvas.setTextDatum(top_left);
-      canvas.setTextColor(C_AMBER);
-      canvas.drawString("Join network?", 8, 32);
-      canvas.setFont(&fonts::FreeSans9pt7b);
-      canvas.setTextColor(C_TEXT);
-      canvas.drawString(pendingNet.ssid.substring(0, 22), 8, 66);
-      canvas.drawString("A: save", 8, 108);
-      canvas.setTextDatum(top_right);
-      canvas.setTextColor(C_MUTED);
-      canvas.drawString("B: ignore", W - 8, 108);
-      break;
-    }
-    case Mode::Revoked: {
-      header("Leash", C_RED);
-      canvas.setFont(&fonts::FreeSansBold12pt7b);
-      canvas.setTextDatum(top_left);
-      canvas.setTextColor(C_RED);
-      canvas.drawString("All keys revoked", 8, 40);
-      canvas.setFont(&fonts::FreeSans9pt7b);
-      canvas.setTextColor(C_MUTED);
-      canvas.drawString("No agent can spend until", 8, 78);
-      canvas.drawString("you issue a new key.", 8, 98);
-      break;
-    }
+    case Mode::Unpaired: drawIdle(); break;
+    case Mode::Pairing: pairWaitingPhone ? drawKeygen() : drawPairHold(); break;
+    case Mode::Home: drawHome(); break;
+    case Mode::Prompt: drawPrompt(); break;
+    case Mode::Result: drawResult(); break;
+    case Mode::Revoked: drawRevoked(); break;
+    case Mode::ConfirmWipe: drawConfirm("Erase this stick?", "The wallet here can't sign again.", "Hold A"); break;
+    case Mode::ConfirmWifi: drawConfirm("Join network?", pendingNet.ssid.substring(0, 24), "Hold A"); break;
   }
   canvas.pushSprite(0, 0);
 }
 
-static void showResult(const String& text, uint16_t color, uint32_t ms = 1800) {
+// Screens that move redraw on their own.
+static bool animating() {
+  if (mode == Mode::Unpaired || mode == Mode::Pairing || mode == Mode::Prompt) return true;
+  if (mode == Mode::ConfirmWipe || mode == Mode::ConfirmWifi) return true;
+  if (mode == Mode::Result) return millis() - modeSince < 1000;
+  if (mode == Mode::Home) return millis() - modeSince < 800;
+  return false;
+}
+
+// Hold A for `need` ms. true once, when the hold completes. Letting go early resets.
+static bool heldA(uint32_t need = 1000) {
+  if (waitRelease) {
+    if (!M5.BtnA.isPressed()) waitRelease = false;
+    holdProgress = 0;
+    return false;
+  }
+  if (!M5.BtnA.isPressed()) {
+    holdStart = 0;
+    holdProgress = 0;
+    return false;
+  }
+  if (!holdStart) holdStart = millis();
+  holdProgress = std::min(1.0f, (float)(millis() - holdStart) / need);
+  if (millis() - holdStart >= need) {
+    holdStart = 0;
+    holdProgress = 0;
+    waitRelease = true;
+    return true;
+  }
+  return false;
+}
+
+static void showResult(const String& text, uint16_t color, uint32_t ms = 1800, Fx fx = Fx::None) {
+  resultFx = fx;
   resultText = text;
   resultColor = color;
   resultUntil = millis() + ms;
@@ -543,8 +703,9 @@ static void onPair(JsonDocument& in) {
   pairCode = c.substring(0, 4) + " " + c.substring(4, 8);
   pairWaitingPhone = false;
   mode = Mode::Pairing;
+  waitRelease = M5.BtnA.isPressed();
   dirty = true;
-  chirp();
+  buzz(2);
   JsonDocument d;
   d["t"] = "pair";
   d["nonce"] = hex(wn, 16);
@@ -587,8 +748,8 @@ static void onDkg(JsonDocument& in) {
   d["pop"]["s"] = hex(s2, 32);
   d["groupKey"] = hex(groupKey, 32);
   send(d);
-  String gk = hex(groupKey, 32);
-  showResult("Key " + gk.substring(0, 4) + ".." + gk.substring(60), C_AMBER, 15000);
+  showResult("Wallet ready", C_TEXT, 2600, Fx::Burst);
+  chime();
 }
 
 static bool decodeTx(const String& to, const String& calldata, Prompt& p) {
@@ -769,7 +930,8 @@ static void approvePrompt() {
   d["z"] = hex(z2, 32);
   send(d);
   memset(z2, 0, 32);
-  showResult("Signed", C_TEXT);
+  showResult("Approved", C_TEXT, 1800, Fx::Burst);
+  chirp();
 }
 
 static void onExposure(JsonDocument& in) {
@@ -1037,7 +1199,7 @@ static void rootFromVault(const std::vector<uint8_t>& m) {
   d["E3"] = hex(rjob.E[2], 33);
   d["z3"] = hex(z3, 32);
   send(d);
-  showResult("Root signed, 3 of 3", C_TEXT, 3000);
+  showResult("Root signed", C_TEXT, 2600, Fx::Burst);
 }
 
 // Vault: a root request arrived over IR.
@@ -1082,13 +1244,13 @@ static void vaultApprove() {
   memcpy(pkt + 67, z3, 32);
   irShowWaiting("Sending to wrist");
   bool ok = ir::send(pkt, sizeof pkt, 60000);
-  showResult(ok ? "Signed" : "Wrist not in sight", ok ? C_TEXT : C_RED, 3000);
+  showResult(ok ? "Signed" : "Wrist not in sight", ok ? C_TEXT : C_RED, 2600, ok ? Fx::Burst : Fx::Shake);
 }
 
 static void vaultReject() {
   uint8_t r[2] = {'R', 0};
   ir::send(r, 2, 8000);
-  showResult("Rejected", C_MUTED);
+  showResult("Rejected", C_MUTED, 1500, Fx::Shake);
 }
 
 // Vault: a reshare piece, sealed to our device key, relayed by the hub.
@@ -1775,6 +1937,7 @@ void setup() {
   C_AMBER = M5.Display.color565(255, 177, 59);
   C_RED = M5.Display.color565(255, 90, 78);
   C_CELL = M5.Display.color565(38, 41, 47);
+  C_PANEL = M5.Display.color565(17, 19, 22);
 
   uint8_t mac[6];
   esp_efuse_mac_get_default(mac);
@@ -1831,7 +1994,8 @@ void loop() {
 #ifndef LEASH_NO_WIFI
   // WiFi scanning and dialing block the loop for seconds, which makes IR acks late.
   // While a root request is out with the vault, leave WiFi alone.
-  if ((!isVault || windowOpen()) && !rjob.active) pollWifi();
+  // With Bluetooth up the phone is right here: skip WiFi entirely (scans and dials stall the UI).
+  if ((!isVault || windowOpen()) && !rjob.active && (!ble::connected() || isVault)) pollWifi();
   if (isVault && windowUntil && millis() >= windowUntil) closeWindow();
 #endif
 
@@ -1891,7 +2055,7 @@ void loop() {
 
   // Buttons.
   if (mode == Mode::ConfirmWifi) {
-    if (M5.BtnA.wasPressed()) {
+    if (heldA()) {
       // Replace a network with the same name, otherwise add it, dropping the oldest if full.
       int at = -1;
       for (int i = 0; i < netCount; i++)
@@ -1920,7 +2084,7 @@ void loop() {
       dirty = true;
     }
   } else if (mode == Mode::ConfirmWipe) {
-    if (M5.BtnA.wasPressed()) {
+    if (heldA()) {
       wipeShare();
       mode = Mode::Unpaired;
       showResult("Shard erased", C_MUTED);
@@ -1930,7 +2094,7 @@ void loop() {
       dirty = true;
     }
   } else if (mode == Mode::Pairing && !pairWaitingPhone) {
-    if (M5.BtnA.wasPressed()) {
+    if (heldA()) {
       pairWaitingPhone = true;
       chirp();
       JsonDocument d;
@@ -1945,13 +2109,13 @@ void loop() {
       dirty = true;
     }
   } else if (mode == Mode::Prompt) {
-    if (M5.BtnA.wasPressed()) {
+    if (heldA()) {
       approvePrompt();
     } else if (M5.BtnB.wasPressed()) {
       if (prompt.kind == "vault_sign") vaultReject();
       else {
         reject(prompt.id, "user");
-        showResult("Rejected", C_MUTED);
+        showResult("Rejected", C_MUTED, 1500, Fx::Shake);
       }
     } else if (millis() - prompt.shownAt > 60000) {
       reject(prompt.id, "timeout");
@@ -1983,8 +2147,11 @@ void loop() {
     dirty = true;  // refresh link indicator and battery
   }
 
+  static uint32_t lastFrame = 0;
+  if (animating() && millis() - lastFrame > 33) dirty = true;
   if (dirty && !irQuiet) {
     dirty = false;
+    lastFrame = millis();
     draw();
   }
   delay(5);
