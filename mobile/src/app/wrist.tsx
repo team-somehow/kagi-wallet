@@ -78,7 +78,14 @@ export default function WristSettings() {
     }
   };
 
-  const link_ = !wrist.connected ? 'offline' : wrist.via === 'wifi' ? `WiFi${wrist.ssid ? `, ${wrist.ssid}` : ''}` : 'USB cable';
+  const net = wrist.ssid ? `, ${wrist.ssid.trim()}` : '';
+  const link_ = !wrist.connected
+    ? 'offline'
+    : wrist.via === 'relay'
+      ? `Internet relay${net}`
+      : wrist.via === 'wifi'
+        ? `Local WiFi${net}`
+        : 'USB cable';
 
   return (
     <Screen scroll edges={['top', 'bottom']}>

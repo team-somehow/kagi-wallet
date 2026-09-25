@@ -28,7 +28,7 @@ export function WristBridge() {
         case 'hub':
           dispatch({
             type: 'WRIST',
-            patch: { hub: true, connected: Boolean(m.wrist), via: m.via === 'wifi' || m.via === 'usb' ? m.via : null },
+            patch: { hub: true, connected: Boolean(m.wrist), via: parseVia(m.via) },
           });
           break;
         case 'hello':
@@ -52,7 +52,7 @@ export function WristBridge() {
               onArm: Boolean(m.onArm),
               battery: Number(m.battery),
               paired: Boolean(m.paired),
-              via: m.via === 'wifi' ? 'wifi' : 'usb',
+              via: parseVia(m.via) ?? 'usb',
               ssid: typeof m.ssid === 'string' ? m.ssid : null,
             },
           });
@@ -85,6 +85,10 @@ export function WristBridge() {
   }, [cap, spent, live.length, state.wrist.connected, state.onboarded]);
 
   return null;
+}
+
+function parseVia(v: unknown): 'relay' | 'wifi' | 'usb' | null {
+  return v === 'relay' || v === 'wifi' || v === 'usb' ? v : null;
 }
 
 /** True when the wrist holds a share of this phone's wallet. */

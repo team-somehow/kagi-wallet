@@ -57,6 +57,13 @@ export default function Demo() {
 
       <View style={styles.group}>
         <Txt size={15} weight="medium" color={colors.muted}>
+          Chain
+        </Txt>
+        <Button label="Sepolia testnet" variant="secondary" onPress={() => router.push('/chain')} />
+      </View>
+
+      <View style={styles.group}>
+        <Txt size={15} weight="medium" color={colors.muted}>
           Clock
         </Txt>
         <Button label="Expire the soonest key" variant="secondary" disabled={noKeys} onPress={sim.expireSoonest} />

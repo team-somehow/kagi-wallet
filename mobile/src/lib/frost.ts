@@ -65,6 +65,39 @@ export function txCanonical(to: string, calldata: string): string {
   return `tx|${to.toLowerCase()}|${calldata.toLowerCase()}`;
 }
 
+/**
+ * Bytes the Leash smart account hashes (see contracts/LeashAccount.sol):
+ *   "LEASH/evm" || chainid (32) || account (20) || nonce (32) || to (20) || value (32) || data
+ * The wrist builds the same bytes from the fields it displays.
+ */
+export interface EvmCall {
+  chainId: number;
+  account: string;
+  nonce: bigint;
+  to: string;
+  value: bigint;
+  data: string;
+}
+
+const u256 = (v: bigint) => hexToBytes(v.toString(16).padStart(64, '0'));
+const addr = (a: string) => hexToBytes(a.toLowerCase().replace(/^0x/, '').padStart(40, '0'));
+
+export function evmPreimage(c: EvmCall): Uint8Array {
+  return concatBytes(
+    utf8ToBytes('LEASH/evm'),
+    u256(BigInt(c.chainId)),
+    addr(c.account),
+    u256(c.nonce),
+    addr(c.to),
+    u256(c.value),
+    hexToBytes(c.data.replace(/^0x/, '')),
+  );
+}
+
+export function evmMessage(c: EvmCall): Uint8Array {
+  return sha256(evmPreimage(c));
+}
+
 /** Pairing code both screens show. Pure display check, no secrets. */
 export function pairingCode(phoneNonce: Hex, wristNonce: Hex): string {
   const h = bytesToHex(sha256(concatBytes(utf8ToBytes('LEASH/pair'), hexToBytes(phoneNonce), hexToBytes(wristNonce))));

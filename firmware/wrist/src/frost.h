@@ -22,4 +22,7 @@ bool sign(const uint8_t share[32], const uint8_t groupKey[32], const uint8_t msg
           const uint8_t D1[65], const uint8_t E1[65],
           uint8_t outD2[65], uint8_t outE2[65], uint8_t outZ2[32]);
 
+// Parse a non-negative decimal string (up to 2^256 - 1) into 32 bytes, big endian.
+bool u256FromDecimal(const char* s, uint8_t out[32]);
+
 }  // namespace frost

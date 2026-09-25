@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "serialport": "^13.0.0",
+    "solc": "^0.8.37",
+    "viem": "^2.56.9",
     "ws": "^8.21.3"
   },
   "devDependencies": {

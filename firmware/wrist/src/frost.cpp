@@ -277,4 +277,13 @@ bool sign(const uint8_t share[32], const uint8_t groupKey[32], const uint8_t msg
   return true;
 }
 
+bool u256FromDecimal(const char* s, uint8_t out[32]) {
+  if (!s || !*s) return false;
+  for (const char* c = s; *c; c++)
+    if (*c < '0' || *c > '9') return false;
+  Mpi v;
+  if (mbedtls_mpi_read_string(&v.v, 10, s) != 0) return false;
+  return mbedtls_mpi_write_binary(&v.v, out, 32) == 0;
+}
+
 }  // namespace frost

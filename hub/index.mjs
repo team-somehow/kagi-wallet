@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SerialPort } from 'serialport';
 import { WebSocketServer } from 'ws';
+import * as evm from './evm.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WS_PORT = Number(process.env.HUB_PORT ?? 8787);
@@ -146,6 +147,8 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (m) => {
     const line = m.toString();
     if (!line.includes('"ping"')) log('phone →', short(line));
+    // Chain requests are handled here; everything else is for the wrist.
+    if (line.includes('"t":"evm_')) return void handleEvm(ws, line);
     if (!toWrist(line)) ws.send(JSON.stringify(hubStatus()));
   });
   ws.on('close', () => {
@@ -154,6 +157,37 @@ wss.on('connection', (ws, req) => {
   });
   ws.on('error', () => undefined);
 });
+
+async function handleEvm(ws, line) {
+  let msg;
+  try {
+    msg = JSON.parse(line);
+  } catch {
+    return;
+  }
+  const reply = (o) => ws.readyState === 1 && ws.send(JSON.stringify({ ...o, reqId: msg.reqId }));
+  const gk = String(msg.groupKey ?? '').toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(gk)) return reply({ t: 'evm_error', reason: 'bad group key' });
+  try {
+    if (msg.t === 'evm_info?') return reply(await evm.info(gk));
+    if (msg.t === 'evm_deploy') {
+      log('deploying a Leash account on Sepolia');
+      const r = await evm.deploy(gk, msg.fund ?? '0');
+      log('deployed', r.account, `${evm.EXPLORER}/tx/${r.hash}`);
+      return reply(r);
+    }
+    if (msg.t === 'evm_submit') {
+      log('submitting a signed call on Sepolia');
+      const r = await evm.submit(gk, msg);
+      log('landed', r.status, `${evm.EXPLORER}/tx/${r.hash}`);
+      return reply(r);
+    }
+  } catch (e) {
+    const reason = e?.shortMessage ?? e?.message ?? String(e);
+    log('evm error', reason);
+    reply({ t: 'evm_error', reason: reason.split('\n')[0] });
+  }
+}
 
 // ---- local network TCP -------------------------------------------------------
 

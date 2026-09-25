@@ -13,6 +13,9 @@ import { StoreProvider, useStore } from '../store/store';
 import { colors } from '../theme';
 import { buzz } from '../lib/haptics';
 import { WristBridge } from '../components/WristBridge';
+import { AUTOTEST } from '../lib/biometrics';
+import { View } from 'react-native';
+import { Txt } from '../components/Txt';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -35,6 +38,16 @@ function IncomingWatcher() {
     router.push(`/sign/${pending.id}`);
   }, [state.signs, ready]);
   return null;
+}
+
+function AutotestBanner() {
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: 18, alignItems: 'center' }}>
+      <Txt size={11} color={colors.red}>
+        Test mode: fingerprint skipped
+      </Txt>
+    </View>
+  );
 }
 
 export default function RootLayout() {
@@ -67,7 +80,9 @@ export default function RootLayout() {
           <Stack.Screen name="revoke" options={{ presentation: 'modal', gestureEnabled: false }} />
           <Stack.Screen name="demo" options={{ presentation: 'modal' }} />
           <Stack.Screen name="wrist" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="chain" options={{ presentation: 'modal' }} />
         </Stack>
+        {AUTOTEST ? <AutotestBanner /> : null}
         <IncomingWatcher />
         <WristBridge />
       </ThemeProvider>

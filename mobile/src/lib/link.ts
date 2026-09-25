@@ -89,6 +89,14 @@ class Link {
     };
   }
 
+  /** Send a request tagged with an id and resolve with the reply carrying the same id. */
+  request<T extends Msg = Msg>(m: Msg, ms: number, what = 'the hub'): Promise<T> {
+    const reqId = Math.random().toString(36).slice(2);
+    const p = this.waitFor<T>((x) => x.reqId === reqId, ms, what);
+    if (!this.send({ ...m, reqId })) return Promise.reject(new Error(`Not connected to ${what}.`));
+    return p;
+  }
+
   /** Resolve with the first message matching pred, reject after ms. */
   waitFor<T extends Msg = Msg>(pred: (m: Msg) => boolean, ms: number, what = 'the wrist'): Promise<T> {
     return new Promise((resolve, reject) => {

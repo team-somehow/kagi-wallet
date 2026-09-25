@@ -10,7 +10,17 @@ const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  * Gate access to the phone shard. On devices without enrolled biometrics
  * (most simulators) this falls through after a short delay so demos never stall.
  */
+/**
+ * EXPO_PUBLIC_AUTOTEST=1 skips the fingerprint so the whole flow can be driven by a script.
+ * The app shows a banner whenever it is on. Never ship with it set.
+ */
+export const AUTOTEST = process.env.EXPO_PUBLIC_AUTOTEST === '1';
+
 export async function unlockShard(prompt: string): Promise<UnlockResult> {
+  if (AUTOTEST) {
+    await wait(300);
+    return { ok: true, method: 'none' };
+  }
   try {
     const hw = await LocalAuthentication.hasHardwareAsync();
     const enrolled = hw && (await LocalAuthentication.isEnrolledAsync());

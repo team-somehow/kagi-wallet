@@ -1,3 +1,5 @@
 node_modules/
 .token
 .public.json
+.relayer
+.evm.json

@@ -8,6 +8,7 @@
 
 #include <Arduino.h>
 #include <algorithm>
+#include <vector>
 #include <ArduinoJson.h>
 #include <M5Unified.h>
 #include <ESPmDNS.h>
@@ -15,6 +16,7 @@
 #include <WebSocketsClient.h>
 #include <WiFi.h>
 #include <esp_wifi.h>
+#include <lwip/dns.h>
 #include <bootloader_random.h>
 
 #include "frost.h"
@@ -550,6 +552,55 @@ static void onSign(JsonDocument& in) {
     p.amount = dollars(strtoull(capMicro.c_str(), nullptr, 10) / 1e6);
     p.line1 = "for " + agent + ", " + String(hours) + "h";
     p.line2 = "agent key " + shortHex(pubkey, 4, 4);
+  } else if (p.kind == "evm") {
+    // A call through the Leash smart account. Rebuild the contract's preimage:
+    // "LEASH/evm" || chainid || account || nonce || to || value || data
+    String chain = String(in["chainId"] | "");
+    String account = in["account"] | "";
+    String nonceS = in["nonce"] | "";
+    String to = in["to"] | "";
+    String valueS = in["value"] | "";
+    String data = in["data"] | "0x";
+    uint8_t chainB[32], accB[20], nonceB[32], toB[20], valB[32];
+    String dataHex = data.startsWith("0x") ? data.substring(2) : data;
+    size_t dlen = dataHex.length() / 2;
+    if (!frost::u256FromDecimal(chain.c_str(), chainB) || !unhex(account.c_str(), accB, 20) ||
+        !frost::u256FromDecimal(nonceS.c_str(), nonceB) || !unhex(to.c_str(), toB, 20) ||
+        !frost::u256FromDecimal(valueS.c_str(), valB) || dataHex.length() % 2 != 0 || dlen > 1024)
+      return reject(id, "bad_request");
+    std::vector<uint8_t> pre(9 + 32 + 20 + 32 + 20 + 32 + dlen);
+    uint8_t* w = pre.data();
+    memcpy(w, "LEASH/evm", 9);
+    memcpy(w + 9, chainB, 32);
+    memcpy(w + 41, accB, 20);
+    memcpy(w + 61, nonceB, 32);
+    memcpy(w + 93, toB, 20);
+    memcpy(w + 113, valB, 32);
+    if (dlen && !unhex(dataHex.c_str(), w + 145, dlen)) return reject(id, "bad_request");
+    frost::sha256(pre.data(), pre.size(), p.msg);
+    String net = chain == "11155111" ? "Sepolia" : chain == "1" ? "MAINNET" : "chain " + chain;
+    p.title = net + " tx";
+    char eth[32];
+    snprintf(eth, sizeof eth, "%.6f ETH", strtod(valueS.c_str(), nullptr) / 1e18);
+    p.amount = eth;
+    p.line1 = "to " + shortHex(to, 4, 4);
+    p.line2 = dlen ? "with " + String((int)dlen) + " bytes of data, nonce " + nonceS : "nonce " + nonceS;
+    // Token calls: show what the data does rather than a byte count.
+    Prompt dec;
+    if (dlen >= 4 && decodeTx(to, data, dec) && dec.amount != "?") {
+      p.line1 = dec.line1;
+      p.line2 = "token " + shortHex(to, 4, 4) + ", " + dec.amount;
+    }
+    prompt = p;
+    prompt.shownAt = millis();
+    mode = Mode::Prompt;
+    dirty = true;
+    draw();
+    buzz();
+#ifdef LEASH_AUTO_APPROVE
+    approvePrompt();
+#endif
+    return;
   } else {
     return reject(id, "bad_kind");
   }
@@ -681,6 +732,11 @@ static void handle(const String& line) {
     if (paired) {
       mode = Mode::ConfirmWipe;
       buzz(1);
+#ifdef LEASH_AUTO_APPROVE
+      wipeShare();
+      mode = Mode::Unpaired;
+      sendHello();
+#endif
     } else {
       sendHello();
     }
@@ -830,6 +886,18 @@ static void startWifi() {
   WiFi.mode(WIFI_STA);
   WiFi.onEvent([](WiFiEvent_t, WiFiEventInfo_t info) { wifiReason = info.wifi_sta_disconnected.reason; },
                ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  // Some hotspots hand out a DNS server that doesn't answer. Keep the network's own
+  // server first and add public ones behind it, so the relay name still resolves.
+  WiFi.onEvent(
+      [](WiFiEvent_t, WiFiEventInfo_t) {
+        ip_addr_t d1, d2;
+        IP_ADDR4(&d1, 1, 1, 1, 1);
+        IP_ADDR4(&d2, 8, 8, 8, 8);
+        const ip_addr_t* own = dns_getserver(0);
+        if (own == nullptr || ip_addr_isany(own)) dns_setserver(0, &d1);
+        dns_setserver(1, &d2);
+      },
+      ARDUINO_EVENT_WIFI_STA_GOT_IP);
   WiFi.setHostname(deviceId.c_str());
   WiFi.setAutoReconnect(false);  // we pick the network ourselves
   WiFi.setSleep(true);
@@ -936,6 +1004,7 @@ static void startRelay() {
 
 static void pollWifi() {
   uint32_t now = millis();
+  stepWifi();
   // With a relay address, use it: it works from any network with internet.
   if (relayUrl.length() && wstate == WState::Up) {
     if (!relayStarted) startRelay();
@@ -963,7 +1032,6 @@ static void pollWifi() {
     }
     return;
   }
-  stepWifi();
   if (wstate != WState::Up || now - lastDial < 2000) return;
   lastDial = now;
   IPAddress ip = nextHubAddress();

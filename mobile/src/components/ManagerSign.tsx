@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { colors, space } from '../theme';
 import { unlockShard } from '../lib/biometrics';
 import { success, warn } from '../lib/haptics';
-import { combine, grantCanonical, messageFor, nonces, txCanonical } from '../lib/frost';
+import { combine, evmMessage, grantCanonical, messageFor, nonces, txCanonical } from '../lib/frost';
 import { link, type Msg } from '../lib/link';
 import { loadShard, rand } from '../lib/shard';
 import { uid } from '../store/mock';
@@ -15,7 +15,8 @@ import { wristStatus } from './WristChip';
 
 export type SignPayload =
   | { kind: 'grant'; agent: string; pubkey: string; capUsdc: number; hours: number }
-  | { kind: 'tx'; agent: string; contract: string; calldata: string };
+  | { kind: 'tx'; agent: string; contract: string; calldata: string }
+  | { kind: 'evm'; agent: string; chainId: number; account: string; nonce: bigint; to: string; value: bigint; data: string };
 
 type Phase = 'idle' | 'unlocking' | 'wrist' | 'combining' | 'done' | 'error';
 
@@ -76,11 +77,14 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onDon
     const shard = await loadShard();
     if (!shard) return fail('This phone has no shard. Create the wallet again.');
 
-    const canonical =
-      payload.kind === 'grant'
-        ? grantCanonical(payload.agent, payload.pubkey, payload.capUsdc, payload.hours)
-        : txCanonical(payload.contract, payload.calldata);
-    const m = messageFor(canonical);
+    const m =
+      payload.kind === 'evm'
+        ? evmMessage(payload)
+        : messageFor(
+            payload.kind === 'grant'
+              ? grantCanonical(payload.agent, payload.pubkey, payload.capUsdc, payload.hours)
+              : txCanonical(payload.contract, payload.calldata),
+          );
     const mine = nonces(rand);
     const id = uid();
     pendingId.current = id;
@@ -92,7 +96,18 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onDon
       75000,
     );
     const wire =
-      payload.kind === 'grant'
+      payload.kind === 'evm'
+        ? {
+            kind: 'evm',
+            agent: payload.agent,
+            chainId: String(payload.chainId),
+            account: payload.account,
+            nonce: payload.nonce.toString(),
+            to: payload.to,
+            value: payload.value.toString(),
+            data: payload.data,
+          }
+        : payload.kind === 'grant'
         ? {
             kind: 'grant',
             agent: payload.agent,
