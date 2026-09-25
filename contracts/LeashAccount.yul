@@ -128,17 +128,17 @@ object "LeashAccount" {
         mstore(0x40, calldataload(132))
         mstore(0x60, calldataload(164))
         if iszero(staticcall(gas(), 1, 0x00, 0x80, 0x00, 32)) { revert(0, 0) }
-        if iszero(and(iszero(iszero(agent)), eq(mload(0x00), agent))) { fail("bad agent signature") }
-        if iszero(gt(sload(add(b, 2)), timestamp())) { fail("key expired or revoked") }
+        if iszero(and(iszero(iszero(agent)), eq(mload(0x00), agent))) { fail("bad agent signature", 19) }
+        if iszero(gt(sload(add(b, 2)), timestamp())) { fail("key expired or revoked", 22) }
         let spent := add(sload(add(b, 1)), value)
-        if gt(spent, sload(b)) { fail("over the cap") }
-        if eq(to, address()) { fail("no self calls") }
+        if gt(spent, sload(b)) { fail("over the cap", 12) }
+        if eq(to, address()) { fail("no self calls", 13) }
         sstore(add(b, 1), spent)
         sstore(add(b, 3), add(sn, 1))
         mstore(0x00, value)
         log3(0x00, 0x20, 0xc18352ae46a2296c951b2256c5ebc5b4546e6222fea2e4f36e824db9d44eb7ec, agent, to)
         // Plain ETH only: no calldata, so a session can't approve tokens or call out.
-        if iszero(call(gas(), to, value, 0, 0, 0, 0)) { fail("transfer failed") }
+        if iszero(call(gas(), to, value, 0, 0, 0, 0)) { fail("transfer failed", 15) }
         stop()
       }
       default { revert(0, 0) }
@@ -162,11 +162,11 @@ object "LeashAccount" {
         h := mload(0x00)
       }
 
-      function fail(reason) {
+      function fail(reason, len) {
         // Error(string) with a short reason, so the relayer can tell the phone why.
         mstore(0x00, 0x08c379a000000000000000000000000000000000000000000000000000000000)
         mstore(0x04, 0x20)
-        mstore(0x24, 32)
+        mstore(0x24, len)
         mstore(0x44, reason)
         revert(0x00, 0x64)
       }

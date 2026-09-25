@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { colors, space } from '../theme';
 import { unlockShard } from '../lib/biometrics';
 import { success, warn } from '../lib/haptics';
-import { combine, evmMessage, grantCanonical, messageFor, nonces, txCanonical } from '../lib/frost';
+import { combine, evmGrantMessage, evmMessage, grantCanonical, messageFor, nonces, txCanonical } from '../lib/frost';
 import { link, type Msg } from '../lib/link';
 import { loadShard, rand } from '../lib/shard';
 import { uid } from '../store/mock';
@@ -16,7 +16,8 @@ import { wristStatus } from './WristChip';
 export type SignPayload =
   | { kind: 'grant'; agent: string; pubkey: string; capUsdc: number; hours: number }
   | { kind: 'tx'; agent: string; contract: string; calldata: string }
-  | { kind: 'evm'; agent: string; chainId: number; account: string; nonce: bigint; to: string; value: bigint; data: string };
+  | { kind: 'evm'; agent: string; chainId: number; account: string; nonce: bigint; to: string; value: bigint; data: string }
+  | { kind: 'evm_grant'; agent: string; chainId: number; account: string; nonce: bigint; agentAddress: string; cap: bigint; expiry: bigint };
 
 type Phase = 'idle' | 'unlocking' | 'wrist' | 'combining' | 'done' | 'error';
 
@@ -80,7 +81,9 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onDon
     const m =
       payload.kind === 'evm'
         ? evmMessage(payload)
-        : messageFor(
+        : payload.kind === 'evm_grant'
+          ? evmGrantMessage({ ...payload, agent: payload.agentAddress })
+          : messageFor(
             payload.kind === 'grant'
               ? grantCanonical(payload.agent, payload.pubkey, payload.capUsdc, payload.hours)
               : txCanonical(payload.contract, payload.calldata),
@@ -96,7 +99,18 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onDon
       75000,
     );
     const wire =
-      payload.kind === 'evm'
+      payload.kind === 'evm_grant'
+        ? {
+            kind: 'evm_grant',
+            agent: payload.agent,
+            chainId: String(payload.chainId),
+            account: payload.account,
+            nonce: payload.nonce.toString(),
+            agentAddress: payload.agentAddress,
+            cap: payload.cap.toString(),
+            expiry: payload.expiry.toString(),
+          }
+        : payload.kind === 'evm'
         ? {
             kind: 'evm',
             agent: payload.agent,

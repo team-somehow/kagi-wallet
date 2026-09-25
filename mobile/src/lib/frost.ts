@@ -98,6 +98,37 @@ export function evmMessage(c: EvmCall): Uint8Array {
   return sha256(evmPreimage(c));
 }
 
+export interface EvmGrant {
+  chainId: number;
+  account: string;
+  nonce: bigint;
+  agent: string;
+  cap: bigint;
+  expiry: bigint;
+}
+
+/** sha256("LEASH/grant" || chainid || account || nonce || agent || cap || expiry) */
+export function evmGrantMessage(g: EvmGrant): Uint8Array {
+  return sha256(
+    concatBytes(utf8ToBytes('LEASH/grant'), u256(BigInt(g.chainId)), addr(g.account), u256(g.nonce), addr(g.agent), u256(g.cap), u256(g.expiry)),
+  );
+}
+
+/** sha256("LEASH/revoke" || chainid || account || nonce || agent). The phone signs this alone. */
+export function evmRevokeMessage(chainId: number, account: string, nonce: bigint, agent: string): Uint8Array {
+  return sha256(concatBytes(utf8ToBytes('LEASH/revoke'), u256(BigInt(chainId)), addr(account), u256(nonce), addr(agent)));
+}
+
+/** A plain BIP340 signature by the phone's shard alone. The contract accepts it for revoking only. */
+export function phoneOnlySign(s: Share, m: Uint8Array, rand: RandomBytes): Hex {
+  return bytesToHex(schnorr.sign(m, hexToBytes(s.share), rand(32)));
+}
+
+/** x-only key the contract checks phone-only signatures against. */
+export function phoneKey(s: Share): Hex {
+  return bytesToHex(schnorr.getPublicKey(hexToBytes(s.share)));
+}
+
 /** Pairing code both screens show. Pure display check, no secrets. */
 export function pairingCode(phoneNonce: Hex, wristNonce: Hex): string {
   const h = bytesToHex(sha256(concatBytes(utf8ToBytes('LEASH/pair'), hexToBytes(phoneNonce), hexToBytes(wristNonce))));

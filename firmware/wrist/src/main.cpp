@@ -9,6 +9,7 @@
 #include <Arduino.h>
 #include <algorithm>
 #include <vector>
+#include <time.h>
 #include <ArduinoJson.h>
 #include <M5Unified.h>
 #include <ESPmDNS.h>
@@ -552,6 +553,46 @@ static void onSign(JsonDocument& in) {
     p.amount = dollars(strtoull(capMicro.c_str(), nullptr, 10) / 1e6);
     p.line1 = "for " + agent + ", " + String(hours) + "h";
     p.line2 = "agent key " + shortHex(pubkey, 4, 4);
+  } else if (p.kind == "evm_grant") {
+    // A session key grant on the Leash account. Rebuild the contract's preimage:
+    // "LEASH/grant" || chainid || account || nonce || agent || cap || expiry
+    String chain = String(in["chainId"] | "");
+    String account = in["account"] | "";
+    String nonceS = in["nonce"] | "";
+    String agentAddr = in["agentAddress"] | "";
+    String capS = in["cap"] | "";
+    String expS = in["expiry"] | "";
+    uint8_t pre[11 + 32 + 20 + 32 + 20 + 32 + 32];
+    memcpy(pre, "LEASH/grant", 11);
+    if (!frost::u256FromDecimal(chain.c_str(), pre + 11) || !unhex(account.c_str(), pre + 43, 20) ||
+        !frost::u256FromDecimal(nonceS.c_str(), pre + 63) || !unhex(agentAddr.c_str(), pre + 95, 20) ||
+        !frost::u256FromDecimal(capS.c_str(), pre + 115) || !frost::u256FromDecimal(expS.c_str(), pre + 147))
+      return reject(id, "bad_request");
+    frost::sha256(pre, sizeof pre, p.msg);
+    p.title = "New key " + String(chain == "11155111" ? "Sepolia" : "chain " + chain);
+    char eth[32];
+    snprintf(eth, sizeof eth, "%.6f ETH", strtod(capS.c_str(), nullptr) / 1e18);
+    p.amount = eth;
+    p.line1 = agent + " " + shortHex(agentAddr, 4, 4);
+    // How long it lasts, from the signed expiry and the wrist's own clock.
+    time_t now = time(nullptr);
+    long long exp = atoll(expS.c_str());
+    if (now > 1700000000) {
+      long long mins = (exp - (long long)now) / 60;
+      p.line2 = mins <= 0 ? String("already expired") : mins < 120 ? "lasts " + String((long)mins) + " min" : "lasts " + String((long)(mins / 60)) + " h";
+    } else {
+      p.line2 = "expiry " + expS;
+    }
+    prompt = p;
+    prompt.shownAt = millis();
+    mode = Mode::Prompt;
+    dirty = true;
+    draw();
+    buzz();
+#ifdef LEASH_AUTO_APPROVE
+    approvePrompt();
+#endif
+    return;
   } else if (p.kind == "evm") {
     // A call through the Leash smart account. Rebuild the contract's preimage:
     // "LEASH/evm" || chainid || account || nonce || to || value || data
@@ -914,6 +955,7 @@ static void stepWifi() {
       break;
     case WState::Trying:
       if (up) {
+        configTime(0, 0, "pool.ntp.org", "time.google.com");
         setWState(WState::Up);
         dialStep = 0;
         lastDial = 0;

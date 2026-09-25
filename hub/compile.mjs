@@ -10,7 +10,7 @@ const out = JSON.parse(
     JSON.stringify({
       language: 'Yul',
       sources: { 'LeashAccount.yul': { content: yul } },
-      settings: { optimizer: { enabled: true, details: { yul: true } }, evmVersion: 'cancun', outputSelection: { '*': { '*': ['evm.bytecode.object', 'evm.deployedBytecode.object'] } } },
+      settings: { optimizer: { enabled: true, details: { yul: true, yulDetails: { optimizerSteps: 'u:' } } }, evmVersion: 'cancun', outputSelection: { '*': { '*': ['evm.bytecode.object', 'evm.deployedBytecode.object'] } } },
     }),
   ),
 );
@@ -21,10 +21,19 @@ const abi = [
   { type: 'function', name: 'execute', stateMutability: 'nonpayable', inputs: [
     { name: 'to', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' },
     { name: 'rx', type: 'uint256' }, { name: 's', type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'grant', stateMutability: 'nonpayable', inputs: [
+    { name: 'agent', type: 'address' }, { name: 'cap', type: 'uint256' }, { name: 'expiry', type: 'uint256' },
+    { name: 'rx', type: 'uint256' }, { name: 's', type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'revoke', stateMutability: 'nonpayable', inputs: [
+    { name: 'agent', type: 'address' }, { name: 'rx', type: 'uint256' }, { name: 's', type: 'uint256' }], outputs: [] },
+  { type: 'function', name: 'spend', stateMutability: 'nonpayable', inputs: [
+    { name: 'agent', type: 'address' }, { name: 'to', type: 'address' }, { name: 'value', type: 'uint256' },
+    { name: 'v', type: 'uint8' }, { name: 'r', type: 'bytes32' }, { name: 's', type: 'bytes32' }], outputs: [] },
+  { type: 'function', name: 'session', stateMutability: 'view', inputs: [{ name: 'agent', type: 'address' }],
+    outputs: [{ name: 'cap', type: 'uint256' }, { name: 'spent', type: 'uint256' }, { name: 'expiry', type: 'uint256' }, { name: 'nonce', type: 'uint256' }] },
   { type: 'function', name: 'groupKey', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'phoneKey', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'nonce', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
-  { type: 'event', name: 'Executed', inputs: [
-    { name: 'nonce', type: 'uint256', indexed: true }, { name: 'to', type: 'address', indexed: true }, { name: 'value', type: 'uint256', indexed: false }] },
 ];
 const init = c.evm.bytecode.object;
 const runtime = c.evm.deployedBytecode?.object ?? '';

@@ -120,6 +120,23 @@ const override = [
 await client.call({ to: account, data: exec, stateOverride: override } as never);
 console.log(`PASS Sepolia account code accepted the wrist-signed call  ${ms()}`);
 
+// Session-key grant: the wrist builds the grant preimage in C; the v2 contract must accept it.
+{
+  const { evmGrantMessage, phoneKey } = await import('../mobile/src/lib/frost');
+  const agentAddr = '0x1111111111111111111111111111111111111111';
+  const cap = 5_000_000_000_000n;
+  const expiry = BigInt(Math.floor(Date.now() / 1000) + 3600);
+  const gsig = await sign(
+    'Sepolia session-key grant',
+    { kind: 'evm_grant', agent: 'trader', chainId: String(sepolia.id), account, nonce: '0', agentAddress: agentAddr, cap: cap.toString(), expiry: expiry.toString() },
+    evmGrantMessage({ chainId: sepolia.id, account, nonce: 0n, agent: agentAddr, cap, expiry }),
+  );
+  const g = encodeFunctionData({ abi: art.abi, functionName: 'grant', args: [agentAddr, cap, expiry, BigInt(`0x${gsig.slice(0, 64)}`), BigInt(`0x${gsig.slice(64)}`)] });
+  const ov2 = [{ ...override[0], stateDiff: [...override[0].stateDiff, { slot: toHex(2, { size: 32 }), value: toHex(BigInt(`0x${phoneKey(share)}`), { size: 32 }) }] }];
+  await client.call({ to: account, data: g, stateOverride: ov2 } as never);
+  console.log(`PASS Sepolia account code accepted the wrist-signed grant  ${ms()}`);
+}
+
 console.log(`\nALL PASS over the relay (wrist via ${wristVia || hello.via}). Wallet left paired with test key.`);
 ws.close();
 process.exit(0);

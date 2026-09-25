@@ -169,18 +169,27 @@ async function handleEvm(ws, line) {
   const gk = String(msg.groupKey ?? '').toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(gk)) return reply({ t: 'evm_error', reason: 'bad group key' });
   try {
-    if (msg.t === 'evm_info?') return reply(await evm.info(gk));
-    if (msg.t === 'evm_deploy') {
-      log('deploying a Leash account on Sepolia');
-      const r = await evm.deploy(gk, msg.fund ?? '0');
-      log('deployed', r.account, `${evm.EXPLORER}/tx/${r.hash}`);
+    const run = async (label, fn) => {
+      log(label);
+      const r = await fn();
+      if (r.hash) log(`  ${r.status ?? 'sent'} ${evm.EXPLORER}/tx/${r.hash}`);
       return reply(r);
-    }
-    if (msg.t === 'evm_submit') {
-      log('submitting a signed call on Sepolia');
-      const r = await evm.submit(gk, msg);
-      log('landed', r.status, `${evm.EXPLORER}/tx/${r.hash}`);
-      return reply(r);
+    };
+    switch (msg.t) {
+      case 'evm_info?':
+        return reply(await evm.info(gk));
+      case 'evm_deploy':
+        return await run('deploying a Leash account on Sepolia', () => evm.deploy(gk, msg.phoneKey, msg.fund ?? '0'));
+      case 'evm_agent_key?':
+        return reply(evm.agentKey(msg.name));
+      case 'evm_grant':
+        return await run(`granting a session key to ${msg.name ?? 'an agent'}`, () => evm.grant(gk, msg));
+      case 'evm_revoke':
+        return await run('revoking a session key (phone shard alone)', () => evm.revoke(gk, msg));
+      case 'evm_agent_spend':
+        return await run('the agent is spending on its own', () => evm.agentSpend(gk, msg));
+      case 'evm_submit':
+        return await run('submitting a call signed by phone and wrist', () => evm.submit(gk, msg));
     }
   } catch (e) {
     const reason = e?.shortMessage ?? e?.message ?? String(e);
