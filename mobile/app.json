@@ -37,7 +37,8 @@
         {
           "faceIDPermission": "Leash uses Face ID to unlock your phone shard."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "scheme": "leash",
     "newArchEnabled": true

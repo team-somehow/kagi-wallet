@@ -1,0 +1,17 @@
+{
+  "name": "leash-hub",
+  "private": true,
+  "type": "module",
+  "description": "Relays the wrist's USB serial link to the phone app over WebSocket.",
+  "scripts": {
+    "start": "node index.mjs",
+    "selftest": "tsx selftest.ts"
+  },
+  "dependencies": {
+    "serialport": "^13.0.0",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
+  }
+}
