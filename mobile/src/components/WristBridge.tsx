@@ -70,7 +70,8 @@ export function WristBridge() {
 
   useEffect(() => {
     if (!state.wrist.connected || !state.onboarded) return;
-    link.send({ t: 'exposure', left: Math.max(cap - spent, 0), cap, spent, keys: live.length });
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    link.send({ t: 'exposure', left: r2(Math.max(cap - spent, 0)), cap: r2(cap), spent: r2(spent), keys: live.length });
   }, [cap, spent, live.length, state.wrist.connected, state.onboarded]);
 
   return null;

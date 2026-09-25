@@ -1,52 +1,44 @@
 # Leash mobile
 
-The phone half of Leash: one shard of the manager key, the place you issue
+The phone half of Leash: one shard of the 2-of-2 manager key, the place you issue
 capped keys to agents, and the screen that lights up when an agent goes over.
 
-Expo SDK 57, Expo Router, TypeScript. Everything outside the phone (agent, chain,
-wrist) is simulated in `src/store` for now.
+Expo SDK 57, Expo Router, TypeScript. The wrist is real (see `../firmware/wrist`),
+reached through the laptop hub (`../hub`). The agent and the chain are still
+simulated in `src/store`, driven from the Demo screen.
 
-## Run
-
-```bash
-npm install
-npx expo start            # then i for iOS simulator, a for Android
-```
-
-Start with a wallet already set up, a live key, a pending grant request and an
-over-cap request waiting:
+## Run on a USB-connected Android phone
 
 ```bash
-EXPO_PUBLIC_SEED=full npx expo start
+# 1. hub, with the wrist plugged into the laptop
+cd ../hub && npm install && npm start
+
+# 2. tunnel hub and Metro to the phone over USB
+adb reverse tcp:8787 tcp:8787 && adb reverse tcp:8081 tcp:8081
+
+# 3. app, in Expo Go
+cd ../mobile && npm install && npx expo start --android --localhost
 ```
 
-Fixed ids in seed mode: `seed-key`, `seed-req`, `seed-sign`, so deep links like
-`exp://localhost:8081/--/key/seed-key` work.
+The hub URL defaults to `ws://localhost:8787`. Set `EXPO_PUBLIC_HUB_URL` to point elsewhere.
 
-## Flows
+## What is real
 
-- Onboarding: welcome, lock the phone shard with biometrics, pair the wrist and
-  compare fingerprints, DKG with the address shown for comparison.
-- Home: how much agents can still spend, segmented bargraph with the 80% mark,
-  pending key requests, live keys, hold to revoke everything.
-- Key request: cap, lifetime, agent pubkey, then phone biometric plus wrist press.
-- Over the cap: amount and destination decoded from calldata, chain rejection,
-  phone biometric plus wrist press, then the tx lands. Opens on its own like a push.
-- Demo controls (top right on Home): make the agent ask, spend, go over the cap,
-  take the wrist off, expire a key, wipe the wallet.
+- Phone shard: generated on the phone, stored in the Android Keystore backed
+  secure store, unlocked with biometrics before each signature.
+- Pairing: both screens show the same code. Press A on the wrist and tap on the phone.
+- Key generation: 2-of-2 between phone and wrist with proofs of possession.
+- Signing: grants and over-cap transactions are signed by both shards. The wrist
+  rebuilds the message from the calldata it displays, signs only on a press of A,
+  and the phone checks the wrist's half and the final BIP340 signature.
+- Revoke: hold B on the wrist for 2 seconds, or hold the button on Home.
 
-## Layout
+Protocol notes are at the top of `src/lib/frost.ts`. It must match
+`firmware/wrist/src/frost.cpp` byte for byte.
 
-```
-src/app          routes (expo-router)
-src/components   Txt, Screen, Button, HoldButton, LedBar, Steps, ManagerSign, ...
-src/store        state, reducer, simulated agent/chain/wrist
-src/lib          format, biometrics, haptics
-src/theme.ts     colours, fonts, spacing
-```
-
-Check before committing:
+## Checks
 
 ```bash
 npx tsc --noEmit && npx eslint src
+npx tsx scripts/frost.test.ts      # both parties in JS, 200 signatures
 ```
