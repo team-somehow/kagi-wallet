@@ -182,6 +182,7 @@ static uint8_t pendX[65], pendR[65], pendS[32], pendVaultPub[33];
 
 struct RootJob {
   bool active = false;
+  char type = 'G';  // 'G' root grant (72-byte compact), 'E' plain transaction (64-byte compact)
   String id;
   uint8_t msg[32];
   uint8_t compact[72];
@@ -235,9 +236,16 @@ static void flushOutbox() {
 
 // The speaker amp has to be off for the IR receiver to work, so it is on only while beeping.
 static void beep(int freq, int ms) {
-  M5.Speaker.begin();
+  // The amp needs a moment to power up, and the tone plays from a background task:
+  // wait for it to finish before switching the amp back off.
+  if (!M5.Speaker.isEnabled()) M5.Speaker.begin();
+  M5.Speaker.setVolume(200);
+  delay(30);
   M5.Speaker.tone(freq, ms);
-  delay(ms + 10);
+  uint32_t t0 = millis();
+  delay(ms);
+  while (M5.Speaker.isPlaying() && millis() - t0 < (uint32_t)ms + 300) delay(5);
+  delay(30);
   M5.Speaker.end();
 }
 
@@ -781,7 +789,7 @@ static void onExposure(JsonDocument& in) {
 //
 // The same firmware runs on the wrist and on the vault; NVS "role" picks which.
 // Wrist: holds share 2 of the root key. Root signing goes phone -> wrist -> IR -> vault.
-// Vault: radio off except for a 2-minute window opened by holding A and B, used only for the
+// Vault: radio off except for a 2-minute window opened by holding A for 2 s, used only for the
 // reshare. It signs root actions over IR only, after a press of A on the vault itself.
 
 static void loadRoot() {
@@ -830,8 +838,30 @@ static bool tailOf(const char* dec, uint8_t* out, size_t n) {
   return true;
 }
 
+static size_t compactLen(char type) { return type == 'E' ? 64 : 72; }
+
+// 'E': sha256("LEASH/evm" || chainid || account || nonce || to || value), the call format the
+// root treasury contract checks. Compact: chainId u32 | account 20 | nonce u32 | to 20 | value u128
+static void rootEvmMsg(const uint8_t c[64], uint8_t out[32]) {
+  uint8_t pre[9 + 32 + 20 + 32 + 20 + 32];
+  memset(pre, 0, sizeof pre);
+  memcpy(pre, "LEASH/evm", 9);
+  memcpy(pre + 9 + 28, c, 4);         // chainid
+  memcpy(pre + 41, c + 4, 20);        // account
+  memcpy(pre + 61 + 28, c + 24, 4);   // nonce
+  memcpy(pre + 93, c + 28, 20);       // to
+  memcpy(pre + 113 + 16, c + 48, 16); // value
+  frost::sha256(pre, sizeof pre, out);
+}
+
+static void rootMsgGrant(const uint8_t c[72], uint8_t out[32]);
+static void rootMsg(char type, const uint8_t* c, uint8_t out[32]) {
+  if (type == 'E') rootEvmMsg(c, out);
+  else rootMsgGrant(c, out);
+}
+
 // sha256("LEASH/rootgrant" || chainid || account || nonce || agent || cap || expiry), 32-byte fields
-static void rootMsg(const uint8_t c[72], uint8_t out[32]) {
+static void rootMsgGrant(const uint8_t c[72], uint8_t out[32]) {
   uint8_t pre[15 + 32 + 20 + 32 + 20 + 32 + 32];
   memset(pre, 0, sizeof pre);
   memcpy(pre, "LEASH/rootgrant", 15);
@@ -844,7 +874,18 @@ static void rootMsg(const uint8_t c[72], uint8_t out[32]) {
   frost::sha256(pre, sizeof pre, out);
 }
 
-static void describeRoot(const uint8_t c[72], Prompt& p) {
+static void describeRoot(char type, const uint8_t* c, Prompt& p) {
+  if (type == 'E') {
+    double v = 0;
+    for (int i = 0; i < 16; i++) v = v * 256 + c[48 + i];
+    char eth[32];
+    snprintf(eth, sizeof eth, "%.6f ETH", v / 1e18);
+    p.title = isVault ? "VAULT: send" : "ROOT send";
+    p.amount = eth;
+    p.line1 = "to " + shortHex(hex(c + 28, 20), 4, 4);
+    p.line2 = isVault ? "A: sign as vault  B: no" : "from the root treasury";
+    return;
+  }
   double cap = 0;
   for (int i = 0; i < 16; i++) cap = cap * 256 + c[48 + i];
   char eth[32];
@@ -900,16 +941,21 @@ static void onRootSign(JsonDocument& in) {
   p.id = id;
   p.kind = "root_sign";
   uint8_t* c = rjob.compact;
-  if (!tailOf(String(in["chainId"] | "").c_str(), c, 4) || !unhex(in["account"] | "", c + 4, 20) ||
-      !tailOf(String(in["nonce"] | "").c_str(), c + 24, 4) || !unhex(in["agent"] | "", c + 28, 20) ||
-      !tailOf(String(in["cap"] | "").c_str(), c + 48, 16) || !tailOf(String(in["expiry"] | "").c_str(), c + 64, 8) ||
-      !unhex(in["D"] | "", rjob.D[0], 33) || !unhex(in["E"] | "", rjob.E[0], 33))
-    return reject(id, "bad_request");
-  rootMsg(c, rjob.msg);
+  rjob.type = String(in["kind"] | "grant") == "evm" ? 'E' : 'G';
+  bool ok = tailOf(String(in["chainId"] | "").c_str(), c, 4) && unhex(in["account"] | "", c + 4, 20) &&
+            tailOf(String(in["nonce"] | "").c_str(), c + 24, 4) && unhex(in["D"] | "", rjob.D[0], 33) &&
+            unhex(in["E"] | "", rjob.E[0], 33);
+  if (rjob.type == 'E')
+    ok = ok && unhex(in["to"] | "", c + 28, 20) && tailOf(String(in["value"] | "").c_str(), c + 48, 16);
+  else
+    ok = ok && unhex(in["agent"] | "", c + 28, 20) && tailOf(String(in["cap"] | "").c_str(), c + 48, 16) &&
+         tailOf(String(in["expiry"] | "").c_str(), c + 64, 8);
+  if (!ok) return reject(id, "bad_request");
+  rootMsg(rjob.type, c, rjob.msg);
   memcpy(p.msg, rjob.msg, 32);
   rjob.id = id;
   p.title = "ROOT action";
-  describeRoot(c, p);
+  describeRoot(rjob.type, c, p);
   showPrompt(p);
 }
 
@@ -924,20 +970,25 @@ static void irShowWaiting(const char* text) {
 // Wrist: after A, commit our nonces and send the whole request to the vault over IR.
 static void rootSignToVault() {
   frost::commit(rjob.n, rjob.D[1], rjob.E[1]);
-  uint8_t pkt[1 + 72 + 4 * 33];
+  // 'S' | type | compact | D1 E1 D2 E2
+  size_t cl = compactLen(rjob.type);
+  uint8_t pkt[2 + 72 + 4 * 33];
   pkt[0] = 'S';
-  memcpy(pkt + 1, rjob.compact, 72);
-  memcpy(pkt + 73, rjob.D[0], 33);
-  memcpy(pkt + 106, rjob.E[0], 33);
-  memcpy(pkt + 139, rjob.D[1], 33);
-  memcpy(pkt + 172, rjob.E[1], 33);
+  pkt[1] = rjob.type;
+  memcpy(pkt + 2, rjob.compact, cl);
+  uint8_t* q = pkt + 2 + cl;
+  memcpy(q, rjob.D[0], 33);
+  memcpy(q + 33, rjob.E[0], 33);
+  memcpy(q + 66, rjob.D[1], 33);
+  memcpy(q + 99, rjob.E[1], 33);
+  size_t pktLen = 2 + cl + 132;
   irShowWaiting("Point at the vault");
   JsonDocument st;
   st["t"] = "root_progress";
   st["id"] = rjob.id;
   st["step"] = "ir_to_vault";
   send(st);
-  if (!ir::send(pkt, sizeof pkt, 60000)) {
+  if (!ir::send(pkt, pktLen, 60000)) {
     frost::wipe(rjob.n);
     reject(rjob.id, "ir_failed");
     showResult("Vault not in sight", C_RED, 4000);
@@ -988,23 +1039,28 @@ static void rootFromVault(const std::vector<uint8_t>& m) {
 
 // Vault: a root request arrived over IR.
 static void vaultRequest(const std::vector<uint8_t>& m) {
-  if (m.size() != 1 + 72 + 4 * 33) return;
+  if (m.size() < 2) return;
+  char type = (char)m[1];
+  size_t cl = compactLen(type);
+  if ((type != 'E' && type != 'G') || m.size() != 2 + cl + 4 * 33) return;
   if (!vJoined) {
     uint8_t r[2] = {'R', 1};
     ir::send(r, 2, 8000);
     return;
   }
-  memcpy(vjob.compact, m.data() + 1, 72);
-  memcpy(vjob.D[0], m.data() + 73, 33);
-  memcpy(vjob.E[0], m.data() + 106, 33);
-  memcpy(vjob.D[1], m.data() + 139, 33);
-  memcpy(vjob.E[1], m.data() + 172, 33);
-  rootMsg(vjob.compact, vjob.msg);
+  vjob.type = type;
+  memcpy(vjob.compact, m.data() + 2, cl);
+  const uint8_t* q = m.data() + 2 + cl;
+  memcpy(vjob.D[0], q, 33);
+  memcpy(vjob.E[0], q + 33, 33);
+  memcpy(vjob.D[1], q + 66, 33);
+  memcpy(vjob.E[1], q + 99, 33);
+  rootMsg(type, vjob.compact, vjob.msg);
   Prompt p;
   p.id = "vault";
   p.kind = "vault_sign";
   p.title = "VAULT";
-  describeRoot(vjob.compact, p);
+  describeRoot(type, vjob.compact, p);
   showPrompt(p);
 }
 
@@ -1039,6 +1095,13 @@ static void onResharePiece(JsonDocument& in) {
   if (!windowOpen()) {
     d["t"] = "reshare_error";
     d["reason"] = "window_closed";
+    send(d);
+    return;
+  }
+  // The reshare happens over the 2-minute WiFi window only, never over the USB cable.
+  if (lastSource != 'n') {
+    d["t"] = "reshare_error";
+    d["reason"] = "not_over_wifi";
     send(d);
     return;
   }
@@ -1116,7 +1179,7 @@ static void drawVault() {
     canvas.drawString("Code " + fingerprint(vdevPub), 8, 72);
     canvas.drawString(String((windowUntil - millis()) / 1000) + " s left", 8, 96);
   } else {
-    canvas.drawString(vJoined ? "Signs only by IR." : "Hold A+B to join.", 8, 72);
+    canvas.drawString(vJoined ? "Signs only by IR." : "Hold A to join.", 8, 72);
     canvas.drawString("Code " + fingerprint(vdevPub), 8, 96);
   }
 }
@@ -1202,7 +1265,7 @@ static void handle(const String& line) {
   } else if (t == "root_sign") onRootSign(in);
   else if (t == "reshare_piece") onResharePiece(in);
   else if (t == "open_window") {
-    // Over the USB cable only: plugging in is physical presence, like holding A and B.
+    // Over the USB cable only: plugging in is physical presence, like holding A.
     if (lastSource == 'u' && isVault && !windowOpen()) openWindow();
   } else if (t == "set_role") {
     // Only over the USB cable, never over the network.
@@ -1283,6 +1346,10 @@ static void handle(const String& line) {
     d["board"] = (int)M5.getBoard();
     d["pmic"] = (int)M5.Power.getType();
     send(d);
+  } else if (t == "beep") {
+    // Find which stick is which: it beeps and flashes its name.
+    buzz(2);
+    showResult(isVault ? "This is the vault" : "This is the wrist", C_AMBER, 3000);
   } else if (t == "ir_rate") {
     ir::rateTest(in["frames"] | 30, in["gap"] | 40);
     JsonDocument d;
@@ -1800,8 +1867,8 @@ void loop() {
   }
 #endif
 
-  // Vault: hold A and B together for 2 seconds to open the 2-minute reshare window.
-  if (isVault && !windowUntil && M5.BtnA.isPressed() && M5.BtnB.pressedFor(2000)) openWindow();
+  // Vault: hold A for 2 seconds on the home screen to open the 2-minute reshare window.
+  if (isVault && !windowUntil && mode == Mode::Home && M5.BtnA.pressedFor(2000)) openWindow();
   // Wrist: the vault has two minutes to answer a root request.
   if (rjob.active && millis() - rjob.sentAt > 120000) {
     rjob.active = false;

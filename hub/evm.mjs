@@ -143,3 +143,49 @@ export async function submit(gk, call) {
 }
 
 export const fmt = (wei) => `${formatEther(BigInt(wei))} ETH`;
+
+// ---- root treasury: owned by the 3-of-3 root key (phone + wrist + vault) ----------------
+
+const rootArt = JSON.parse(readFileSync(url('./RootTreasury.json'), 'utf8'));
+const rootEntry = (rk) => load()[`root:${rk}`] ?? null;
+
+export async function rootInfo(rk) {
+  const e = rootEntry(rk);
+  const [relayerBalance, balance, nonce] = await Promise.all([
+    relayer ? pub.getBalance({ address: relayer.address }) : 0n,
+    e ? pub.getBalance({ address: e.account }) : 0n,
+    e ? pub.readContract({ address: e.account, abi: rootArt.abi, functionName: 'nonce' }) : 0n,
+  ]);
+  return { t: 'evm_root_info', chainId: sepolia.id, account: e?.account ?? null, balance: balance.toString(), nonce: nonce.toString(), relayerBalance: relayerBalance.toString(), explorer: EXPLORER };
+}
+
+export async function rootDeploy(rk, fundWei) {
+  if (!wallet) throw new Error('No relayer key in hub/.relayer.');
+  const hash = await wallet.deployContract({
+    abi: rootArt.abi,
+    bytecode: `${rootArt.bytecode}${rk.padStart(64, '0')}`,
+    value: BigInt(fundWei ?? 0),
+    gas: 240_000n,
+    ...(await fees()),
+  });
+  const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
+  if (r.status !== 'success' || !r.contractAddress) throw new Error(`Deploy failed in ${hash}`);
+  const st = load();
+  st[`root:${rk}`] = { account: r.contractAddress, deployTx: hash };
+  save(st);
+  return { t: 'evm_root_deployed', account: r.contractAddress, hash };
+}
+
+export async function rootSubmit(rk, m) {
+  const e = rootEntry(rk);
+  if (!e) throw new Error('No root treasury deployed for this root key.');
+  const args = [m.to, BigInt(m.value), '0x', ...split(m.sig)];
+  try {
+    await pub.simulateContract({ account: relayer, address: e.account, abi: rootArt.abi, functionName: 'execute', args });
+  } catch (err) {
+    throw new Error(`The treasury refused it: ${reason(err)}`);
+  }
+  const hash = await wallet.writeContract({ address: e.account, abi: rootArt.abi, functionName: 'execute', args, gas: 90_000n, ...(await fees()) });
+  const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
+  return { t: 'evm_result', what: 'root_execute', hash, status: r.status, gasUsed: r.gasUsed.toString(), block: r.blockNumber.toString() };
+}

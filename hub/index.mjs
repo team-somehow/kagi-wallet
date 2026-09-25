@@ -230,6 +230,12 @@ async function handleEvm(ws, line) {
         return await run('revoking a session key (phone shard alone)', () => evm.revoke(gk, msg));
       case 'evm_agent_spend':
         return await run('the agent is spending on its own', () => evm.agentSpend(gk, msg));
+      case 'evm_root_info?':
+        return reply(await evm.rootInfo(gk));
+      case 'evm_root_deploy':
+        return await run('deploying the root treasury (owned by the 3-of-3 root key)', () => evm.rootDeploy(gk, msg.fund ?? '0'));
+      case 'evm_root_submit':
+        return await run('submitting a transaction signed by phone, wrist and vault', () => evm.rootSubmit(gk, msg));
       case 'evm_submit':
         return await run('submitting a call signed by phone and wrist', () => evm.submit(gk, msg));
     }

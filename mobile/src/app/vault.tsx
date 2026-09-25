@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Screen } from '../components/Screen';
 import { Txt } from '../components/Txt';
@@ -8,8 +8,8 @@ import { TopBar } from '../components/TopBar';
 import { Fact } from '../components/Fact';
 import { Steps, type Step } from '../components/Steps';
 import { link, type Msg } from '../lib/link';
-import { dkgFinish, dkgStart } from '../lib/frost';
-import { combineRoot, cpt, partial, phoneReshare, pt, reshareCheck, rootGrantMessage, rootNonces, type Commit, type RootShare } from '../lib/root';
+import { dkgFinish, dkgStart, evmMessage } from '../lib/frost';
+import { combineRoot, cpt, partial, phoneReshare, pt, reshareCheck, rootNonces, type Commit, type RootShare } from '../lib/root';
 import { loadRoot, rand, saveRoot } from '../lib/shard';
 import { unlockShard } from '../lib/biometrics';
 import { success, warn } from '../lib/haptics';
@@ -25,13 +25,11 @@ interface VaultInfo {
 
 type Busy = null | 'dkg' | 'reshare' | 'sign';
 
-// The root action this screen signs: raise one agent's cap past what the manager key may grant.
-const ACTION = {
-  chainId: 11155111,
-  account: '0x5d677d257822f5c3aadf2e3484c3f57bd4364adb',
-  agent: '0x1111111111111111111111111111111111111111',
-  cap: 50_000_000_000_000_000n, // 0.05 ETH
-};
+// The root action this screen signs: send a little ETH out of the root treasury, a Sepolia
+// contract only the 3-of-3 root key (phone + wrist + vault) can move.
+const TO = '0x000000000000000000000000000000000000dEaD';
+const VALUE = 1_000_000_000_000n; // 0.000001 ETH
+const FUND = 10_000_000_000_000n; // the treasury starts with 0.00001 ETH
 
 const wait = <T extends Msg>(pred: (m: Msg) => boolean, ms: number, what: string) => link.waitFor<T>(pred, ms, what);
 
@@ -44,6 +42,22 @@ export default function Vault() {
   const [error, setError] = useState<string | null>(null);
   const [sig, setSig] = useState<string | null>(null);
   const [confirmCode, setConfirmCode] = useState(false);
+  const [txs, setTxs] = useState<{ label: string; hash: string }[]>([]);
+  const [treasury, setTreasury] = useState<{ account: string | null; balance: string; relayerBalance: string } | null>(null);
+
+  const loadTreasury = useCallback(async (r: RootShare | null) => {
+    if (!r || r.parties !== 3) return;
+    try {
+      const i = await link.request<Msg>({ t: 'evm_root_info?', groupKey: r.groupKey }, 20000);
+      if (i.t === 'evm_root_info') setTreasury({ account: (i.account as string) ?? null, balance: String(i.balance), relayerBalance: String(i.relayerBalance) });
+    } catch {
+      // offline: the screen still works without chain info
+    }
+  }, []);
+  useEffect(() => {
+    const t = setTimeout(() => void loadTreasury(root), 0);
+    return () => clearTimeout(t);
+  }, [root, loadTreasury]);
 
   useEffect(() => {
     void loadRoot().then(setRoot);
@@ -116,7 +130,7 @@ export default function Vault() {
       if (w.t !== 'root_reshare') throw new Error(`The wrist refused: ${String(w.reason)}.`);
       step('Wrist', 'Sent its piece to the vault', 'done');
       const v = await vaultDone;
-      if (v.t !== 'reshare_vault') throw new Error(v.reason === 'window_closed' ? 'The vault window closed. Hold A and B on the vault again.' : 'The vault could not open a piece.');
+      if (v.t !== 'reshare_vault') throw new Error(v.reason === 'window_closed' ? 'The vault window closed. Hold A on the vault again.' : 'The vault could not open a piece.');
       step('Vault', 'Joined', 'done');
       if (!reshareCheck(root.groupKey, ph.X1, String(w.X2), String(v.X3))) throw new Error('The shares do not add up to the root key. Nothing was changed.');
       const committed = wait((m) => m.t === 'root_committed', 30000, 'the wrist');
@@ -132,10 +146,24 @@ export default function Vault() {
     run('sign', async () => {
       if (!root || root.parties !== 3) return;
       setSig(null);
-      const u = await unlockShard('Sign a root action');
+      const u = await unlockShard('Send from the root treasury');
       if (!u.ok) throw new Error(u.reason);
-      const g = { ...ACTION, nonce: BigInt(Date.now() % 100000), expiry: BigInt(Math.floor(Date.now() / 1000) + 3600) };
-      const m = rootGrantMessage(g);
+      const req = async (o: Msg, ms = 200000) => {
+        const r = await link.request<Msg>(o, ms);
+        if (r.t === 'evm_error') throw new Error(String(r.reason));
+        return r;
+      };
+      // 1. The treasury, created once per root key.
+      let info = await req({ t: 'evm_root_info?', groupKey: root.groupKey }, 20000);
+      if (!info.account) {
+        step('Sepolia', 'Creating the root treasury (about 20 s)');
+        const d = await req({ t: 'evm_root_deploy', groupKey: root.groupKey, fund: FUND.toString() });
+        setTxs((t) => [...t, { label: 'Root treasury created', hash: String(d.hash) }]);
+        info = await req({ t: 'evm_root_info?', groupKey: root.groupKey }, 20000);
+        step('Sepolia', `Treasury ${String(info.account).slice(0, 10)}…`, 'done');
+      }
+      // 2. Sign the send, 3 of 3.
+      const m = evmMessage({ chainId: Number(info.chainId), account: String(info.account), nonce: BigInt(String(info.nonce)), to: TO, value: VALUE, data: '0x' });
       const n1 = rootNonces(rand);
       const id = `root${Date.now()}`;
       step('Phone', 'Signed its part', 'done');
@@ -144,15 +172,13 @@ export default function Vault() {
         if (x.t !== 'root_progress' || x.id !== id) return;
         if (x.step === 'ir_to_vault') {
           step('Wrist', 'Pressed', 'done');
-          step('Vault', 'Sending to the vault by IR. Point the wrist at it.');
+          step('Vault', 'Sending to the vault by IR. Keep the wrist pointed at it.');
         }
         if (x.step === 'vault_prompted') step('Vault', 'Press A on the vault');
       });
       const ans = wait((x) => (x.t === 'root_share' || x.t === 'sign_reject') && x.id === id, 240000, 'the wrist and vault');
-      link.send({
-        t: 'root_sign', id, chainId: String(g.chainId), account: g.account, nonce: g.nonce.toString(), agent: g.agent,
-        cap: g.cap.toString(), expiry: g.expiry.toString(), D: n1.D, E: n1.E,
-      });
+      link.send({ t: 'root_sign', kind: 'evm', id, chainId: String(info.chainId), account: String(info.account), nonce: String(info.nonce), to: TO, value: VALUE.toString(), D: n1.D, E: n1.E });
+      let signature: string;
       try {
         const r = await ans;
         if (r.t === 'sign_reject') {
@@ -171,10 +197,17 @@ export default function Vault() {
           { id: 3, D: String(r.D3), E: String(r.E3) },
         ];
         const z1 = partial(root.share, root.groupKey, m, cs, 1, n1);
-        setSig(combineRoot(root, m, cs, { 1: z1, 2: String(r.z2), 3: String(r.z3) }));
+        signature = combineRoot(root, m, cs, { 1: z1, 2: String(r.z2), 3: String(r.z3) });
+        setSig(signature);
       } finally {
         off();
       }
+      // 3. Send it.
+      step('Sepolia', 'Sending the transaction');
+      const sub = await req({ t: 'evm_root_submit', groupKey: root.groupKey, to: TO, value: VALUE.toString(), sig: signature });
+      setTxs((t) => [...t, { label: `Sent 0.000001 ETH, ${String(sub.status)}`, hash: String(sub.hash) }]);
+      step('Sepolia', 'Landed', 'done');
+      await loadTreasury(root);
     });
 
   const windowOpen = (vault?.window ?? 0) > 0;
@@ -192,6 +225,8 @@ export default function Vault() {
       <View style={styles.facts}>
         <Fact label="Root key" value={!root ? 'none yet' : root.parties === 3 ? '3 of 3' : '2 of 2, no vault'} mono={false} color={root?.parties === 3 ? colors.text : colors.muted} />
         <Fact label="Vault" value={!vault ? 'not found' : `${vault.id}, code ${vault.fingerprint}`} mono={false} />
+        {treasury ? <Fact label="Root treasury" value={treasury.account ? `${treasury.account.slice(0, 10)}…, ${(Number(treasury.balance) / 1e18).toFixed(6)} ETH` : 'not created yet'} mono={false} /> : null}
+        {treasury ? <Fact label="Gas payer" value={`${(Number(treasury.relayerBalance) / 1e18).toFixed(6)} ETH`} mono={false} color={Number(treasury.relayerBalance) < 3.5e14 ? colors.red : colors.text} /> : null}
         {vault ? <Fact label="Vault radio" value={windowOpen ? `window open, ${vault.window} s` : 'off'} mono={false} color={windowOpen ? colors.amber : colors.text} /> : null}
       </View>
 
@@ -205,6 +240,16 @@ export default function Vault() {
           {error}
         </Txt>
       ) : null}
+      {txs.map((t) => (
+        <Pressable key={t.hash} accessibilityRole="link" onPress={() => void Linking.openURL(`https://sepolia.etherscan.io/tx/${t.hash}`)} style={styles.sig}>
+          <Txt size={15} weight="medium">
+            {t.label}
+          </Txt>
+          <Txt mono size={11} color={colors.amber}>
+            {t.hash}
+          </Txt>
+        </Pressable>
+      ))}
       {sig ? (
         <View style={styles.sig}>
           <Txt size={15} weight="medium">
@@ -226,7 +271,7 @@ export default function Vault() {
             </Txt>
           ) : !windowOpen ? (
             <Txt size={15} color={colors.amber}>
-              Hold A and B on the vault for 2 seconds to open its window.
+              Hold A on the vault for 2 seconds to open its window.
             </Txt>
           ) : !confirmCode ? (
             <>
@@ -241,9 +286,9 @@ export default function Vault() {
         ) : (
           <>
             <Txt size={15} color={colors.muted}>
-              Raise the trader cap to 0.05 ETH. Needs phone, wrist and vault.
+              Send 0.000001 ETH out of the root treasury on Sepolia. Needs phone, wrist and vault.
             </Txt>
-            <Button label="Sign a root action" variant="amber" onPress={() => void signRoot()} loading={busy === 'sign'} disabled={busy !== null} />
+            <Button label="Send from the root treasury" variant="amber" onPress={() => void signRoot()} loading={busy === 'sign'} disabled={busy !== null} />
           </>
         )}
         {root && busy === null ? (
