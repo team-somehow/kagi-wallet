@@ -94,8 +94,8 @@ export function WristBridge() {
   return null;
 }
 
-function parseVia(v: unknown): 'relay' | 'wifi' | 'usb' | null {
-  return v === 'relay' || v === 'wifi' || v === 'usb' ? v : null;
+function parseVia(v: unknown): 'ble' | 'relay' | 'wifi' | 'usb' | null {
+  return v === 'ble' || v === 'relay' || v === 'wifi' || v === 'usb' ? v : null;
 }
 
 /** True when the wrist holds a share of this phone's wallet. */

@@ -7,7 +7,8 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.leash.wallet"
     },
     "android": {
       "adaptiveIcon": {
@@ -16,7 +17,8 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": true
+      "predictiveBackGestureEnabled": true,
+      "package": "com.leash.wallet"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -38,7 +40,16 @@
           "faceIDPermission": "Leash uses Face ID to unlock your phone shard."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "neverForLocation": true,
+          "modes": [],
+          "bluetoothAlwaysPermission": "Leash talks to your wrist and vault over Bluetooth."
+        }
+      ]
     ],
     "scheme": "leash",
     "newArchEnabled": true

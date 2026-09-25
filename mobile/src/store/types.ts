@@ -67,7 +67,7 @@ export interface Wrist {
   /** Group key the wrist holds a share of, if any. */
   groupKey: string | null;
   /** How the wrist reaches the hub right now. */
-  via: 'relay' | 'wifi' | 'usb' | null;
+  via: 'ble' | 'relay' | 'wifi' | 'usb' | null;
   /** WiFi network the wrist is on, if any. */
   ssid: string | null;
 }

@@ -1,8 +1,12 @@
 /**
- * WebSocket link to the hub on the laptop, which relays to the wrist over USB serial.
- * On a USB-connected Android phone, `adb reverse tcp:8787 tcp:8787` makes localhost work.
+ * The phone's link to the sticks and the hub.
+ *   Sticks: Bluetooth LE first (lib/ble.ts); the hub (WiFi, relay or USB) as the fallback.
+ *   Chain (evm_*): always the hub.
+ * Everything is merged into one message stream. Vault messages carry "from": "vault", and
+ * the {t: "hub"} status reports a stick connected if it is up on either path.
  */
 import Constants from 'expo-constants';
+import { ble, type Role } from './ble';
 
 export type Msg = { t: string; [k: string]: unknown };
 type Listener = (m: Msg) => void;
@@ -28,12 +32,45 @@ class Link {
   private stateListeners = new Set<StateListener>();
   private started = false;
   private ping: ReturnType<typeof setInterval> | null = null;
+  private hubDevices = { wrist: false, via: null as string | null, vault: false, vaultVia: null as string | null };
   open = false;
 
   start() {
     if (this.started) return;
     this.started = true;
     this.connect();
+    void ble.start();
+    ble.onLine((role, line) => this.fromBle(role, line));
+    ble.onState(() => this.emitDevices());
+  }
+
+  /** A line from a stick over Bluetooth. */
+  private fromBle(role: Role, line: string) {
+    let m: Msg;
+    try {
+      m = JSON.parse(line);
+    } catch {
+      return;
+    }
+    // The wrist can address the vault directly (its reshare piece). Pass it on.
+    if (role === 'wrist' && m.to === 'vault') {
+      this.send(m);
+      return;
+    }
+    if (role === 'vault') m.from = 'vault';
+    this.listeners.forEach((l) => l(m));
+  }
+
+  private emitDevices() {
+    const b = ble.state();
+    const s: Msg = {
+      t: 'hub',
+      wrist: b.wrist || this.hubDevices.wrist,
+      via: b.wrist ? 'ble' : this.hubDevices.via,
+      vault: b.vault || this.hubDevices.vault,
+      vaultVia: b.vault ? 'ble' : this.hubDevices.vaultVia,
+    };
+    this.listeners.forEach((l) => l(s));
   }
 
   private connect() {
@@ -52,6 +89,13 @@ class Link {
         return;
       }
       if (typeof m?.t !== 'string') return;
+      if (m.t === 'hub') {
+        this.hubDevices = { wrist: Boolean(m.wrist), via: (m.via as string) ?? null, vault: Boolean(m.vault), vaultVia: (m.vaultVia as string) ?? null };
+        return this.emitDevices();
+      }
+      // A stick that is on Bluetooth speaks for itself; ignore its copy through the hub.
+      const b = ble.state();
+      if ((m.from === 'vault' && b.vault) || (m.from !== 'vault' && b.wrist && m.t !== 'evm_info' && !String(m.t).startsWith('evm_') && m.reqId === undefined)) return;
       this.listeners.forEach((l) => l(m));
     };
     ws.onclose = () => {
@@ -70,8 +114,22 @@ class Link {
   }
 
   send(m: Msg): boolean {
+    const line = JSON.stringify(m);
+    if (!String(m.t).startsWith('evm_')) {
+      const role: Role = m.to === 'vault' ? 'vault' : 'wrist';
+      if (ble.state()[role]) {
+        void ble.send(role, line).then((ok) => {
+          if (!ok) this.sendHub(line);
+        });
+        return true;
+      }
+    }
+    return this.sendHub(line);
+  }
+
+  private sendHub(line: string): boolean {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
-    this.ws.send(JSON.stringify(m));
+    this.ws.send(line);
     return true;
   }
 

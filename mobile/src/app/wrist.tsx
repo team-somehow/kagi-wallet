@@ -81,7 +81,9 @@ export default function WristSettings() {
   const net = wrist.ssid ? `, ${wrist.ssid.trim()}` : '';
   const link_ = !wrist.connected
     ? 'offline'
-    : wrist.via === 'relay'
+    : wrist.via === 'ble'
+      ? 'Bluetooth'
+      : wrist.via === 'relay'
       ? `Internet relay${net}`
       : wrist.via === 'wifi'
         ? `Local WiFi${net}`

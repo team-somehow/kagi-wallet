@@ -24,6 +24,7 @@
 
 #include "frost.h"
 #include "ir.h"
+#include "ble.h"
 
 #if __has_include("secrets.h")
 #include "secrets.h"
@@ -216,6 +217,8 @@ static String fingerprint(const uint8_t* pub33) {
 static std::vector<String> outbox;
 static void sendLine(const String& line) {
   String l = line;  // the WebSocket library takes a non-const String
+  // Bluetooth to the phone first; WiFi (relay, then local network) and USB are fallbacks.
+  if (ble::send(l)) return;
   if (relayUp) relay.sendTXT(l);
   else if (tcp.connected()) tcp.print(line);
   else if (Serial) Serial.print(line);
@@ -228,7 +231,7 @@ static void send(JsonDocument& doc) {
   sendLine(line);
 }
 static void flushOutbox() {
-  if (outbox.empty() || !(relayUp || tcp.connected() || Serial)) return;
+  if (outbox.empty() || !(ble::connected() || relayUp || tcp.connected() || Serial)) return;
   std::vector<String> q;
   q.swap(outbox);
   for (auto& l : q) sendLine(l);
@@ -310,7 +313,7 @@ static void header(const char* left, uint16_t leftColor) {
   canvas.setFont(&fonts::Font0);
   canvas.setTextDatum(top_right);
   canvas.setTextColor(phoneUp ? C_MUTED : C_RED);
-  const char* via = relayUp ? "relay" : tcp.connected() ? "wifi" : WiFi.status() == WL_CONNECTED ? "no hub" : "no wifi";
+  const char* via = ble::connected() ? "ble" : relayUp ? "relay" : tcp.connected() ? "wifi" : WiFi.status() == WL_CONNECTED ? "no hub" : "no wifi";
   String s = String(phoneUp ? via : (tcpUp() ? "no phone" : via)) + "  " + String(M5.Power.getBatteryLevel()) + "%";
   canvas.drawString(s, W - 8, 10);
 }
@@ -476,7 +479,7 @@ static void sendHello() {
   d["fw"] = FW;
   d["reset"] = (int)esp_reset_reason();  // 1 power-on, 3 software, 4 panic, 5-7 watchdog, 9 brownout
   d["uptime"] = millis() / 1000;
-  d["via"] = relayUp ? "relay" : tcp.connected() ? "wifi" : "usb";
+  d["via"] = ble::connected() ? "ble" : relayUp ? "relay" : tcp.connected() ? "wifi" : "usb";
   d["role"] = isVault ? "vault" : "wrist";
   if (isVault) {
     d["devPub"] = hex(vdevPub, 33);
@@ -503,7 +506,7 @@ static void sendStatus() {
   if (WiFi.status() == WL_CONNECTED) d["ssid"] = WiFi.SSID();
   else d["reason"] = wifiReason;
   d["networks"] = netCount;
-  d["via"] = relayUp ? "relay" : tcp.connected() ? "wifi" : "usb";
+  d["via"] = ble::connected() ? "ble" : relayUp ? "relay" : tcp.connected() ? "wifi" : "usb";
   d["battery"] = M5.Power.getBatteryLevel();
   d["onArm"] = onArm;
   d["paired"] = paired;
@@ -1098,8 +1101,8 @@ static void onResharePiece(JsonDocument& in) {
     send(d);
     return;
   }
-  // The reshare happens over the 2-minute WiFi window only, never over the USB cable.
-  if (lastSource != 'n') {
+  // The reshare happens over the 2-minute window, by Bluetooth or WiFi, never over the USB cable.
+  if (lastSource != 'n' && lastSource != 'b') {
     d["t"] = "reshare_error";
     d["reason"] = "not_over_wifi";
     send(d);
@@ -1142,6 +1145,7 @@ static void onResharePiece(JsonDocument& in) {
 static void openWindow() {
   windowUntil = millis() + 120000;
   havePiece[0] = havePiece[1] = false;
+  ble::setAdvertising(true);
   startWifi();
   buzz(1);
   dirty = true;
@@ -1149,6 +1153,7 @@ static void openWindow() {
 
 static void closeWindow() {
   windowUntil = 0;
+  ble::setAdvertising(false);
   relay.disconnect();
   relayUp = relayStarted = false;
   tcp.stop();
@@ -1168,7 +1173,7 @@ static void drawVault() {
   canvas.setFont(&fonts::Font0);
   canvas.setTextDatum(top_right);
   canvas.setTextColor(C_MUTED);
-  canvas.drawString(String(win ? (tcpUp() ? "hub" : "wifi...") : "radio off") + "  " + String(M5.Power.getBatteryLevel()) + "%", W - 8, 10);
+  canvas.drawString(String(win ? (ble::connected() ? "ble" : tcpUp() ? "hub" : "wifi...") : "radio off") + "  " + String(M5.Power.getBatteryLevel()) + "%", W - 8, 10);
   canvas.setTextDatum(top_left);
   canvas.setFont(&fonts::FreeSansBold12pt7b);
   canvas.setTextColor(vJoined ? C_TEXT : C_MUTED);
@@ -1793,6 +1798,8 @@ void setup() {
   ir::begin();
   loadShare();
   loadRoot();
+  // The wrist advertises all the time; the vault only while its window is open.
+  ble::begin(String(isVault ? "Leash vault-" : "Leash wrist-") + deviceId.substring(6), !isVault);
 #ifndef LEASH_NO_WIFI
   if (!isVault) startWifi();  // the vault keeps its radio off except during the reshare window
 #endif
@@ -1804,6 +1811,11 @@ void setup() {
 
 void loop() {
   M5.update();
+
+  for (auto& line : ble::poll()) {
+    lastSource = 'b';
+    if (line.length()) handle(line);
+  }
 
   while (Serial.available()) {
     char c = (char)Serial.read();
