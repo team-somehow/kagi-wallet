@@ -38,39 +38,71 @@ const short = (s) => (s.length > 140 ? `${s.slice(0, 140)}…` : s);
 let publicHub = null; // https://....trycloudflare.com
 let publicMetro = null;
 
-// ---- the wrist, over whichever link it is using -----------------------------
+// ---- devices: the wrist and the vault, over whichever links they are using -------
+//
+// Every link (USB port, local-network socket, relay WebSocket) learns which device is on
+// it from that device's hello ("role": "wrist" or "vault"). Each role talks through its
+// best link: relay, then local network, then USB. Phone messages go to the wrist unless
+// they say "to": "vault"; vault messages reach the phone tagged "from": "vault".
 
-let serial = null;
-let tcp = null; // local network socket
-let wsWrist = null; // WebSocket, local or through the tunnel
-let lastStatus = '';
+const RANK = { relay: 3, wifi: 2, usb: 1 };
+const links = new Set(); // { kind, name, role, write(line) }
+let lastStatus = {};
 
-const via = () => (wsWrist ? 'relay' : tcp ? 'wifi' : serial?.isOpen ? 'usb' : null);
-const hubStatus = () => ({ t: 'hub', wrist: via() !== null, via: via() });
-
-function toWrist(line) {
-  if (wsWrist?.readyState === 1) return wsWrist.send(line), true;
-  if (tcp) return tcp.write(`${line}\n`), true;
-  if (serial?.isOpen) return serial.write(`${line}\n`), true;
-  return false;
+function best(role) {
+  let top = null;
+  for (const l of links) if (l.role === role && (!top || RANK[l.kind] > RANK[top.kind])) top = l;
+  return top;
 }
 
-function fromWrist(line, source) {
+const via = (role = 'wrist') => best(role)?.kind ?? null;
+const hubStatus = () => ({ t: 'hub', wrist: best('wrist') !== null, via: via('wrist'), vault: best('vault') !== null, vaultVia: via('vault') });
+
+function toDevice(role, line) {
+  const l = best(role);
+  if (!l) return false;
+  l.write(line);
+  return true;
+}
+const toWrist = (line) => toDevice('wrist', line);
+
+function fromDevice(link, line) {
   if (!line.startsWith('{')) {
-    if (line) log(`wrist log (${source})`, short(line));
+    if (line) log(`${link.role ?? 'device'} log (${link.kind})`, short(line));
     return;
   }
-  // Only the link the wrist is actually using speaks for it.
-  if (source !== via()) return;
-  if (!line.includes('"status"')) log(`wrist (${source}) →`, short(line));
-  else if (line.replace(/"battery":\d+,?/, '') !== lastStatus) {
-    lastStatus = line.replace(/"battery":\d+,?/, '');
-    log(`wrist (${source}) status`, short(line));
+  let m;
+  try {
+    m = JSON.parse(line);
+  } catch {
+    return;
   }
-  broadcastPhones(line);
+  if (m.t === 'hello' && m.role !== link.role) {
+    link.role = m.role === 'vault' ? 'vault' : 'wrist';
+    log(`${link.name} is the ${link.role}`);
+    broadcastPhones(hubStatus());
+  }
+  const role = link.role ?? 'wrist';
+  // Only the link that device is actually using speaks for it.
+  if (best(role) !== link) return;
+  if (m.t === 'status') {
+    const key = line.replace(/"battery":\d+,?/, '');
+    if (key !== lastStatus[role]) {
+      lastStatus[role] = key;
+      log(`${role} (${link.kind}) status`, short(line));
+    }
+  } else {
+    log(`${role} (${link.kind}) →`, short(line));
+  }
+  // A device can address the other device directly, e.g. the wrist's reshare piece for the vault.
+  if (m.to === 'vault' && role === 'wrist') {
+    if (!toDevice('vault', line)) log('no vault to deliver to');
+    return;
+  }
+  broadcastPhones(role === 'vault' ? JSON.stringify({ ...m, from: 'vault' }) : line);
 }
 
-function lineReader(source) {
+function lineReader(link) {
   let buf = '';
   return (chunk) => {
     buf += chunk.toString('utf8');
@@ -78,15 +110,23 @@ function lineReader(source) {
     while ((i = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, i).trim();
       buf = buf.slice(i + 1);
-      fromWrist(line, source);
+      fromDevice(link, line);
     }
   };
 }
 
-function wristChanged(what) {
-  log(what, `(now via ${via() ?? 'nothing'})`);
+function addLink(link) {
+  links.add(link);
+  log(`${link.name} connected`);
+  link.write(JSON.stringify({ t: 'hello?' }));
   broadcastPhones(hubStatus());
-  toWrist(JSON.stringify({ t: 'hello?' }));
+}
+
+function dropLink(link) {
+  if (!links.delete(link)) return;
+  log(`${link.name} (${link.role ?? 'unknown'}) left`);
+  broadcastPhones(hubStatus());
+  for (const r of ['wrist', 'vault']) if (best(r)) best(r).write(JSON.stringify({ t: 'hello?' }));
 }
 
 // ---- phones ------------------------------------------------------------------
@@ -117,24 +157,25 @@ wss.on('connection', (ws, req) => {
   }
   const where = remote ? 'through the tunnel' : 'locally';
 
-  if (url.pathname === '/wrist') {
-    if (wsWrist) wsWrist.close();
-    wsWrist = ws;
-    wristChanged(`wrist connected ${where}`);
+  if (url.pathname === '/wrist' || url.pathname === '/vault') {
+    const link = {
+      kind: 'relay',
+      name: `relay ${where}`,
+      role: url.pathname === '/vault' ? 'vault' : null,
+      write: (line) => ws.readyState === 1 && ws.send(line),
+    };
+    addLink(link);
     let last = Date.now();
     ws.on('message', (m) => {
       last = Date.now();
-      for (const line of m.toString().split('\n')) fromWrist(line.trim(), 'relay');
+      for (const line of m.toString().split('\n')) fromDevice(link, line.trim());
     });
     const ping = setInterval(() => {
       if (Date.now() - last > 15000) ws.terminate();
     }, 5000);
     ws.on('close', () => {
       clearInterval(ping);
-      if (wsWrist === ws) {
-        wsWrist = null;
-        wristChanged('wrist left the relay');
-      }
+      dropLink(link);
     });
     ws.on('error', () => undefined);
     return;
@@ -147,9 +188,10 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (m) => {
     const line = m.toString();
     if (!line.includes('"ping"')) log('phone →', short(line));
-    // Chain requests are handled here; everything else is for the wrist.
+    // Chain requests are handled here; everything else goes to a device.
     if (line.includes('"t":"evm_')) return void handleEvm(ws, line);
-    if (!toWrist(line)) ws.send(JSON.stringify(hubStatus()));
+    const role = line.includes('"to":"vault"') ? 'vault' : 'wrist';
+    if (!toDevice(role, line)) ws.send(JSON.stringify(hubStatus()));
   });
   ws.on('close', () => {
     phones.delete(ws);
@@ -203,12 +245,11 @@ async function handleEvm(ws, line) {
 net
   .createServer((sock) => {
     const who = `${sock.remoteAddress?.replace('::ffff:', '')}:${sock.remotePort}`;
-    if (tcp) tcp.destroy();
-    tcp = sock;
     sock.setNoDelay(true);
     sock.setKeepAlive(true, 5000);
-    wristChanged(`wrist connected on the local network from ${who}`);
-    const read = lineReader('wifi');
+    const link = { kind: 'wifi', name: `local network ${who}`, role: null, write: (line) => sock.write(`${line}\n`) };
+    addLink(link);
+    const read = lineReader(link);
     let last = Date.now();
     sock.on('data', (d) => {
       last = Date.now();
@@ -220,9 +261,7 @@ net
     }, 4000);
     sock.on('close', () => {
       clearInterval(ping);
-      if (tcp !== sock) return;
-      tcp = null;
-      wristChanged('wrist left the local network');
+      dropLink(link);
     });
     sock.on('error', () => undefined);
   })
@@ -230,24 +269,30 @@ net
 
 // ---- USB ---------------------------------------------------------------------
 
+const usb = new Map(); // path -> port
+
 async function connectSerial() {
-  if (serial?.isOpen) return;
   const ports = await SerialPort.list();
-  const path = process.env.WRIST_PORT ?? ports.find((p) => (p.vendorId ?? '').toLowerCase() === ESPRESSIF)?.path;
-  if (!path) return;
-  const port = new SerialPort({ path, baudRate: 115200, autoOpen: false, hupcl: false });
-  port.open((err) => {
-    if (err) return log('usb open failed', err.message);
-    serial = port;
-    wristChanged(`wrist on usb at ${path}`);
-    sendHint();
-  });
-  port.on('data', lineReader('usb'));
-  port.on('close', () => {
-    serial = null;
-    wristChanged('wrist left usb');
-  });
-  port.on('error', (e) => log('usb error', e.message));
+  for (const p of ports) {
+    if ((p.vendorId ?? '').toLowerCase() !== ESPRESSIF || usb.has(p.path)) continue;
+    const port = new SerialPort({ path: p.path, baudRate: 115200, autoOpen: false, hupcl: false });
+    usb.set(p.path, port);
+    const link = { kind: 'usb', name: `usb ${p.path}`, role: null, write: (line) => port.isOpen && port.write(`${line}\n`) };
+    port.open((err) => {
+      if (err) {
+        usb.delete(p.path);
+        return log('usb open failed', p.path, err.message);
+      }
+      addLink(link);
+      sendHint();
+    });
+    port.on('data', lineReader(link));
+    port.on('close', () => {
+      usb.delete(p.path);
+      dropLink(link);
+    });
+    port.on('error', (e) => log('usb error', e.message));
+  }
 }
 setInterval(connectSerial, 1000);
 connectSerial();
@@ -272,9 +317,11 @@ function sendHint() {
   const relay = wristRelayUrl();
   if (relay) hint.relay = relay;
   const line = JSON.stringify(hint);
-  if (serial?.isOpen) serial.write(`${line}\n`);
-  if (tcp) tcp.write(`${line}\n`);
-  if (wsWrist?.readyState === 1) wsWrist.send(line);
+  for (const l of links) {
+    // The vault only learns the relay for its own path.
+    if (l.role === 'vault' && relay) l.write(JSON.stringify({ ...hint, relay: relay.replace('/wrist?', '/vault?') }));
+    else l.write(line);
+  }
 }
 setInterval(sendHint, 5000);
 

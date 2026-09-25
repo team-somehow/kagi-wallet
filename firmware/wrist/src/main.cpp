@@ -17,6 +17,8 @@
 #include <WebSocketsClient.h>
 #include <WiFi.h>
 #include <esp_wifi.h>
+#include <esp_mac.h>
+#include <esp_system.h>
 #include <lwip/dns.h>
 #include <bootloader_random.h>
 
@@ -43,7 +45,7 @@ enum class Mode { Unpaired, Pairing, Home, Prompt, Result, Revoked, ConfirmWipe,
 
 struct Prompt {
   String id;
-  String kind;  // "tx" or "grant"
+  String kind;  // tx, grant, evm, evm_grant, root_dkg, root_reshare, root_sign, vault_sign
   String title;
   String amount;
   String line1;
@@ -81,7 +83,8 @@ static float lastA[3] = {0, 0, 0};
 static const uint32_t STILL_MS = 120000;
 
 static uint32_t lastStatus = 0;
-static uint32_t autoAt = 0;  // test firmware only: when to press A by itself
+static uint32_t autoAt = 0;
+static bool irQuiet = false;  // bench: stop IMU and display updates  // test firmware only: when to press A by itself
 static String rx;     // USB serial line buffer
 static String rxTcp;  // WiFi line buffer
 
@@ -168,14 +171,66 @@ static String dollars(double v) {
   return String(b);
 }
 
-// Replies go to WiFi when the hub is reachable there, otherwise to USB.
+// Root key state (see the root key section further down).
+static bool isVault = false;
+static char lastSource = 'u';  // 'u' USB serial, 'n' network: where the current message came from
+
+// Wrist side of the root key.
+static uint8_t rshare[32], rgk[32], rX2new[32];
+static int rparties = 0;  // 0 none, 2 phone + wrist, 3 with the vault
+static uint8_t pendX[65], pendR[65], pendS[32], pendVaultPub[33];
+
+struct RootJob {
+  bool active = false;
+  String id;
+  uint8_t msg[32];
+  uint8_t compact[72];
+  uint8_t D[3][33], E[3][33];
+  frost::Nonce n;
+  uint32_t sentAt = 0;
+};
+static RootJob rjob;
+
+// Vault side.
+static uint8_t vdevPriv[32], vdevPub[33], vshare[32], vgk[32];
+static bool vJoined = false;
+static uint32_t windowUntil = 0;
+static bool havePiece[2] = {false, false};
+static uint8_t piece[2][32];
+static RootJob vjob;
+
+static bool windowOpen() { return isVault && windowUntil && millis() < windowUntil; }
+
+static String fingerprint(const uint8_t* pub33) {
+  uint8_t h[32];
+  frost::sha256(pub33, 33, h);
+  String f = hex(h, 4);
+  f.toUpperCase();
+  return f.substring(0, 4) + " " + f.substring(4, 8);
+}
+
+
+// Replies go to WiFi when the hub is reachable there, otherwise to USB. With neither
+// (the wrist unplugged and between networks) they wait in a small outbox.
+static std::vector<String> outbox;
+static void sendLine(const String& line) {
+  String l = line;  // the WebSocket library takes a non-const String
+  if (relayUp) relay.sendTXT(l);
+  else if (tcp.connected()) tcp.print(line);
+  else if (Serial) Serial.print(line);
+  else if (outbox.size() < 6) outbox.push_back(line);
+}
 static void send(JsonDocument& doc) {
   String line;
   serializeJson(doc, line);
   line += '\n';
-  if (relayUp) relay.sendTXT(line);
-  else if (tcp.connected()) tcp.print(line);
-  else Serial.print(line);
+  sendLine(line);
+}
+static void flushOutbox() {
+  if (outbox.empty() || !(relayUp || tcp.connected() || Serial)) return;
+  std::vector<String> q;
+  q.swap(outbox);
+  for (auto& l : q) sendLine(l);
 }
 
 // The speaker amp has to be off for the IR receiver to work, so it is on only while beeping.
@@ -252,8 +307,15 @@ static void header(const char* left, uint16_t leftColor) {
   canvas.drawString(s, W - 8, 10);
 }
 
+static void drawVault();
+static bool isVaultRole();
 static void draw() {
   canvas.fillSprite(C_BG);
+  if (isVaultRole() && (mode == Mode::Home || mode == Mode::Unpaired)) {
+    drawVault();
+    canvas.pushSprite(0, 0);
+    return;
+  }
 
   if (!onArm && mode != Mode::Unpaired && mode != Mode::Pairing) {
     header("Leash", C_FAINT);
@@ -394,7 +456,8 @@ static void showResult(const String& text, uint16_t color, uint32_t ms = 1800) {
   dirty = true;
 }
 
-static Mode restingMode() { return paired ? Mode::Home : Mode::Unpaired; }
+static bool isVaultRole();
+static Mode restingMode() { return (paired || isVaultRole()) ? Mode::Home : Mode::Unpaired; }
 
 // ---- protocol -------------------------------------------------------------
 
@@ -403,9 +466,22 @@ static void sendHello() {
   d["t"] = "hello";
   d["id"] = deviceId;
   d["fw"] = FW;
+  d["reset"] = (int)esp_reset_reason();  // 1 power-on, 3 software, 4 panic, 5-7 watchdog, 9 brownout
+  d["uptime"] = millis() / 1000;
   d["via"] = relayUp ? "relay" : tcp.connected() ? "wifi" : "usb";
-  d["paired"] = paired;
-  if (paired) d["groupKey"] = hex(groupKey, 32);
+  d["role"] = isVault ? "vault" : "wrist";
+  if (isVault) {
+    d["devPub"] = hex(vdevPub, 33);
+    d["fingerprint"] = fingerprint(vdevPub);
+    d["joined"] = vJoined;
+    if (vJoined) d["rootKey"] = hex(vgk, 32);
+    d["window"] = windowOpen() ? (int)((windowUntil - millis()) / 1000) : 0;
+  } else {
+    d["paired"] = paired;
+    if (paired) d["groupKey"] = hex(groupKey, 32);
+    d["rootParties"] = rparties;
+    if (rparties) d["rootKey"] = hex(rgk, 32);
+  }
   d["battery"] = M5.Power.getBatteryLevel();
   d["onArm"] = onArm;
   send(d);
@@ -435,6 +511,7 @@ static void reject(const String& id, const char* reason) {
 }
 
 static void approvePrompt();
+static void startWifi();
 static void saveNets();
 static void wifiRestart();
 static bool isIp(const String& s);
@@ -664,7 +741,9 @@ static void onSign(JsonDocument& in) {
 #endif
 }
 
+static void approveRoot();
 static void approvePrompt() {
+  if (prompt.kind.startsWith("root") || prompt.kind == "vault_sign") return approveRoot();
   uint8_t D2[65], E2[65], z2[32];
   if (!frost::sign(share, groupKey, prompt.msg, prompt.D1, prompt.E1, D2, E2, z2)) {
     reject(prompt.id, "sign_failed");
@@ -697,6 +776,403 @@ static void onExposure(JsonDocument& in) {
   dirty = true;
 }
 
+
+// ---- root key: 3-of-3 with the vault --------------------------------------------------
+//
+// The same firmware runs on the wrist and on the vault; NVS "role" picks which.
+// Wrist: holds share 2 of the root key. Root signing goes phone -> wrist -> IR -> vault.
+// Vault: radio off except for a 2-minute window opened by holding A and B, used only for the
+// reshare. It signs root actions over IR only, after a press of A on the vault itself.
+
+static void loadRoot() {
+  Preferences p;
+  p.begin("root", false);
+  isVault = p.getString("role", "wrist") == "vault";
+  if (isVault) {
+    if (p.getBytes("vdev", vdevPriv, 32) != 32) {
+      frost::keypair(vdevPriv, vdevPub);
+      p.putBytes("vdev", vdevPriv, 32);
+    }
+    frost::pubOf(vdevPriv, vdevPub);
+    vJoined = p.getBytes("vshare", vshare, 32) == 32 && p.getBytes("vgk", vgk, 32) == 32;
+  } else {
+    rparties = p.getUChar("rparties", 0);
+    if (rparties && (p.getBytes("rshare", rshare, 32) != 32 || p.getBytes("rgk", rgk, 32) != 32)) rparties = 0;
+  }
+  p.end();
+}
+
+static void saveRoot() {
+  Preferences p;
+  p.begin("root", false);
+  if (isVault) {
+    if (vJoined) {
+      p.putBytes("vshare", vshare, 32);
+      p.putBytes("vgk", vgk, 32);
+    }
+  } else {
+    p.putUChar("rparties", rparties);
+    if (rparties) {
+      p.putBytes("rshare", rshare, 32);
+      p.putBytes("rgk", rgk, 32);
+    }
+  }
+  p.end();
+}
+
+// Compact root action for IR: chainId u32 | account 20 | nonce u32 | agent 20 | cap u128 | expiry u64
+static bool tailOf(const char* dec, uint8_t* out, size_t n) {
+  uint8_t full[32];
+  if (!frost::u256FromDecimal(dec, full)) return false;
+  for (size_t i = 0; i < 32 - n; i++)
+    if (full[i]) return false;  // too big for the compact field
+  memcpy(out, full + 32 - n, n);
+  return true;
+}
+
+// sha256("LEASH/rootgrant" || chainid || account || nonce || agent || cap || expiry), 32-byte fields
+static void rootMsg(const uint8_t c[72], uint8_t out[32]) {
+  uint8_t pre[15 + 32 + 20 + 32 + 20 + 32 + 32];
+  memset(pre, 0, sizeof pre);
+  memcpy(pre, "LEASH/rootgrant", 15);
+  memcpy(pre + 15 + 28, c, 4);          // chainid
+  memcpy(pre + 47, c + 4, 20);          // account
+  memcpy(pre + 67 + 28, c + 24, 4);     // nonce
+  memcpy(pre + 99, c + 28, 20);         // agent
+  memcpy(pre + 119 + 16, c + 48, 16);   // cap
+  memcpy(pre + 151 + 24, c + 64, 8);    // expiry
+  frost::sha256(pre, sizeof pre, out);
+}
+
+static void describeRoot(const uint8_t c[72], Prompt& p) {
+  double cap = 0;
+  for (int i = 0; i < 16; i++) cap = cap * 256 + c[48 + i];
+  char eth[32];
+  snprintf(eth, sizeof eth, "%.6f ETH", cap / 1e18);
+  p.amount = eth;
+  p.line1 = "raise cap, agent " + shortHex(hex(c + 28, 20), 4, 4);
+  p.line2 = isVault ? "A: sign as vault  B: no" : "needs the vault next";
+}
+
+static void showPrompt(Prompt& p) {
+  p.shownAt = millis();
+  prompt = p;
+  mode = Mode::Prompt;
+  dirty = true;
+  draw();
+  buzz(2);
+#ifdef LEASH_AUTO_APPROVE
+  autoAt = millis() + 3000;
+#endif
+}
+
+static void onRootDkg(JsonDocument& in) {
+  Prompt p;
+  p.id = "root_dkg";
+  p.kind = "root_dkg";
+  if (!unhex(in["X"] | "", pendX, 65) || !unhex(in["pop"]["R"] | "", pendR, 65) || !unhex(in["pop"]["s"] | "", pendS, 32))
+    return reject("root_dkg", "bad_request");
+  p.title = "Root key";
+  p.amount = "Create";
+  p.line1 = "a second key with the phone";
+  p.line2 = rparties ? "replaces the old root key" : "for root actions only";
+  showPrompt(p);
+}
+
+static void onRootReshare(JsonDocument& in) {
+  if (rparties != 2) return reject("root_reshare", rparties == 3 ? "already_3_of_3" : "no_root_key");
+  if (!unhex(in["vaultPub"] | "", pendVaultPub, 33)) return reject("root_reshare", "bad_request");
+  Prompt p;
+  p.id = "root_reshare";
+  p.kind = "root_reshare";
+  p.title = "Add vault";
+  p.amount = fingerprint(pendVaultPub);
+  p.line1 = "same code on the vault?";
+  p.line2 = "root key becomes 3 of 3";
+  showPrompt(p);
+}
+
+static void onRootSign(JsonDocument& in) {
+  String id = in["id"] | "";
+  if (rparties != 3) return reject(id, "root_not_3_of_3");
+  if (rjob.active) return reject(id, "busy");
+  Prompt p;
+  p.id = id;
+  p.kind = "root_sign";
+  uint8_t* c = rjob.compact;
+  if (!tailOf(String(in["chainId"] | "").c_str(), c, 4) || !unhex(in["account"] | "", c + 4, 20) ||
+      !tailOf(String(in["nonce"] | "").c_str(), c + 24, 4) || !unhex(in["agent"] | "", c + 28, 20) ||
+      !tailOf(String(in["cap"] | "").c_str(), c + 48, 16) || !tailOf(String(in["expiry"] | "").c_str(), c + 64, 8) ||
+      !unhex(in["D"] | "", rjob.D[0], 33) || !unhex(in["E"] | "", rjob.E[0], 33))
+    return reject(id, "bad_request");
+  rootMsg(c, rjob.msg);
+  memcpy(p.msg, rjob.msg, 32);
+  rjob.id = id;
+  p.title = "ROOT action";
+  describeRoot(c, p);
+  showPrompt(p);
+}
+
+static void irShowWaiting(const char* text) {
+  resultText = text;
+  resultColor = C_AMBER;
+  resultUntil = millis() + 600000;
+  mode = Mode::Result;
+  draw();
+}
+
+// Wrist: after A, commit our nonces and send the whole request to the vault over IR.
+static void rootSignToVault() {
+  frost::commit(rjob.n, rjob.D[1], rjob.E[1]);
+  uint8_t pkt[1 + 72 + 4 * 33];
+  pkt[0] = 'S';
+  memcpy(pkt + 1, rjob.compact, 72);
+  memcpy(pkt + 73, rjob.D[0], 33);
+  memcpy(pkt + 106, rjob.E[0], 33);
+  memcpy(pkt + 139, rjob.D[1], 33);
+  memcpy(pkt + 172, rjob.E[1], 33);
+  irShowWaiting("Point at the vault");
+  JsonDocument st;
+  st["t"] = "root_progress";
+  st["id"] = rjob.id;
+  st["step"] = "ir_to_vault";
+  send(st);
+  if (!ir::send(pkt, sizeof pkt, 60000)) {
+    frost::wipe(rjob.n);
+    reject(rjob.id, "ir_failed");
+    showResult("Vault not in sight", C_RED, 4000);
+    return;
+  }
+  rjob.active = true;
+  rjob.sentAt = millis();
+  irShowWaiting("Vault: press A");
+  JsonDocument d;
+  d["t"] = "root_progress";
+  d["id"] = rjob.id;
+  d["step"] = "vault_prompted";
+  send(d);
+}
+
+// Wrist: the vault answered over IR.
+static void rootFromVault(const std::vector<uint8_t>& m) {
+  if (!rjob.active) return;
+  rjob.active = false;
+  if (m[0] == 'R' || m.size() < 1 + 33 + 33 + 32) {
+    frost::wipe(rjob.n);
+    reject(rjob.id, "vault_rejected");
+    showResult("Vault said no", C_MUTED, 3000);
+    return;
+  }
+  memcpy(rjob.D[2], m.data() + 1, 33);
+  memcpy(rjob.E[2], m.data() + 34, 33);
+  const uint8_t* z3 = m.data() + 67;
+  uint8_t ids[3] = {1, 2, 3};
+  uint8_t z2[32];
+  if (!frost::respond(rshare, rgk, rjob.msg, 3, ids, rjob.D, rjob.E, 2, rjob.n, z2)) {
+    reject(rjob.id, "sign_failed");
+    showResult("Signing failed", C_RED);
+    return;
+  }
+  JsonDocument d;
+  d["t"] = "root_share";
+  d["id"] = rjob.id;
+  d["D2"] = hex(rjob.D[1], 33);
+  d["E2"] = hex(rjob.E[1], 33);
+  d["z2"] = hex(z2, 32);
+  d["D3"] = hex(rjob.D[2], 33);
+  d["E3"] = hex(rjob.E[2], 33);
+  d["z3"] = hex(z3, 32);
+  send(d);
+  showResult("Root signed, 3 of 3", C_TEXT, 3000);
+}
+
+// Vault: a root request arrived over IR.
+static void vaultRequest(const std::vector<uint8_t>& m) {
+  if (m.size() != 1 + 72 + 4 * 33) return;
+  if (!vJoined) {
+    uint8_t r[2] = {'R', 1};
+    ir::send(r, 2, 8000);
+    return;
+  }
+  memcpy(vjob.compact, m.data() + 1, 72);
+  memcpy(vjob.D[0], m.data() + 73, 33);
+  memcpy(vjob.E[0], m.data() + 106, 33);
+  memcpy(vjob.D[1], m.data() + 139, 33);
+  memcpy(vjob.E[1], m.data() + 172, 33);
+  rootMsg(vjob.compact, vjob.msg);
+  Prompt p;
+  p.id = "vault";
+  p.kind = "vault_sign";
+  p.title = "VAULT";
+  describeRoot(vjob.compact, p);
+  showPrompt(p);
+}
+
+static void vaultApprove() {
+  frost::commit(vjob.n, vjob.D[2], vjob.E[2]);
+  uint8_t ids[3] = {1, 2, 3};
+  uint8_t z3[32];
+  if (!frost::respond(vshare, vgk, vjob.msg, 3, ids, vjob.D, vjob.E, 3, vjob.n, z3)) {
+    showResult("Signing failed", C_RED);
+    return;
+  }
+  uint8_t pkt[1 + 33 + 33 + 32];
+  pkt[0] = 'Z';
+  memcpy(pkt + 1, vjob.D[2], 33);
+  memcpy(pkt + 34, vjob.E[2], 33);
+  memcpy(pkt + 67, z3, 32);
+  irShowWaiting("Sending to wrist");
+  bool ok = ir::send(pkt, sizeof pkt, 60000);
+  showResult(ok ? "Signed" : "Wrist not in sight", ok ? C_TEXT : C_RED, 3000);
+}
+
+static void vaultReject() {
+  uint8_t r[2] = {'R', 0};
+  ir::send(r, 2, 8000);
+  showResult("Rejected", C_MUTED);
+}
+
+// Vault: a reshare piece, sealed to our device key, relayed by the hub.
+static void onResharePiece(JsonDocument& in) {
+  if (!isVault) return;
+  JsonDocument d;
+  if (!windowOpen()) {
+    d["t"] = "reshare_error";
+    d["reason"] = "window_closed";
+    send(d);
+    return;
+  }
+  String from = in["from"] | "";
+  int k = from == "phone" ? 0 : from == "wrist" ? 1 : -1;
+  String ctHex = in["ct"] | "";
+  std::vector<uint8_t> ct(ctHex.length() / 2);
+  size_t outLen = 0;
+  if (k < 0 || ct.size() < 61 || !unhex(ctHex.c_str(), ct.data(), ct.size()) ||
+      !frost::open(vdevPriv, ct.data(), ct.size(), piece[k], &outLen) || outLen != 32) {
+    d["t"] = "reshare_error";
+    d["reason"] = "bad_piece";
+    send(d);
+    return;
+  }
+  if (k == 0 && !unhex(in["groupKey"] | "", vgk, 32)) return;
+  havePiece[k] = true;
+  if (havePiece[0] && havePiece[1]) {
+    frost::addMod(piece[0], piece[1], vshare);
+    memset(piece, 0, sizeof piece);
+    havePiece[0] = havePiece[1] = false;
+    vJoined = true;
+    saveRoot();
+    uint8_t X3[33];
+    frost::pubOf(vshare, X3);
+    d["t"] = "reshare_vault";
+    d["X3"] = hex(X3, 33);
+    send(d);
+    showResult("Joined: root 3 of 3", C_TEXT, 5000);
+    windowUntil = millis() + 5000;  // radio goes off shortly
+  } else {
+    d["t"] = "reshare_progress";
+    d["have"] = from;
+    send(d);
+  }
+}
+
+static void openWindow() {
+  windowUntil = millis() + 120000;
+  havePiece[0] = havePiece[1] = false;
+  startWifi();
+  buzz(1);
+  dirty = true;
+}
+
+static void closeWindow() {
+  windowUntil = 0;
+  relay.disconnect();
+  relayUp = relayStarted = false;
+  tcp.stop();
+  WiFi.disconnect(true, false);
+  WiFi.mode(WIFI_OFF);
+  dirty = true;
+}
+
+static bool isVaultRole() { return isVault; }
+
+static void drawVault() {
+  bool win = windowOpen();
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(win ? C_AMBER : C_TEXT);
+  canvas.drawString(win ? "Vault: window open" : "Vault", 8, 6);
+  canvas.setFont(&fonts::Font0);
+  canvas.setTextDatum(top_right);
+  canvas.setTextColor(C_MUTED);
+  canvas.drawString(String(win ? (tcpUp() ? "hub" : "wifi...") : "radio off") + "  " + String(M5.Power.getBatteryLevel()) + "%", W - 8, 10);
+  canvas.setTextDatum(top_left);
+  canvas.setFont(&fonts::FreeSansBold12pt7b);
+  canvas.setTextColor(vJoined ? C_TEXT : C_MUTED);
+  canvas.drawString(vJoined ? "Root 3 of 3" : "Not joined", 8, 34);
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextColor(C_MUTED);
+  if (win) {
+    canvas.drawString("Code " + fingerprint(vdevPub), 8, 72);
+    canvas.drawString(String((windowUntil - millis()) / 1000) + " s left", 8, 96);
+  } else {
+    canvas.drawString(vJoined ? "Signs only by IR." : "Hold A+B to join.", 8, 72);
+    canvas.drawString("Code " + fingerprint(vdevPub), 8, 96);
+  }
+}
+
+static void approveRoot() {
+  if (prompt.kind == "root_dkg") {
+    uint8_t X2[65], R2[65], s2[32], ns[32], ng[32];
+    if (!frost::dkg(pendX, pendR, pendS, X2, R2, s2, ns, ng)) {
+      reject("root_dkg", "bad_proof");
+      showResult("Root key failed", C_RED);
+      return;
+    }
+    memcpy(rshare, ns, 32);
+    memcpy(rgk, ng, 32);
+    memset(ns, 0, 32);
+    rparties = 2;
+    saveRoot();
+    JsonDocument d;
+    d["t"] = "root_dkg";
+    d["X"] = hex(X2, 65);
+    d["pop"]["R"] = hex(R2, 65);
+    d["pop"]["s"] = hex(s2, 32);
+    d["groupKey"] = hex(rgk, 32);
+    send(d);
+    showResult("Root key 2 of 2", C_TEXT, 3000);
+  } else if (prompt.kind == "root_reshare") {
+    uint8_t r2[32], X2[33];
+    frost::randomScalar32(r2);
+    frost::subMod(rshare, r2, rX2new);
+    frost::pubOf(rX2new, X2);
+    uint8_t ct[61 + 32];
+    size_t ctLen = 0;
+    bool ok = frost::seal(pendVaultPub, r2, 32, ct, &ctLen);
+    memset(r2, 0, 32);
+    if (!ok) {
+      reject("root_reshare", "seal_failed");
+      return;
+    }
+    JsonDocument pc;
+    pc["t"] = "reshare_piece";
+    pc["to"] = "vault";
+    pc["from"] = "wrist";
+    pc["ct"] = hex(ct, ctLen);
+    send(pc);
+    JsonDocument d;
+    d["t"] = "root_reshare";
+    d["X2"] = hex(X2, 33);
+    send(d);
+    showResult("Sent to the vault", C_TEXT, 3000);
+  } else if (prompt.kind == "root_sign") {
+    rootSignToVault();
+  } else if (prompt.kind == "vault_sign") {
+    vaultApprove();
+  }
+}
+
 static void handle(const String& line) {
   JsonDocument in;
   if (deserializeJson(in, line)) return;
@@ -709,6 +1185,36 @@ static void handle(const String& line) {
   else if (t == "pair_cancel") {
     if (mode == Mode::Pairing) mode = restingMode();
   } else if (t == "dkg") onDkg(in);
+  else if (t == "root_dkg") onRootDkg(in);
+  else if (t == "root_reshare") onRootReshare(in);
+  else if (t == "root_commit") {
+    if (rparties == 2) {
+      memcpy(rshare, rX2new, 32);
+      memset(rX2new, 0, 32);
+      rparties = 3;
+      saveRoot();
+      showResult("Root is 3 of 3", C_TEXT, 4000);
+    }
+    JsonDocument d;
+    d["t"] = "root_committed";
+    d["parties"] = rparties;
+    send(d);
+  } else if (t == "root_sign") onRootSign(in);
+  else if (t == "reshare_piece") onResharePiece(in);
+  else if (t == "open_window") {
+    // Over the USB cable only: plugging in is physical presence, like holding A and B.
+    if (lastSource == 'u' && isVault && !windowOpen()) openWindow();
+  } else if (t == "set_role") {
+    // Only over the USB cable, never over the network.
+    if (lastSource == 'u') {
+      Preferences p;
+      p.begin("root", false);
+      p.putString("role", String(in["role"] | "wrist") == "vault" ? "vault" : "wrist");
+      p.end();
+      delay(100);
+      ESP.restart();
+    }
+  }
   else if (t == "sign") onSign(in);
   else if (t == "sign_cancel") {
     if (mode == Mode::Prompt && prompt.id == String(in["id"] | "")) mode = restingMode();
@@ -769,9 +1275,6 @@ static void handle(const String& line) {
     }
     send(d);
   } else if (t == "ir_loop") {
-    if (in["l3b"].is<int>()) M5.Power.M5pm1.setGPIOOutput(m5::M5PM1_Class::gpio2, (int)in["l3b"] != 0);
-    if (in["ldo"].is<int>()) M5.Power.M5pm1.setLDOOutput((int)in["ldo"] != 0);
-    if (in["ext"].is<int>()) M5.Power.setExtOutput((int)in["ext"] != 0, m5::ext_none);
     delay(100);
     JsonDocument d;
     d["t"] = "ir_loop";
@@ -779,6 +1282,33 @@ static void handle(const String& line) {
     d["heard"] = ir::loopback();
     d["board"] = (int)M5.getBoard();
     d["pmic"] = (int)M5.Power.getType();
+    send(d);
+  } else if (t == "ir_rate") {
+    ir::rateTest(in["frames"] | 30, in["gap"] | 40);
+    JsonDocument d;
+    d["t"] = "ir_rate_done";
+    send(d);
+  } else if (t == "ir_stats") {
+    if (in["reset"] | false) ir::resetStats();
+    if (in["ack"].is<int>()) ir::setAck((int)in["ack"] != 0);
+    auto st = ir::stats();
+    JsonDocument d;
+    d["t"] = "ir_stats";
+    d["ok"] = st.framesOk;
+    d["bad"] = st.framesBad;
+    send(d);
+  } else if (t == "ir_env") {
+    // Bench switches to find what disturbs the IR receiver.
+    if (in["wifi"].is<int>() && (int)in["wifi"] == 0) {
+      relay.disconnect();
+      tcp.stop();
+      WiFi.mode(WIFI_OFF);
+    }
+    if (in["bl"].is<int>()) M5.Display.setBrightness((int)in["bl"]);
+    if (in["imu"].is<int>()) irQuiet = (int)in["imu"] == 0;
+    JsonDocument d;
+    d["t"] = "ir_env";
+    d["ok"] = true;
     send(d);
   } else if (t == "ir_blast") {
     ir::blast(in["ms"] | 20000);
@@ -941,7 +1471,13 @@ static void scanAndPick() {
     setWState(WState::Backoff);
     return;
   }
-  int n = WiFi.scanNetworks();
+  // Scans run in the background so the loop (buttons, IR acks) never stalls on them.
+  int n = WiFi.scanComplete();
+  if (n == WIFI_SCAN_RUNNING) return;
+  if (n < 0) {
+    WiFi.scanNetworks(true);
+    return;
+  }
   int best[MAX_NETS];
   int rssi[MAX_NETS];
   for (int k = 0; k < netCount; k++) {
@@ -994,6 +1530,8 @@ static void stepWifi() {
   bool up = WiFi.status() == WL_CONNECTED;
   switch (wstate) {
     case WState::Scan:
+      // Plugged into the laptop, the hub is already reachable over USB: retry WiFi gently.
+      if (Serial && now - wstateAt < 30000 && netIdx >= 0) break;
       scanAndPick();
       break;
     case WState::Trying:
@@ -1053,7 +1591,7 @@ static void startRelay() {
   String host = colon < 0 ? hostPort : hostPort.substring(0, colon);
   uint16_t port = colon < 0 ? 443 : hostPort.substring(colon + 1).toInt();
   relay.beginSSL(host.c_str(), port, path.c_str());
-  relay.setReconnectInterval(4000);
+  relay.setReconnectInterval(20000);  // a failing DNS lookup blocks, so retry rarely
   relay.enableHeartbeat(10000, 4000, 2);
   relay.onEvent([](WStype_t type, uint8_t* payload, size_t len) {
     switch (type) {
@@ -1075,6 +1613,7 @@ static void startRelay() {
           if (nl < 0) nl = msg.length();
           String line = msg.substring(start, nl);
           line.trim();
+          lastSource = 'n';
           if (line.length()) handle(line);
           start = nl + 1;
         }
@@ -1104,6 +1643,7 @@ static void pollWifi() {
       char c = (char)tcp.read();
       lastTcpRx = now;
       if (c == '\n') {
+        lastSource = 'n';
         if (rxTcp.length()) handle(rxTcp);
         rxTcp = "";
       } else if (c != '\r' && rxTcp.length() < 4000) {
@@ -1141,10 +1681,15 @@ static void pollWifi() {
 // ---- main -----------------------------------------------------------------
 
 void setup() {
-  auto cfg = M5.config();
-  cfg.serial_baudrate = 115200;
-  M5.begin(cfg);
+  // Size the USB serial buffers before the port starts, and never block on writes when
+  // nobody on the laptop is reading: on core 3 a full TX buffer otherwise wedges the link.
   Serial.setRxBufferSize(4096);
+  Serial.setTxBufferSize(4096);
+  Serial.setTxTimeoutMs(0);
+  Serial.begin(115200);
+  auto cfg = M5.config();
+  cfg.serial_baudrate = 0;  // already started above
+  M5.begin(cfg);
   M5.Display.setRotation(1);
   M5.Display.setBrightness(110);
   M5.Speaker.setVolume(140);
@@ -1168,16 +1713,22 @@ void setup() {
   frost::init();
   M5.Speaker.end();
   // The IR LED runs off the stick's external power rail, which M5Unified leaves off.
-  M5.Power.setExtOutput(true, m5::ext_none);
-  // The IR LED and receiver sit on the L3B rail, switched by M5PM1 GPIO2. M5Unified leaves it off.
+  // Known-good power state: LDO on (IR needs it), L3B rail on via M5PM1 GPIO2 driven high
+  // (the display needs it), 5V rail on. The M5PM1 remembers its state across ESP resets,
+  // so set all of it on every boot.
   auto& pm1 = M5.Power.M5pm1;
+  pm1.setLDOOutput(true);
   pm1.setGPIOFunction(m5::M5PM1_Class::gpio2, m5::M5PM1_Class::gpio);
   pm1.setGPIOMode(m5::M5PM1_Class::gpio2, m5::M5PM1_Class::output);
   pm1.setGPIOOutput(m5::M5PM1_Class::gpio2, true);
+  M5.Power.setExtOutput(true, m5::ext_none);
   delay(50);
   ir::begin();
   loadShare();
-  startWifi();
+  loadRoot();
+#ifndef LEASH_NO_WIFI
+  if (!isVault) startWifi();  // the vault keeps its radio off except during the reshare window
+#endif
   mode = restingMode();
   lastMotion = millis();
   draw();
@@ -1190,6 +1741,7 @@ void loop() {
   while (Serial.available()) {
     char c = (char)Serial.read();
     if (c == '\n') {
+      lastSource = 'u';
       if (rx.length()) handle(rx);
       rx = "";
     } else if (c != '\r' && rx.length() < 4000) {
@@ -1197,11 +1749,20 @@ void loop() {
     }
   }
 
-  pollWifi();
+#ifndef LEASH_NO_WIFI
+  // WiFi scanning and dialing block the loop for seconds, which makes IR acks late.
+  // While a root request is out with the vault, leave WiFi alone.
+  if ((!isVault || windowOpen()) && !rjob.active) pollWifi();
+  if (isVault && windowUntil && millis() >= windowUntil) closeWindow();
+#endif
 
   // IR: report whole messages that arrive (the vault protocol builds on this).
   static std::vector<uint8_t> irMsg;
-  if (ir::poll(irMsg)) {
+  bool irGot = ir::poll(irMsg);
+  if (irGot && !irMsg.empty() && (irMsg[0] == 'S' || irMsg[0] == 'Z' || irMsg[0] == 'R')) {
+    if (isVault && irMsg[0] == 'S') vaultRequest(irMsg);
+    else if (!isVault && (irMsg[0] == 'Z' || irMsg[0] == 'R')) rootFromVault(irMsg);
+  } else if (irGot) {
     bool pattern = true;
     for (size_t i = 0; i < irMsg.size(); i++)
       if (irMsg[i] != (uint8_t)(i * 7 + 3)) pattern = false;
@@ -1215,8 +1776,10 @@ void loop() {
     send(d);
   }
 
+  flushOutbox();
+
   static uint32_t lastImu = 0;
-  if (millis() - lastImu > 100) {
+  if (!irQuiet && millis() - lastImu > 100) {
     lastImu = millis();
     pollImu();
   }
@@ -1236,6 +1799,16 @@ void loop() {
     }
   }
 #endif
+
+  // Vault: hold A and B together for 2 seconds to open the 2-minute reshare window.
+  if (isVault && !windowUntil && M5.BtnA.isPressed() && M5.BtnB.pressedFor(2000)) openWindow();
+  // Wrist: the vault has two minutes to answer a root request.
+  if (rjob.active && millis() - rjob.sentAt > 120000) {
+    rjob.active = false;
+    frost::wipe(rjob.n);
+    reject(rjob.id, "vault_timeout");
+    showResult("Vault timed out", C_MUTED, 3000);
+  }
 
   // Buttons.
   if (mode == Mode::ConfirmWifi) {
@@ -1296,8 +1869,11 @@ void loop() {
     if (M5.BtnA.wasPressed()) {
       approvePrompt();
     } else if (M5.BtnB.wasPressed()) {
-      reject(prompt.id, "user");
-      showResult("Rejected", C_MUTED);
+      if (prompt.kind == "vault_sign") vaultReject();
+      else {
+        reject(prompt.id, "user");
+        showResult("Rejected", C_MUTED);
+      }
     } else if (millis() - prompt.shownAt > 60000) {
       reject(prompt.id, "timeout");
       showResult("Timed out", C_MUTED);
@@ -1328,7 +1904,7 @@ void loop() {
     dirty = true;  // refresh link indicator and battery
   }
 
-  if (dirty) {
+  if (dirty && !irQuiet) {
     dirty = false;
     draw();
   }

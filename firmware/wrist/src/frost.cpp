@@ -7,7 +7,15 @@
 #include <mbedtls/ecp.h>
 #include <mbedtls/platform_util.h>
 #include <mbedtls/sha256.h>
+#include <mbedtls/gcm.h>
 #include <mbedtls/version.h>
+
+// mbedTLS 3 hides struct fields behind MBEDTLS_PRIVATE; 2.x has no such macro.
+#ifndef MBEDTLS_PRIVATE
+#define MBEDTLS_PRIVATE(m) m
+#endif
+#define PX(p) (p).v.MBEDTLS_PRIVATE(X)
+#define PY(p) (p).v.MBEDTLS_PRIVATE(Y)
 
 #if __has_include(<bootloader_random.h>)
 #include <bootloader_random.h>
@@ -77,15 +85,15 @@ void writePoint(const Pt& p, uint8_t out[65]) {
 
 void writeScalar(const Mpi& s, uint8_t out[32]) { mbedtls_mpi_write_binary(&s.v, out, 32); }
 
-void xOnly(const Pt& p, uint8_t out[32]) { mbedtls_mpi_write_binary(&p.v.X, out, 32); }
+void xOnly(const Pt& p, uint8_t out[32]) { mbedtls_mpi_write_binary(&PX(p), out, 32); }
 
-bool isOdd(const Pt& p) { return mbedtls_mpi_get_bit(&p.v.Y, 0) == 1; }
+bool isOdd(const Pt& p) { return mbedtls_mpi_get_bit(&PY(p), 0) == 1; }
 
 void negate(Pt& p) {
   // y -> p - y. Points here are never at infinity.
   Mpi t;
-  mbedtls_mpi_sub_mpi(&t.v, &grp.P, &p.v.Y);
-  mbedtls_mpi_copy(&p.v.Y, &t.v);
+  mbedtls_mpi_sub_mpi(&t.v, &grp.P, &PY(p));
+  mbedtls_mpi_copy(&PY(p), &t.v);
 }
 
 void negScalar(Mpi& s) {
@@ -284,6 +292,223 @@ bool u256FromDecimal(const char* s, uint8_t out[32]) {
   Mpi v;
   if (mbedtls_mpi_read_string(&v.v, 10, s) != 0) return false;
   return mbedtls_mpi_write_binary(&v.v, out, 32) == 0;
+}
+
+
+// ---- compressed points ------------------------------------------------------
+
+namespace {
+
+void writeCompressed(const Pt& p, uint8_t out[33]) {
+  out[0] = isOdd(p) ? 0x03 : 0x02;
+  mbedtls_mpi_write_binary(&PX(p), out + 1, 32);
+}
+
+// y = (x^3 + 7)^((p+1)/4) mod p, then pick the parity the prefix asks for.
+bool readCompressed(Pt& p, const uint8_t in[33]) {
+  if (in[0] != 0x02 && in[0] != 0x03) return false;
+  Mpi x, y, t, e, seven;
+  mbedtls_mpi_read_binary(&x.v, in + 1, 32);
+  if (mbedtls_mpi_cmp_mpi(&x.v, &grp.P) >= 0) return false;
+  mbedtls_mpi_mul_mpi(&t.v, &x.v, &x.v);
+  mbedtls_mpi_mod_mpi(&t.v, &t.v, &grp.P);
+  mbedtls_mpi_mul_mpi(&t.v, &t.v, &x.v);
+  mbedtls_mpi_lset(&seven.v, 7);
+  mbedtls_mpi_add_mpi(&t.v, &t.v, &seven.v);
+  mbedtls_mpi_mod_mpi(&t.v, &t.v, &grp.P);
+  mbedtls_mpi_add_int(&e.v, &grp.P, 1);
+  mbedtls_mpi_shift_r(&e.v, 2);
+  if (mbedtls_mpi_exp_mod(&y.v, &t.v, &e.v, &grp.P, nullptr) != 0) return false;
+  Mpi chk;
+  mbedtls_mpi_mul_mpi(&chk.v, &y.v, &y.v);
+  mbedtls_mpi_mod_mpi(&chk.v, &chk.v, &grp.P);
+  if (mbedtls_mpi_cmp_mpi(&chk.v, &t.v) != 0) return false;  // not on the curve
+  if ((int)mbedtls_mpi_get_bit(&y.v, 0) != (in[0] & 1)) mbedtls_mpi_sub_mpi(&y.v, &grp.P, &y.v);
+  mbedtls_mpi_copy(&PX(p), &x.v);
+  mbedtls_mpi_copy(&PY(p), &y.v);
+  mbedtls_mpi_lset(&p.v.MBEDTLS_PRIVATE(Z), 1);
+  return mbedtls_ecp_check_pubkey(&grp, &p.v) == 0;
+}
+
+void rhoN(Mpi& r, uint8_t i, const uint8_t m[32], int count, const uint8_t (*D)[33], const uint8_t (*E)[33]) {
+  Sha h;
+  h.add("LEASH/rhoN");
+  h.add(&i, 1);
+  h.add(m, 32);
+  for (int k = 0; k < count; k++) {
+    h.add(D[k], 33);
+    h.add(E[k], 33);
+  }
+  uint8_t d[32];
+  h.done(d);
+  scalarFromHash(r, d);
+}
+
+bool gcm(bool enc, const uint8_t key[32], const uint8_t iv[12], const uint8_t* in, size_t len, uint8_t* out,
+         uint8_t tag[16]) {
+  mbedtls_gcm_context g;
+  mbedtls_gcm_init(&g);
+  bool ok = mbedtls_gcm_setkey(&g, MBEDTLS_CIPHER_ID_AES, key, 256) == 0;
+  if (ok) {
+    if (enc) ok = mbedtls_gcm_crypt_and_tag(&g, MBEDTLS_GCM_ENCRYPT, len, iv, 12, nullptr, 0, in, out, 16, tag) == 0;
+    else ok = mbedtls_gcm_auth_decrypt(&g, len, iv, 12, nullptr, 0, tag, 16, in, out) == 0;
+  }
+  mbedtls_gcm_free(&g);
+  return ok;
+}
+
+void eciesKey(const Pt& shared, uint8_t key[32]) {
+  uint8_t x[32];
+  mbedtls_mpi_write_binary(&PX(shared), x, 32);
+  Sha h;
+  h.add("LEASH/ecies");
+  h.add(x, 32);
+  h.done(key);
+  mbedtls_platform_zeroize(x, 32);
+}
+
+}  // namespace
+
+bool commit(Nonce& n, uint8_t Dout[33], uint8_t Eout[33]) {
+  if (!ready) return false;
+  Mpi d, e;
+  Pt D, E;
+  randomScalar(d);
+  randomScalar(e);
+  mulG(D, d);
+  mulG(E, e);
+  writeCompressed(D, Dout);
+  writeCompressed(E, Eout);
+  mbedtls_mpi_write_binary(&d.v, n.d, 32);
+  mbedtls_mpi_write_binary(&e.v, n.e, 32);
+  return true;
+}
+
+void wipe(Nonce& n) { mbedtls_platform_zeroize(&n, sizeof n); }
+
+bool respond(const uint8_t share[32], const uint8_t groupKey[32], const uint8_t msg[32], int count,
+             const uint8_t* ids, const uint8_t (*D)[33], const uint8_t (*E)[33], int me, Nonce& n,
+             uint8_t outZ[32]) {
+  if (!ready || count < 2) return false;
+  Pt R, Ri, Dp, Ep;
+  Mpi one, rho, myRho;
+  mbedtls_mpi_lset(&one.v, 1);
+  bool first = true, found = false;
+  for (int k = 0; k < count; k++) {
+    if (!readCompressed(Dp, D[k]) || !readCompressed(Ep, E[k])) return false;
+    rhoN(rho, ids[k], msg, count, D, E);
+    if (!mulAdd(Ri, one, Dp, rho, Ep)) return false;
+    if (first) {
+      mbedtls_ecp_copy(&R.v, &Ri.v);
+      first = false;
+    } else {
+      Pt sum;
+      if (!add(sum, R, Ri)) return false;
+      mbedtls_ecp_copy(&R.v, &sum.v);
+    }
+    if (ids[k] == me) {
+      mbedtls_mpi_copy(&myRho.v, &rho.v);
+      found = true;
+    }
+  }
+  if (!found) return false;
+  Mpi d, e, k, c, x, z, t;
+  mbedtls_mpi_read_binary(&d.v, n.d, 32);
+  mbedtls_mpi_read_binary(&e.v, n.e, 32);
+  mbedtls_mpi_mul_mpi(&k.v, &myRho.v, &e.v);
+  mbedtls_mpi_add_mpi(&k.v, &k.v, &d.v);
+  modN(k);
+  if (isOdd(R)) negScalar(k);
+  uint8_t Rx[32];
+  xOnly(R, Rx);
+  bip340Challenge(c, Rx, groupKey, msg);
+  mbedtls_mpi_read_binary(&x.v, share, 32);
+  mbedtls_mpi_mul_mpi(&t.v, &c.v, &x.v);
+  mbedtls_mpi_add_mpi(&z.v, &t.v, &k.v);
+  modN(z);
+  writeScalar(z, outZ);
+  mbedtls_mpi_lset(&d.v, 0);
+  mbedtls_mpi_lset(&e.v, 0);
+  mbedtls_mpi_lset(&k.v, 0);
+  mbedtls_mpi_lset(&x.v, 0);
+  wipe(n);  // single use
+  return true;
+}
+
+void randomScalar32(uint8_t out[32]) {
+  Mpi s;
+  randomScalar(s);
+  writeScalar(s, out);
+}
+
+bool pubOf(const uint8_t priv[32], uint8_t pub[33]) {
+  if (!ready) return false;
+  Mpi s;
+  Pt P;
+  mbedtls_mpi_read_binary(&s.v, priv, 32);
+  mulG(P, s);
+  writeCompressed(P, pub);
+  mbedtls_mpi_lset(&s.v, 0);
+  return true;
+}
+
+bool keypair(uint8_t priv[32], uint8_t pub[33]) {
+  randomScalar32(priv);
+  return pubOf(priv, pub);
+}
+
+void subMod(const uint8_t a[32], const uint8_t b[32], uint8_t out[32]) {
+  Mpi x, y, r;
+  mbedtls_mpi_read_binary(&x.v, a, 32);
+  mbedtls_mpi_read_binary(&y.v, b, 32);
+  mbedtls_mpi_sub_mpi(&r.v, &x.v, &y.v);
+  modN(r);
+  writeScalar(r, out);
+}
+
+void addMod(const uint8_t a[32], const uint8_t b[32], uint8_t out[32]) {
+  Mpi x, y, r;
+  mbedtls_mpi_read_binary(&x.v, a, 32);
+  mbedtls_mpi_read_binary(&y.v, b, 32);
+  mbedtls_mpi_add_mpi(&r.v, &x.v, &y.v);
+  modN(r);
+  writeScalar(r, out);
+}
+
+bool seal(const uint8_t pub[33], const uint8_t* msg, size_t len, uint8_t* out, size_t* outLen) {
+  if (!ready) return false;
+  Pt V, S, K;
+  Mpi k;
+  if (!readCompressed(V, pub)) return false;
+  randomScalar(k);
+  mulG(K, k);
+  if (mbedtls_ecp_mul(&grp, &S.v, &k.v, &V.v, rng, nullptr) != 0) return false;
+  uint8_t key[32];
+  eciesKey(S, key);
+  writeCompressed(K, out);
+  esp_fill_random(out + 33, 12);
+  bool ok = gcm(true, key, out + 33, msg, len, out + 61, out + 45);
+  mbedtls_platform_zeroize(key, 32);
+  mbedtls_mpi_lset(&k.v, 0);
+  *outLen = 61 + len;
+  return ok;
+}
+
+bool open(const uint8_t priv[32], const uint8_t* ct, size_t len, uint8_t* out, size_t* outLen) {
+  if (!ready || len < 61) return false;
+  Pt K, S;
+  Mpi d;
+  if (!readCompressed(K, ct)) return false;
+  mbedtls_mpi_read_binary(&d.v, priv, 32);
+  if (mbedtls_ecp_mul(&grp, &S.v, &d.v, &K.v, rng, nullptr) != 0) return false;
+  uint8_t key[32], tag[16];
+  eciesKey(S, key);
+  memcpy(tag, ct + 45, 16);
+  bool ok = gcm(false, key, ct + 33, ct + 61, len - 61, out, tag);
+  mbedtls_platform_zeroize(key, 32);
+  mbedtls_mpi_lset(&d.v, 0);
+  *outLen = len - 61;
+  return ok;
 }
 
 }  // namespace frost

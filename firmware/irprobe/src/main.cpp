@@ -5,11 +5,20 @@
 #include "driver/rmt_tx.h"
 #include "driver/rmt_encoder.h"
 
+// Undo earlier bench experiments: the M5PM1 keeps its own state across ESP resets.
+static void restorePmic() {
+  auto& pm = M5.Power.M5pm1;
+  pm.setLDOOutput(true);
+  pm.setGPIOMode(m5::M5PM1_Class::gpio2, m5::M5PM1_Class::input);
+  M5.Power.setExtOutput(true, m5::ext_none);
+}
+
 #ifdef ROLE_TX
 rmt_channel_handle_t tx_chan = NULL;
 rmt_encoder_handle_t enc = NULL;
 void setup() {
   M5.begin();
+  restorePmic();
   Serial.begin(115200);
   rmt_tx_channel_config_t c = {};
   c.gpio_num = (gpio_num_t)46;
@@ -58,6 +67,7 @@ rmt_receive_config_t rc = {};
 void setup() {
   M5.begin();
   M5.Speaker.end();
+  restorePmic();
   Serial.begin(115200);
   rmt_rx_channel_config_t c = {};
   c.gpio_num = (gpio_num_t)42;

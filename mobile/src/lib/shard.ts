@@ -28,3 +28,19 @@ export async function deleteShard(): Promise<void> {
     // nothing stored
   }
 }
+
+const ROOT_KEY = 'leash.root-shard.v1';
+
+/** The phone's share of the root key (3-of-3 with wrist and vault once the vault joins). */
+export async function loadRoot(): Promise<import('./root').RootShare | null> {
+  try {
+    const v = await SecureStore.getItemAsync(ROOT_KEY);
+    return v ? JSON.parse(v) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveRoot(r: import('./root').RootShare): Promise<void> {
+  await SecureStore.setItemAsync(ROOT_KEY, JSON.stringify(r));
+}

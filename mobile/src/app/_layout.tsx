@@ -81,6 +81,7 @@ export default function RootLayout() {
           <Stack.Screen name="demo" options={{ presentation: 'modal' }} />
           <Stack.Screen name="wrist" options={{ presentation: 'modal' }} />
           <Stack.Screen name="chain" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="vault" options={{ presentation: 'modal' }} />
         </Stack>
         {AUTOTEST ? <AutotestBanner /> : null}
         <IncomingWatcher />

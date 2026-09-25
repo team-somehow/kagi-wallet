@@ -60,6 +60,7 @@ export default function Demo() {
           Chain
         </Txt>
         <Button label="Sepolia testnet" variant="secondary" onPress={() => router.push('/chain')} />
+        <Button label="Vault and root key" variant="secondary" onPress={() => router.push('/vault')} />
       </View>
 
       <View style={styles.group}>

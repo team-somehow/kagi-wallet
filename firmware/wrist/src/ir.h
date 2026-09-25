@@ -24,6 +24,9 @@ Stats stats();
 String dumpRaw();
 void blast(uint32_t ms);
 String loopback();
+void setAck(bool on);
+void resetStats();
+void rateTest(int frames, int gapMs);
 String pinInfo();
 
 }  // namespace ir

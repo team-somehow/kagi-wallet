@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo-google-fonts/martian-mono": "^0.4.2",
     "@expo-google-fonts/schibsted-grotesk": "^0.4.2",
+    "@noble/ciphers": "^2.4.0",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "expo": "~57.0.25",
