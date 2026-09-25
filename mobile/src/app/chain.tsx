@@ -202,10 +202,19 @@ export default function Chain() {
                   <Txt mono size={13} color={colors.muted}>
                     {eth(s.spent)} of {eth(s.cap)} · {live(s) ? `${Math.max(0, Math.round(Number(BigInt(s.expiry) - now) / 60))} min left` : BigInt(s.expiry) === 0n ? 'revoked' : 'expired'}
                   </Txt>
+                  {live(s) && !s.held ? (
+                    <Txt size={13} color={colors.faint}>
+                      The agent restarted and no longer holds this key. It cannot spend, but revoke it anyway.
+                    </Txt>
+                  ) : null}
                   {live(s) && !pending ? (
                     <View style={styles.buttons}>
-                      <Button label={`Agent spends ${eth(SPEND)}`} variant="secondary" onPress={() => void agentSpend(s, SPEND)} disabled={busy !== null} style={styles.small} />
-                      <Button label="Agent goes over the cap" variant="secondary" onPress={() => void agentSpend(s, BigInt(s.cap) + 1n)} disabled={busy !== null} style={styles.small} />
+                      {s.held ? (
+                        <>
+                          <Button label={`Agent spends ${eth(SPEND)}`} variant="secondary" onPress={() => void agentSpend(s, SPEND)} disabled={busy !== null} style={styles.small} />
+                          <Button label="Agent goes over the cap" variant="secondary" onPress={() => void agentSpend(s, BigInt(s.cap) + 1n)} disabled={busy !== null} style={styles.small} />
+                        </>
+                      ) : null}
                       <Button label="Revoke with the phone alone" variant="danger" onPress={() => void revoke(s)} disabled={busy !== null} style={styles.small} />
                     </View>
                   ) : null}
