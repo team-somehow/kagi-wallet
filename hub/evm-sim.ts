@@ -60,7 +60,8 @@ await run('tampered s', 0n, { ...good, s: good.s ^ 1n }, false);
 for (let i = 1; i <= 5; i++) await run(`valid signature ${i + 1}`, 0n, sign(0n), true);
 
 const block = await client.getBlock();
-const deployData = `${art.bytecode}${px.toString(16).padStart(64, '0')}` as `0x${string}`;
+// Constructor takes (groupKey, phoneKey); the phone key doesn't matter for a gas estimate.
+const deployData = `${art.bytecode}${px.toString(16).padStart(64, '0').repeat(2)}` as `0x${string}`;
 const deployGas = await client.estimateGas({ data: deployData, account: '0xD130448ff0c82Cd4f8044E41ACE6cA5289A88107', value: parseEther('0') }).catch((e) => {
   console.log('deploy estimate failed:', e.shortMessage);
   return null;

@@ -85,7 +85,7 @@ export async function info(gk) {
     accountBalance: accountBalance.toString(),
     nonce: nonce.toString(),
     sessions,
-    deployCost: (500_000n * f).toString(),
+    deployCost: (960_000n * f).toString(),
     grantCost: (110_000n * f).toString(),
     spendCost: (90_000n * f).toString(),
     explorer: EXPLORER,
@@ -98,7 +98,7 @@ export async function deploy(gk, phoneKey, fundWei) {
     abi: art.abi,
     bytecode: `${art.bytecode}${gk.padStart(64, '0')}${String(phoneKey).padStart(64, '0')}`,
     value: BigInt(fundWei ?? 0),
-    gas: 560_000n,
+    gas: 1_100_000n,
     ...(await fees()),
   });
   const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
@@ -165,7 +165,7 @@ export async function rootDeploy(rk, fundWei) {
     abi: rootArt.abi,
     bytecode: `${rootArt.bytecode}${rk.padStart(64, '0')}`,
     value: BigInt(fundWei ?? 0),
-    gas: 240_000n,
+    gas: 500_000n,
     ...(await fees()),
   });
   const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });

@@ -1,0 +1,29 @@
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.30"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+bytecode_hash = "none"
+cbor_metadata = false
+fs_permissions = [{ access = "read", path = "./test/fixtures" }]
+
+[fuzz]
+runs = 512
+
+[fmt]
+line_length = 120
+
+[lint]
+# By design, not bugs:
+#   arbitrary-send-eth  execute/spend send to a signed-for destination; that is their job
+#   ecrecover           Bip340 uses ecrecover for curve math, not as a signature; spend's
+#                       agent signature covers a per-session nonce, so a malleated copy can't replay
+#   block-timestamp     session expiry is hours long; seconds of validator skew don't matter
+#   missing-zero-check  spend rejects agent == 0; to == 0 is a legitimate burn
+exclude_lints = ["arbitrary-send-eth", "ecrecover", "block-timestamp", "missing-zero-check"]

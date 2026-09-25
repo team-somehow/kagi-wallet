@@ -1,50 +1,15 @@
-// Compiles the Leash account. The Yul version is what gets deployed (small, cheap);
-// LeashAccount.sol is the readable reference with the same ABI and behaviour.
-// Output: hub/LeashAccount.json
-import solc from 'solc';
+// Builds the contracts with Foundry (contracts/, `forge build`) and copies what the hub needs
+// into hub/LeashAccount.json and hub/RootTreasury.json as { abi, bytecode, deployed }.
+// Constructor arguments are appended to `bytecode` at deploy time (see evm.mjs).
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const yul = readFileSync(new URL('../contracts/LeashAccount.yul', import.meta.url), 'utf8');
-const out = JSON.parse(
-  solc.compile(
-    JSON.stringify({
-      language: 'Yul',
-      sources: { 'LeashAccount.yul': { content: yul } },
-      settings: { optimizer: { enabled: true, details: { yul: true, yulDetails: { optimizerSteps: 'u:' } } }, evmVersion: 'cancun', outputSelection: { '*': { '*': ['evm.bytecode.object', 'evm.deployedBytecode.object'] } } },
-    }),
-  ),
-);
-for (const e of out.errors ?? []) console.error(e.formattedMessage);
-if ((out.errors ?? []).some((e) => e.severity === 'error')) process.exit(1);
-const c = out.contracts['LeashAccount.yul'].LeashAccount;
-const abi = [
-  { type: 'function', name: 'execute', stateMutability: 'nonpayable', inputs: [
-    { name: 'to', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' },
-    { name: 'rx', type: 'uint256' }, { name: 's', type: 'uint256' }], outputs: [] },
-  { type: 'function', name: 'grant', stateMutability: 'nonpayable', inputs: [
-    { name: 'agent', type: 'address' }, { name: 'cap', type: 'uint256' }, { name: 'expiry', type: 'uint256' },
-    { name: 'rx', type: 'uint256' }, { name: 's', type: 'uint256' }], outputs: [] },
-  { type: 'function', name: 'revoke', stateMutability: 'nonpayable', inputs: [
-    { name: 'agent', type: 'address' }, { name: 'rx', type: 'uint256' }, { name: 's', type: 'uint256' }], outputs: [] },
-  { type: 'function', name: 'spend', stateMutability: 'nonpayable', inputs: [
-    { name: 'agent', type: 'address' }, { name: 'to', type: 'address' }, { name: 'value', type: 'uint256' },
-    { name: 'v', type: 'uint8' }, { name: 'r', type: 'bytes32' }, { name: 's', type: 'bytes32' }], outputs: [] },
-  { type: 'function', name: 'session', stateMutability: 'view', inputs: [{ name: 'agent', type: 'address' }],
-    outputs: [{ name: 'cap', type: 'uint256' }, { name: 'spent', type: 'uint256' }, { name: 'expiry', type: 'uint256' }, { name: 'nonce', type: 'uint256' }] },
-  { type: 'function', name: 'groupKey', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
-  { type: 'function', name: 'phoneKey', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
-  { type: 'function', name: 'nonce', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
-  { type: 'function', name: 'isValidSignature', stateMutability: 'view', inputs: [
-    { name: 'hash', type: 'bytes32' }, { name: 'signature', type: 'bytes' }], outputs: [{ type: 'bytes4' }] },
-  { type: 'function', name: 'onERC721Received', stateMutability: 'nonpayable', inputs: [
-    { type: 'address' }, { type: 'address' }, { type: 'uint256' }, { type: 'bytes' }], outputs: [{ type: 'bytes4' }] },
-  { type: 'function', name: 'onERC1155Received', stateMutability: 'nonpayable', inputs: [
-    { type: 'address' }, { type: 'address' }, { type: 'uint256' }, { type: 'uint256' }, { type: 'bytes' }], outputs: [{ type: 'bytes4' }] },
-  { type: 'function', name: 'onERC1155BatchReceived', stateMutability: 'nonpayable', inputs: [
-    { type: 'address' }, { type: 'address' }, { type: 'uint256[]' }, { type: 'uint256[]' }, { type: 'bytes' }], outputs: [{ type: 'bytes4' }] },
-  { type: 'function', name: 'supportsInterface', stateMutability: 'view', inputs: [{ name: 'id', type: 'bytes4' }], outputs: [{ type: 'bool' }] },
-];
-const init = c.evm.bytecode.object;
-const runtime = c.evm.deployedBytecode?.object ?? '';
-writeFileSync(new URL('./LeashAccount.json', import.meta.url), JSON.stringify({ abi, bytecode: `0x${init}`, deployed: `0x${runtime}` }, null, 2));
-console.log('init bytes', init.length / 2, 'runtime bytes', runtime.length / 2);
+const contracts = new URL('../contracts/', import.meta.url);
+execFileSync('forge', ['build'], { cwd: contracts, stdio: 'inherit' });
+
+for (const name of ['LeashAccount', 'RootTreasury']) {
+  const a = JSON.parse(readFileSync(new URL(`out/${name}.sol/${name}.json`, contracts), 'utf8'));
+  const art = { abi: a.abi, bytecode: a.bytecode.object, deployed: a.deployedBytecode.object };
+  writeFileSync(new URL(`./${name}.json`, import.meta.url), JSON.stringify(art, null, 2));
+  console.log(name, 'init bytes', (art.bytecode.length - 2) / 2, 'runtime bytes', (art.deployed.length - 2) / 2);
+}
