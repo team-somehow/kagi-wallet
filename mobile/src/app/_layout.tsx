@@ -12,6 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { StoreProvider, useStore } from '../store/store';
 import { colors } from '../theme';
 import { buzz } from '../lib/haptics';
+import { WristBridge } from '../components/WristBridge';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -67,6 +68,7 @@ export default function RootLayout() {
           <Stack.Screen name="demo" options={{ presentation: 'modal' }} />
         </Stack>
         <IncomingWatcher />
+        <WristBridge />
       </ThemeProvider>
     </StoreProvider>
   );

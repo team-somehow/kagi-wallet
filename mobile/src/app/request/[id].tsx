@@ -75,7 +75,7 @@ export default function Request() {
           <ManagerSign
             action="Approve and sign"
             phoneDetail="Unlock to sign the grant with the phone shard"
-            wrist={state.wrist}
+            payload={{ kind: 'grant', agent: req.agent, pubkey: req.pubkey, capUsdc: req.capUsdc, hours: req.durationH }}
             onDone={approve}
           />
         </View>

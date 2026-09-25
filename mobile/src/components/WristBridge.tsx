@@ -13,7 +13,9 @@ export function WristBridge() {
   const { live, cap, spent } = useExposure();
   const ready = Boolean(useRootNavigationState()?.key);
   const readyRef = useRef(ready);
-  readyRef.current = ready;
+  useEffect(() => {
+    readyRef.current = ready;
+  }, [ready]);
 
   useEffect(() => {
     link.start();

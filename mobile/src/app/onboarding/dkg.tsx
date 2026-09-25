@@ -6,43 +6,75 @@ import { Txt } from '../../components/Txt';
 import { Button } from '../../components/Button';
 import { Steps, type Step } from '../../components/Steps';
 import { useStore } from '../../store/store';
-import { makeAddress } from '../../store/mock';
+import { dkgFinish, dkgStart, type Pop } from '../../lib/frost';
+import { link, type Msg } from '../../lib/link';
+import { rand, saveShard } from '../../lib/shard';
 import { groupAddr } from '../../lib/format';
-import { success, tap } from '../../lib/haptics';
+import { success, tap, warn } from '../../lib/haptics';
 import { colors, space } from '../../theme';
 
 const ROUNDS = [
-  { label: 'Commitments exchanged', detail: 'Each device commits to its share before revealing anything' },
-  { label: 'Shares delivered', detail: 'Encrypted to the other device, over the paired channel' },
-  { label: 'Shares verified', detail: 'Each side checks the other against its commitment' },
-  { label: 'Address derived', detail: 'Same public key on both screens, no private key anywhere' },
+  { label: 'Phone share made', detail: 'Picked on this phone, never leaves it' },
+  { label: 'Wrist share made', detail: 'Picked on the wrist, never leaves it' },
+  { label: 'Proofs checked', detail: 'Each side proved it holds the share it announced' },
+  { label: 'Group key derived', detail: 'One public key from both shares. No private key exists anywhere.' },
 ];
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export default function Dkg() {
   const { dispatch } = useStore();
   const [done, setDone] = useState(0);
-  const [address] = useState(makeAddress);
-  const finished = done >= ROUNDS.length;
+  const [groupKey, setGroupKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const finished = groupKey !== null;
 
   useEffect(() => {
-    if (finished) {
-      void success();
-      return;
-    }
-    const t = setTimeout(() => {
+    let alive = true;
+    const step = async (n: number) => {
+      if (!alive) return;
+      setDone(n);
       void tap();
-      setDone((d) => d + 1);
-    }, 900);
-    return () => clearTimeout(t);
-  }, [done, finished]);
+      await wait(250);
+    };
+    (async () => {
+      await wait(200);
+      const mine = dkgStart(rand);
+      await step(1);
+      const reply = link.waitFor((m: Msg) => m.t === 'dkg' || m.t === 'dkg_error', 15000);
+      if (!link.send({ t: 'dkg', X: mine.X, pop: mine.pop })) throw new Error('Lost the hub.');
+      const m = await reply;
+      if (m.t === 'dkg_error') {
+        throw new Error(m.reason === 'not_confirmed' ? 'The wrist has not confirmed the code. Go back and pair again.' : 'The wrist rejected the phone proof.');
+      }
+      await step(2);
+      const share = dkgFinish(mine, String(m.X), m.pop as Pop);
+      await step(3);
+      if (share.groupKey !== String(m.groupKey)) throw new Error('Phone and wrist derived different keys. Start over.');
+      await saveShard(share);
+      await step(4);
+      if (!alive) return;
+      setGroupKey(share.groupKey);
+      void success();
+    })().catch((e: unknown) => {
+      if (!alive) return;
+      setError(e instanceof Error ? e.message : 'Key generation failed.');
+      void warn();
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const steps: Step[] = ROUNDS.map((r, i) => ({
     ...r,
-    state: i < done ? 'done' : i === done ? 'active' : 'todo',
+    state: i < done ? 'done' : i === done ? (error ? 'failed' : 'active') : 'todo',
   }));
 
   const confirm = () => {
-    dispatch({ type: 'ONBOARDED', address });
+    if (!groupKey) return;
+    dispatch({ type: 'ONBOARDED', address: groupKey });
+    router.dismissAll();
     router.replace('/home');
   };
 
@@ -51,29 +83,34 @@ export default function Dkg() {
       footer={
         finished ? (
           <>
-            <Button label="Same address on the wrist" onPress={confirm} />
-            <Button label="Different address" variant="ghost" onPress={() => router.back()} />
+            <Button label="Same key on the wrist" onPress={confirm} />
+            <Button label="Different key" variant="ghost" onPress={() => router.back()} />
           </>
+        ) : error ? (
+          <Button label="Back to pairing" onPress={() => router.back()} />
         ) : null
       }
     >
       <View style={styles.top}>
         <Txt size={32} weight="bold" lineHeight={36}>
-          {finished ? 'Wallet created' : 'Generating the key'}
+          {finished ? 'Wallet created' : error ? 'Could not create the key' : 'Generating the key'}
         </Txt>
-        <Txt size={17} color={colors.muted}>
+        <Txt size={17} color={error ? colors.red : colors.muted}>
           {finished
-            ? 'Check the wrist. It should be showing exactly this.'
-            : 'Phone and wrist are building one key between them. Keep the wrist awake.'}
+            ? 'The wrist is showing the start and end of this key. Check they match.'
+            : error ?? 'Phone and wrist are building one key between them. Keep the wrist plugged in.'}
         </Txt>
       </View>
-      {finished ? (
+      {finished && groupKey ? (
         <View style={styles.address}>
-          <Txt mono size={22} lineHeight={34} color={colors.text}>
-            {groupAddr(address)}
+          <Txt mono size={28} weight="bold" lineHeight={36} color={colors.amber}>
+            {groupKey.slice(0, 4)}..{groupKey.slice(-4)}
+          </Txt>
+          <Txt mono size={15} lineHeight={24} color={colors.muted}>
+            {groupAddr(groupKey)}
           </Txt>
           <Txt size={14} color={colors.muted}>
-            Root key, 2 of 2. You can add the vault later to make it 3 of 3.
+            Manager key, 2 of 2. Phone and wrist each hold one share.
           </Txt>
         </View>
       ) : (

@@ -6,9 +6,11 @@ import { Txt } from '../components/Txt';
 import { Button } from '../components/Button';
 import { TopBar } from '../components/TopBar';
 import { useExposure, useStore } from '../store/store';
+import { link } from '../lib/link';
+import { deleteShard } from '../lib/shard';
 import { colors, space } from '../theme';
 
-/** Stand-in for the agent, the chain and the wrist, until the real ones are wired up. */
+/** Stand-in for the agent and the chain. The wrist is real. */
 export default function Demo() {
   const { state, sim } = useStore();
   const { live } = useExposure();
@@ -26,7 +28,7 @@ export default function Demo() {
         Demo controls
       </Txt>
       <Txt size={15} color={colors.muted} style={styles.lead}>
-        Everything here pretends to be something outside the phone.
+        These pretend to be the agent and the chain. The wrist is the real one on your arm.
       </Txt>
 
       <View style={styles.group}>
@@ -55,22 +57,6 @@ export default function Demo() {
 
       <View style={styles.group}>
         <Txt size={15} weight="medium" color={colors.muted}>
-          Wrist
-        </Txt>
-        <Button
-          label={state.wrist.onArm ? 'Take it off the arm' : 'Put it back on'}
-          variant="secondary"
-          onPress={() => sim.wristOnArm(!state.wrist.onArm)}
-        />
-        <Button
-          label={state.wrist.connected ? 'Drop the connection' : 'Reconnect'}
-          variant="secondary"
-          onPress={() => sim.wristConnected(!state.wrist.connected)}
-        />
-      </View>
-
-      <View style={styles.group}>
-        <Txt size={15} weight="medium" color={colors.muted}>
           Clock
         </Txt>
         <Button label="Expire the soonest key" variant="secondary" disabled={noKeys} onPress={sim.expireSoonest} />
@@ -81,12 +67,15 @@ export default function Demo() {
           Wallet
         </Txt>
         <Button
-          label="Wipe and start over"
+          label="Wipe phone and wrist, start over"
           variant="danger"
           onPress={() => {
-            sim.reset();
-            router.dismissAll();
-            router.replace('/onboarding');
+            link.send({ t: 'wipe' });
+            void deleteShard().then(() => {
+              sim.reset();
+              router.dismissAll();
+              router.replace('/onboarding');
+            });
           }}
         />
       </View>

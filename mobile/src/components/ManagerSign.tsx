@@ -2,91 +2,154 @@ import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { colors, space } from '../theme';
 import { unlockShard } from '../lib/biometrics';
-import { buzz, success } from '../lib/haptics';
-import type { Wrist } from '../store/types';
+import { success, warn } from '../lib/haptics';
+import { combine, grantCanonical, messageFor, nonces, txCanonical } from '../lib/frost';
+import { link, type Msg } from '../lib/link';
+import { loadShard, rand } from '../lib/shard';
+import { uid } from '../store/mock';
+import { useStore } from '../store/store';
 import { Button } from './Button';
 import { Steps, type Step } from './Steps';
 import { Txt } from './Txt';
+import { wristStatus } from './WristChip';
 
-export type Phase = 'idle' | 'unlocking' | 'wrist' | 'done' | 'error';
+export type SignPayload =
+  | { kind: 'grant'; agent: string; pubkey: string; capUsdc: number; hours: number }
+  | { kind: 'tx'; agent: string; contract: string; calldata: string };
+
+type Phase = 'idle' | 'unlocking' | 'wrist' | 'combining' | 'done' | 'error';
 
 interface Props {
-  /** What the primary button says before anything has happened. */
   action: string;
-  /** Shown under the phone step. */
   phoneDetail: string;
-  wrist: Wrist;
+  payload: SignPayload;
   onPhoneSigned?: () => void;
-  onDone: () => void;
-  /** Milliseconds until the simulated wrist press. Real hardware replaces this. */
-  wristDelayMs?: number;
+  /** Called with the verified 64 byte BIP340 signature, hex. */
+  onDone: (signature: string) => void;
 }
 
+const PHONE_ERRORS = ['Cancelled', 'Could not verify you. Try again.', 'This phone has no shard. Create the wallet again.'];
+
+const REJECT_TEXT: Record<string, string> = {
+  user: 'You rejected it on the wrist.',
+  timeout: 'The wrist timed out. Nothing was signed.',
+  off_arm: 'The wrist is off your arm. Put it on and try again.',
+  not_paired: 'The wrist has no shard. Pair it again from a fresh wallet.',
+  busy: 'The wrist is showing another request. Finish that one first.',
+  bad_calldata: 'The wrist could not read this transaction, so it refused.',
+};
+
 /**
- * The manager key is 2-of-2: phone shard, then wrist shard.
- * Biometrics release the phone's partial signature. A press on the wrist
- * releases the other half. Nothing is signed until both happen.
+ * The manager key is 2 of 2: phone shard, then wrist shard.
+ * Biometrics unlock the phone's share. The wrist shows what it is signing, decoded
+ * from the raw bytes, and signs its half only when you press A. The phone checks
+ * the wrist's half and the final signature before anything counts as signed.
  */
-export function ManagerSign({ action, phoneDetail, wrist, onPhoneSigned, onDone, wristDelayMs = 2800 }: Props) {
+export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onDone }: Props) {
+  const { state } = useStore();
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wristReady = wrist.connected && wrist.onArm;
+  const [sig, setSig] = useState<string | null>(null);
+  const pendingId = useRef<string | null>(null);
+  const status = wristStatus(state.wrist, state.address);
 
-  const finish = () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    setPhase('done');
-    void success();
-    onDone();
+  // Leaving the screen mid-request clears it off the wrist.
+  useEffect(
+    () => () => {
+      if (pendingId.current) link.send({ t: 'sign_cancel', id: pendingId.current });
+    },
+    [],
+  );
+
+  const fail = (msg: string) => {
+    pendingId.current = null;
+    setError(msg);
+    setPhase('error');
+    void warn();
   };
 
-  useEffect(() => {
-    if (phase !== 'wrist' || !wristReady) return;
-    void buzz();
-    timer.current = setTimeout(finish, wristDelayMs);
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, wristReady]);
-
-  const unlock = async () => {
+  const run = async () => {
     setError(null);
     setPhase('unlocking');
-    const r = await unlockShard(action);
-    if (!r.ok) {
-      setError(r.reason);
-      setPhase('error');
-      return;
-    }
+    const unlocked = await unlockShard(action);
+    if (!unlocked.ok) return fail(unlocked.reason);
+    const shard = await loadShard();
+    if (!shard) return fail('This phone has no shard. Create the wallet again.');
+
+    const canonical =
+      payload.kind === 'grant'
+        ? grantCanonical(payload.agent, payload.pubkey, payload.capUsdc, payload.hours)
+        : txCanonical(payload.contract, payload.calldata);
+    const m = messageFor(canonical);
+    const mine = nonces(rand);
+    const id = uid();
+    pendingId.current = id;
     onPhoneSigned?.();
     setPhase('wrist');
+
+    const answer = link.waitFor(
+      (x: Msg) => (x.t === 'sig_share' || x.t === 'sign_reject') && x.id === id,
+      75000,
+    );
+    const wire =
+      payload.kind === 'grant'
+        ? {
+            kind: 'grant',
+            agent: payload.agent,
+            pubkey: payload.pubkey,
+            capMicro: String(Math.round(payload.capUsdc * 1_000_000)),
+            hours: payload.hours,
+          }
+        : { kind: 'tx', agent: payload.agent, to: payload.contract, calldata: payload.calldata };
+    if (!link.send({ t: 'sign', id, ...wire, D: mine.D, E: mine.E })) return fail('Lost the hub. Nothing was signed.');
+
+    let reply: Msg;
+    try {
+      reply = await answer;
+    } catch (e) {
+      return fail(e instanceof Error ? e.message : 'No answer from the wrist.');
+    }
+    pendingId.current = null;
+    if (reply.t === 'sign_reject') return fail(REJECT_TEXT[String(reply.reason)] ?? `The wrist refused: ${String(reply.reason)}.`);
+
+    setPhase('combining');
+    // Let the spinner paint before the curve math blocks the JS thread.
+    await new Promise((r) => setTimeout(r, 30));
+    try {
+      const signature = combine(shard, m, mine, { D2: String(reply.D), E2: String(reply.E), z2: String(reply.z) });
+      setSig(signature);
+      setPhase('done');
+      void success();
+      onDone(signature);
+    } catch (e) {
+      fail(e instanceof Error ? e.message : 'The signature did not verify.');
+    }
   };
 
+  const phoneFailed = phase === 'error' && phaseBeforeWrist(error);
+  const wristFailed = phase === 'error' && !phoneFailed;
   const phoneState: Step['state'] =
-    phase === 'idle' ? 'todo' : phase === 'unlocking' ? 'active' : phase === 'error' ? 'failed' : 'done';
-  const wristState: Step['state'] = phase === 'wrist' ? 'active' : phase === 'done' ? 'done' : 'todo';
+    phase === 'idle' ? 'todo' : phase === 'unlocking' ? 'active' : phoneFailed ? 'failed' : 'done';
+  const wristState: Step['state'] =
+    phase === 'wrist' || phase === 'combining' ? 'active' : phase === 'done' ? 'done' : wristFailed ? 'failed' : 'todo';
+
+  const phoneText =
+    phoneFailed && error ? error : phase === 'idle' || phase === 'unlocking' ? phoneDetail : 'Unlocked from the secure keystore';
+  const wristText = wristFailed
+    ? (error ?? 'Something went wrong.')
+    : phase === 'wrist'
+      ? 'It buzzed. Check the amount on the wrist, then press A to sign or B to reject.'
+      : phase === 'combining'
+        ? 'Pressed. Checking both halves.'
+        : phase === 'done' && sig
+          ? `Signature ${sig.slice(0, 8)}…${sig.slice(-8)} verified`
+          : !status.ok
+            ? `${status.text}.`
+            : 'Press A on the wrist when it buzzes';
 
   const steps: Step[] = [
-    {
-      label: 'Phone shard',
-      detail: phase === 'error' && error ? error : phase === 'idle' || phase === 'unlocking' ? phoneDetail : 'Signed from the secure keystore',
-      state: phoneState,
-    },
-    {
-      label: 'Wrist shard',
-      detail: !wristReady
-        ? wrist.connected
-          ? 'The wrist is off your arm. Put it on to wake the shard.'
-          : 'The wrist is offline. Bring it within range.'
-        : phase === 'wrist'
-          ? 'It buzzed. Press A on the wrist.'
-          : phase === 'done'
-            ? 'Pressed. Both halves signed.'
-            : 'Press A on the wrist when it buzzes',
-      state: wristState,
-    },
+    { label: 'Phone shard', detail: phoneText, state: phoneState },
+    { label: 'Wrist shard', detail: wristText, state: wristState },
   ];
 
   return (
@@ -96,23 +159,25 @@ export function ManagerSign({ action, phoneDetail, wrist, onPhoneSigned, onDone,
         <Button
           label={phase === 'error' ? 'Try again' : action}
           variant="amber"
-          onPress={() => void unlock()}
+          onPress={() => void run()}
           loading={phase === 'unlocking'}
+          disabled={!status.ok}
         />
       ) : null}
       {phase === 'wrist' ? (
-        <View style={styles.waiting}>
-          <Txt size={14} color={colors.muted} align="center">
-            {wristReady ? 'Waiting for the wrist' : 'Paused until the wrist is back'}
-          </Txt>
-          {wristReady ? <Button label="Simulate the press" variant="ghost" onPress={finish} /> : null}
-        </View>
+        <Txt size={14} color={colors.muted} align="center">
+          Waiting for the wrist
+        </Txt>
       ) : null}
     </View>
   );
 }
 
+// Errors raised before anything reached the wrist belong on the phone step.
+function phaseBeforeWrist(error: string | null): boolean {
+  return error !== null && PHONE_ERRORS.includes(error);
+}
+
 const styles = StyleSheet.create({
   wrap: { gap: space.m },
-  waiting: { gap: space.xs, alignItems: 'center' },
 });

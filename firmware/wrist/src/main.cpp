@@ -129,7 +129,8 @@ static void chirp() { M5.Speaker.tone(1800, 40); }
 
 static void loadShare() {
   prefs.begin("leash", true);
-  paired = prefs.getBytes("share", share, 32) == 32 && prefs.getBytes("gk", groupKey, 32) == 32;
+  paired = prefs.isKey("share") && prefs.isKey("gk") && prefs.getBytes("share", share, 32) == 32 &&
+           prefs.getBytes("gk", groupKey, 32) == 32;
   prefs.end();
 }
 
@@ -390,7 +391,7 @@ static void onDkg(JsonDocument& in) {
   d["groupKey"] = hex(groupKey, 32);
   send(d);
   String gk = hex(groupKey, 32);
-  showResult("Key " + gk.substring(0, 4) + ".." + gk.substring(60), C_TEXT, 4000);
+  showResult("Key " + gk.substring(0, 4) + ".." + gk.substring(60), C_AMBER, 15000);
 }
 
 static bool decodeTx(const String& to, const String& calldata, Prompt& p) {

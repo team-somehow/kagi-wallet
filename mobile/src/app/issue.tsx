@@ -189,12 +189,14 @@ export default function Issue() {
           <Txt size={15} color={colors.muted} style={styles.signLead}>
             The agent sent its public key. Its private half never left the agent. Signing binds this cap and lifetime to it.
           </Txt>
-          <ManagerSign
-            action="Sign the grant"
-            phoneDetail="Unlock to sign the grant with the phone shard"
-            wrist={state.wrist}
-            onDone={issue}
-          />
+          {agent && pubkey && chosenCap !== null ? (
+            <ManagerSign
+              action="Sign the grant"
+              phoneDetail="Unlock to sign the grant with the phone shard"
+              payload={{ kind: 'grant', agent, pubkey, capUsdc: chosenCap, hours: life }}
+              onDone={issue}
+            />
+          ) : null}
         </View>
       ) : null}
     </Screen>

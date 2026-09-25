@@ -34,5 +34,5 @@ export function hours(h: number): string {
 /** Break a 0x address into groups of 4 hex chars for display. */
 export function groupAddr(a: string): string {
   const hex = a.startsWith('0x') ? a.slice(2) : a;
-  return `0x ${hex.match(/.{1,4}/g)?.join(' ') ?? hex}`;
+  return hex.match(/.{1,4}/g)?.join(' ') ?? hex;
 }

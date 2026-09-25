@@ -83,6 +83,9 @@ export default function Sign() {
         <Txt mono size={13} color={colors.muted}>
           {shortAddr(req.to, 10, 8)}
         </Txt>
+        <Txt size={13} color={colors.faint}>
+          The wrist shows this amount and recipient decoded from the raw bytes. Check they match.
+        </Txt>
       </View>
 
       <View style={styles.facts}>
@@ -120,7 +123,7 @@ export default function Sign() {
           <ManagerSign
             action="Sign it anyway"
             phoneDetail="Unlock to sign with the phone shard"
-            wrist={state.wrist}
+            payload={{ kind: 'tx', agent: req.agent, contract: req.contract, calldata: req.calldata }}
             onPhoneSigned={() => dispatch({ type: 'SIGN_UPDATE', id: req.id, status: 'phone-signed' })}
             onDone={() => dispatch({ type: 'SIGN_UPDATE', id: req.id, status: 'signed' })}
           />

@@ -4,5 +4,6 @@ import { useStore } from '../store/store';
 
 export default function Index() {
   const { state } = useStore();
+  if (!state.hydrated) return null;
   return <Redirect href={state.onboarded ? '/home' : '/onboarding'} />;
 }

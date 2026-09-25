@@ -12,6 +12,7 @@ import { useExposure, useStore } from '../store/store';
 import { useNow } from '../lib/useNow';
 import { hours, usdc } from '../lib/format';
 import { tap } from '../lib/haptics';
+import { link } from '../lib/link';
 import { colors, radius, space } from '../theme';
 
 export default function Home() {
@@ -24,6 +25,7 @@ export default function Home() {
 
   const revokeAll = () => {
     dispatch({ type: 'REVOKE_ALL' });
+    link.send({ t: 'revoked' });
     router.push('/revoke');
   };
 
@@ -42,7 +44,7 @@ export default function Home() {
           Leash
         </Txt>
         <View style={styles.barRight}>
-          <WristChip wrist={state.wrist} />
+          <WristChip wrist={state.wrist} address={state.address} />
           <Pressable
             accessibilityRole="button"
             hitSlop={8}
