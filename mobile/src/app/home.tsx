@@ -13,6 +13,7 @@ import { useNow } from '../lib/useNow';
 import { hours, usdc } from '../lib/format';
 import { tap } from '../lib/haptics';
 import { link } from '../lib/link';
+import { revokeAllOnChain } from '../lib/chainRevoke';
 import { colors, radius, space } from '../theme';
 
 export default function Home() {
@@ -26,6 +27,7 @@ export default function Home() {
   const revokeAll = () => {
     dispatch({ type: 'REVOKE_ALL' });
     link.send({ t: 'revoked' });
+    void revokeAllOnChain(state.address);
     router.push('/revoke');
   };
 

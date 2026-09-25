@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { router, useRootNavigationState } from 'expo-router';
 import { link } from '../lib/link';
 import { buzz } from '../lib/haptics';
+import { revokeAllOnChain } from '../lib/chainRevoke';
 import { useExposure, useStore } from '../store/store';
 
 /**
@@ -13,6 +14,10 @@ export function WristBridge() {
   const { live, cap, spent } = useExposure();
   const ready = Boolean(useRootNavigationState()?.key);
   const readyRef = useRef(ready);
+  const addressRef = useRef(state.address);
+  useEffect(() => {
+    addressRef.current = state.address;
+  }, [state.address]);
   useEffect(() => {
     readyRef.current = ready;
   }, [ready]);
@@ -62,6 +67,8 @@ export function WristBridge() {
           break;
         case 'revoke_all':
           dispatch({ type: 'REVOKE_ALL' });
+          // The wrist asked; the phone's shard alone signs the on-chain revokes.
+          void revokeAllOnChain(addressRef.current);
           void buzz();
           if (readyRef.current) router.push('/revoke');
           break;

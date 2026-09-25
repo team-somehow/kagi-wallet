@@ -1,15 +1,20 @@
 // The agent. Stand-in for an AI agent that holds money through Leash.
-// It makes its own ephemeral key for every grant it asks for. The private half lives only
-// in this process's memory and is never sent anywhere: the phone only ever sees the address.
+// It makes its own ephemeral key for every grant it asks for. The private half stays with
+// the agent (its own gitignored file, hub/.agent-keys.json, mode 600) and is never sent
+// anywhere: the phone only ever sees the address. Keys are useless after their expiry.
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { encodePacked, keccak256 } from 'viem';
 import { generatePrivateKey, privateKeyToAccount, sign } from 'viem/accounts';
 
-const keys = new Map(); // address -> private key, in memory only
+const FILE = new URL('./.agent-keys.json', import.meta.url);
+const keys = new Map(Object.entries(existsSync(FILE) ? JSON.parse(readFileSync(FILE, 'utf8')) : {}));
+const persist = () => writeFileSync(FILE, JSON.stringify(Object.fromEntries(keys), null, 2), { mode: 0o600 });
 
 export function newKey() {
   const pk = generatePrivateKey();
   const address = privateKeyToAccount(pk).address;
   keys.set(address.toLowerCase(), pk);
+  persist();
   return address;
 }
 

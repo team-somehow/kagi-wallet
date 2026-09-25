@@ -80,6 +80,7 @@ static float lastA[3] = {0, 0, 0};
 static const uint32_t STILL_MS = 120000;
 
 static uint32_t lastStatus = 0;
+static uint32_t autoAt = 0;  // test firmware only: when to press A by itself
 static String rx;     // USB serial line buffer
 static String rxTcp;  // WiFi line buffer
 
@@ -452,10 +453,7 @@ static void onPair(JsonDocument& in) {
   d["nonce"] = hex(wn, 16);
   send(d);
 #ifdef LEASH_AUTO_APPROVE
-  pairWaitingPhone = true;
-  JsonDocument ok;
-  ok["t"] = "pair_ok";
-  send(ok);
+  autoAt = millis() + 3000;  // show the code, then confirm
 #endif
 }
 
@@ -590,7 +588,7 @@ static void onSign(JsonDocument& in) {
     draw();
     buzz();
 #ifdef LEASH_AUTO_APPROVE
-    approvePrompt();
+    autoAt = millis() + 3000;  // long enough to read the prompt
 #endif
     return;
   } else if (p.kind == "evm") {
@@ -639,7 +637,7 @@ static void onSign(JsonDocument& in) {
     draw();
     buzz();
 #ifdef LEASH_AUTO_APPROVE
-    approvePrompt();
+    autoAt = millis() + 3000;  // long enough to read the prompt
 #endif
     return;
   } else {
@@ -653,7 +651,7 @@ static void onSign(JsonDocument& in) {
   draw();
   buzz();
 #ifdef LEASH_AUTO_APPROVE
-  approvePrompt();
+  autoAt = millis() + 3000;  // long enough to read the prompt
 #endif
 }
 
@@ -1151,6 +1149,22 @@ void loop() {
     lastImu = millis();
     pollImu();
   }
+
+#ifdef LEASH_AUTO_APPROVE
+  // Test firmware: press A by itself once the prompt has been on screen for a moment.
+  if (autoAt && millis() > autoAt) {
+    autoAt = 0;
+    if (mode == Mode::Prompt) approvePrompt();
+    else if (mode == Mode::Pairing && !pairWaitingPhone) {
+      pairWaitingPhone = true;
+      chirp();
+      JsonDocument ok;
+      ok["t"] = "pair_ok";
+      send(ok);
+      dirty = true;
+    }
+  }
+#endif
 
   // Buttons.
   if (mode == Mode::ConfirmWifi) {
