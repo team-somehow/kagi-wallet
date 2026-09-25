@@ -1,13 +1,16 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
-import { AGENTS, initialState, makeGrantRequest, makeSignRequest, makeTx, pick, seededKeys } from './mock';
+import { AGENTS, initialState, makeGrantRequest, makeSignRequest, makeTx, pick } from './mock';
+import { loadShard } from '../lib/shard';
 import type { Action, AgentKey, State, TxKind } from './types';
 
 function reducer(state: State, a: Action): State {
   switch (a.type) {
+    case 'HYDRATED':
+      return { ...state, hydrated: true, onboarded: a.address !== null, address: a.address };
     case 'ONBOARDED':
-      return { ...state, onboarded: true, address: a.address, keys: seededKeys() };
+      return { ...state, onboarded: true, address: a.address, keys: [], requests: [], signs: [] };
     case 'RESET':
-      return { ...initialState };
+      return { ...initialState, hydrated: true, wrist: state.wrist };
     case 'WRIST':
       return { ...state, wrist: { ...state.wrist, ...a.patch } };
     case 'SPEND':
@@ -85,8 +88,6 @@ export interface Sim {
   spend: (amountUsdc?: number) => string | null;
   /** Agent tries something over the cap: on-chain reject, then escalation to the manager key. */
   overCap: () => string | null;
-  wristOnArm: (on: boolean) => void;
-  wristConnected: (on: boolean) => void;
   expireSoonest: () => void;
   autopilot: (on: boolean) => void;
   reset: () => void;
@@ -110,6 +111,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [state]);
 
   useEffect(() => {
+    void loadShard().then((s) => dispatch({ type: 'HYDRATED', address: s?.groupKey ?? null }));
+  }, []);
+
+  useEffect(() => {
     const t = setInterval(() => dispatch({ type: 'TICK', now: Date.now() }), 15000);
     return () => clearInterval(t);
   }, []);
@@ -117,7 +122,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const sim = useMemo<Sim>(() => {
     const liveKeys = () => ref.current.keys.filter((k) => k.status === 'live');
     const spendWith = (key: AgentKey, amount: number, escalate: boolean): string | null => {
-      const kind = pick<TxKind>(['transfer', 'swap', 'approve']);
+      // The wrist decodes transfer and approve calldata, so the agent sticks to those.
+      const kind = pick<TxKind>(['transfer', 'transfer', 'approve']);
       if (key.spentUsdc + amount > key.capUsdc) {
         if (!escalate) return null;
         dispatch({ type: 'SPEND', tx: makeTx(key.id, amount, kind, 'rejected') });
@@ -152,8 +158,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const amt = round2(Math.max(headroom + 100, key.capUsdc * 0.6));
         return spendWith(key, amt, true);
       },
-      wristOnArm: (on) => dispatch({ type: 'WRIST', patch: { onArm: on } }),
-      wristConnected: (on) => dispatch({ type: 'WRIST', patch: { connected: on } }),
       expireSoonest: () => dispatch({ type: 'EXPIRE_SOONEST' }),
       autopilot: (on) => dispatch({ type: 'AUTOPILOT', on }),
       reset: () => dispatch({ type: 'RESET' }),

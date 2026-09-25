@@ -68,6 +68,8 @@ export function makeGrantRequest(agent: string, capUsdc: number, durationH: numb
   return { id: uid(), agent, pubkey: makePubkey(), capUsdc, durationH, at: Date.now(), status: 'pending' };
 }
 
+export const USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
+
 export function makeSignRequest(key: AgentKey, amountUsdc: number, kind: TxKind): SignRequest {
   const d = pick(DESTINATIONS);
   return {
@@ -77,6 +79,7 @@ export function makeSignRequest(key: AgentKey, amountUsdc: number, kind: TxKind)
     amountUsdc,
     to: d.to,
     toLabel: d.label,
+    contract: USDC,
     kind,
     calldata: encodeCalldata(kind, d.to, amountUsdc),
     decoded: describe(kind, d.label, amountUsdc),
@@ -105,32 +108,14 @@ export function seededKeys(): AgentKey[] {
   return [key];
 }
 
-const blankState: State = {
+export const initialState: State = {
+  hydrated: false,
   onboarded: false,
   address: null,
-  wrist: { id: 'wrist-7C1E', connected: true, onArm: true, battery: 82 },
+  wrist: { id: null, hub: false, connected: false, onArm: false, battery: 0, paired: false, groupKey: null },
   managerRaiseLimit: 2000,
   keys: [],
   requests: [],
   signs: [],
   autopilot: false,
 };
-
-/**
- * EXPO_PUBLIC_SEED=full skips onboarding and starts with a live key, a pending
- * grant request and an over-cap request, so every screen can be reached by
- * deep link. Ids are fixed so links are stable: seed-key, seed-req, seed-sign.
- */
-function seededState(): State {
-  const keys = seededKeys();
-  const key = keys[0]!;
-  key.id = 'seed-key';
-  key.txs = key.txs.map((t) => ({ ...t, keyId: key.id }));
-  const req = makeGrantRequest('payroll', 150, 12);
-  req.id = 'seed-req';
-  const sign = makeSignRequest(key, 600, 'transfer');
-  sign.id = 'seed-sign';
-  return { ...blankState, onboarded: true, address: makeAddress(), keys, requests: [req], signs: [sign] };
-}
-
-export const initialState: State = process.env.EXPO_PUBLIC_SEED === 'full' ? seededState() : blankState;

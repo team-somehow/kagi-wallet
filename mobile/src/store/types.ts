@@ -43,8 +43,11 @@ export interface SignRequest {
   keyId: string;
   agent: string;
   amountUsdc: number;
+  /** Where the money ends up. */
   to: string;
   toLabel: string;
+  /** The contract the transaction calls (USDC). */
+  contract: string;
   kind: TxKind;
   calldata: string;
   decoded: string;
@@ -53,14 +56,22 @@ export interface SignRequest {
 }
 
 export interface Wrist {
-  id: string;
+  id: string | null;
+  /** The laptop hub is reachable. */
+  hub: boolean;
+  /** The wrist is on the hub's USB port and talking. */
   connected: boolean;
   onArm: boolean;
   battery: number;
+  paired: boolean;
+  /** Group key the wrist holds a share of, if any. */
+  groupKey: string | null;
 }
 
 export interface State {
+  hydrated: boolean;
   onboarded: boolean;
+  /** x-only group key of the manager key, hex. */
   address: string | null;
   wrist: Wrist;
   /** Manager key can raise caps by up to this much. Beyond it, the vault. */
@@ -72,6 +83,7 @@ export interface State {
 }
 
 export type Action =
+  | { type: 'HYDRATED'; address: string | null }
   | { type: 'ONBOARDED'; address: string }
   | { type: 'RESET' }
   | { type: 'WRIST'; patch: Partial<Wrist> }
