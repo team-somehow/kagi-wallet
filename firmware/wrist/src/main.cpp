@@ -21,6 +21,7 @@
 #include <bootloader_random.h>
 
 #include "frost.h"
+#include "ir.h"
 
 #if __has_include("secrets.h")
 #include "secrets.h"
@@ -177,14 +178,22 @@ static void send(JsonDocument& doc) {
   else Serial.print(line);
 }
 
+// The speaker amp has to be off for the IR receiver to work, so it is on only while beeping.
+static void beep(int freq, int ms) {
+  M5.Speaker.begin();
+  M5.Speaker.tone(freq, ms);
+  delay(ms + 10);
+  M5.Speaker.end();
+}
+
 static void buzz(int times = 3) {
   for (int i = 0; i < times; i++) {
-    M5.Speaker.tone(2600, 90);
-    delay(150);
+    beep(2600, 90);
+    delay(60);
   }
 }
 
-static void chirp() { M5.Speaker.tone(1800, 40); }
+static void chirp() { beep(1800, 40); }
 
 // ---- storage --------------------------------------------------------------
 
@@ -759,6 +768,42 @@ static void handle(const String& line) {
       WiFi.scanDelete();
     }
     send(d);
+  } else if (t == "ir_loop") {
+    if (in["l3b"].is<int>()) M5.Power.M5pm1.setGPIOOutput(m5::M5PM1_Class::gpio2, (int)in["l3b"] != 0);
+    if (in["ldo"].is<int>()) M5.Power.M5pm1.setLDOOutput((int)in["ldo"] != 0);
+    if (in["ext"].is<int>()) M5.Power.setExtOutput((int)in["ext"] != 0, m5::ext_none);
+    delay(100);
+    JsonDocument d;
+    d["t"] = "ir_loop";
+    d["pins"] = ir::pinInfo();
+    d["heard"] = ir::loopback();
+    d["board"] = (int)M5.getBoard();
+    d["pmic"] = (int)M5.Power.getType();
+    send(d);
+  } else if (t == "ir_blast") {
+    ir::blast(in["ms"] | 20000);
+  } else if (t == "ir_dump") {
+    JsonDocument d;
+    d["t"] = "ir_dump";
+    d["raw"] = ir::dumpRaw();
+    send(d);
+  } else if (t == "ir_test") {
+    // Bench test of the IR link: send n bytes to the other stick and report how it went.
+    int n = in["n"] | 64;
+    std::vector<uint8_t> buf(std::min(n, 1024));
+    for (size_t i = 0; i < buf.size(); i++) buf[i] = (uint8_t)(i * 7 + 3);
+    uint32_t t0 = millis();
+    bool ok = ir::send(buf.data(), buf.size());
+    auto s = ir::stats();
+    JsonDocument d;
+    d["t"] = "ir_test_result";
+    d["ok"] = ok;
+    d["bytes"] = (int)buf.size();
+    d["ms"] = millis() - t0;
+    d["retries"] = s.retries;
+    d["framesOk"] = s.framesOk;
+    d["framesBad"] = s.framesBad;
+    send(d);
   } else if (t == "wifi_list?") {
     JsonDocument d;
     d["t"] = "wifi_list";
@@ -1121,6 +1166,16 @@ void setup() {
   deviceId = id;
 
   frost::init();
+  M5.Speaker.end();
+  // The IR LED runs off the stick's external power rail, which M5Unified leaves off.
+  M5.Power.setExtOutput(true, m5::ext_none);
+  // The IR LED and receiver sit on the L3B rail, switched by M5PM1 GPIO2. M5Unified leaves it off.
+  auto& pm1 = M5.Power.M5pm1;
+  pm1.setGPIOFunction(m5::M5PM1_Class::gpio2, m5::M5PM1_Class::gpio);
+  pm1.setGPIOMode(m5::M5PM1_Class::gpio2, m5::M5PM1_Class::output);
+  pm1.setGPIOOutput(m5::M5PM1_Class::gpio2, true);
+  delay(50);
+  ir::begin();
   loadShare();
   startWifi();
   mode = restingMode();
@@ -1143,6 +1198,22 @@ void loop() {
   }
 
   pollWifi();
+
+  // IR: report whole messages that arrive (the vault protocol builds on this).
+  static std::vector<uint8_t> irMsg;
+  if (ir::poll(irMsg)) {
+    bool pattern = true;
+    for (size_t i = 0; i < irMsg.size(); i++)
+      if (irMsg[i] != (uint8_t)(i * 7 + 3)) pattern = false;
+    JsonDocument d;
+    d["t"] = "ir_rx";
+    d["bytes"] = (int)irMsg.size();
+    d["pattern"] = pattern;
+    auto s = ir::stats();
+    d["framesOk"] = s.framesOk;
+    d["framesBad"] = s.framesBad;
+    send(d);
+  }
 
   static uint32_t lastImu = 0;
   if (millis() - lastImu > 100) {
