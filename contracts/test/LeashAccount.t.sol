@@ -107,6 +107,58 @@ contract LeashAccountTest is SchnorrTest {
         assertEq(spent, 0);
     }
 
+    function limitSig(uint256 oldCap, uint256 newCap, uint256 exp, uint256 key) internal returns (uint256, uint256) {
+        return schnorrSign(key, sha256(abi.encodePacked("LEASH/limit", block.chainid, address(acct), acct.nonce(), agent, oldCap, newCap, exp)));
+    }
+
+    function test_RaisePreservesSpendExpiryAndAgentNonce() public {
+        doGrant(CAP);
+        doSpend(to, 0.4 ether);
+        (uint256 rx, uint256 s) = limitSig(CAP, 2 ether, expiry, MANAGER);
+        acct.raiseLimit(agent, CAP, 2 ether, expiry, rx, s);
+        (uint256 cap, uint256 spent, uint256 exp, uint256 sn) = acct.session(agent);
+        assertEq(cap, 2 ether);
+        assertEq(spent, 0.4 ether);
+        assertEq(exp, expiry);
+        assertEq(sn, 1);
+        doSpend(to, 1.6 ether);
+        assertEq(to.balance, 2 ether);
+    }
+
+    function test_RaiseRejectsReplayOrChangedFields() public {
+        doGrant(CAP);
+        (uint256 rx, uint256 s) = limitSig(CAP, 2 ether, expiry, MANAGER);
+        vm.expectRevert(bytes("bad signature"));
+        acct.raiseLimit(agent, CAP, 3 ether, expiry, rx, s);
+        acct.raiseLimit(agent, CAP, 2 ether, expiry, rx, s);
+        vm.expectRevert(bytes("session changed"));
+        acct.raiseLimit(agent, CAP, 2 ether, expiry, rx, s);
+    }
+
+    function test_RaiseCannotReviveRevokedOrExpiredKey() public {
+        doGrant(CAP);
+        (uint256 rx, uint256 s) = limitSig(CAP, 2 ether, expiry, MANAGER);
+        vm.warp(expiry);
+        vm.expectRevert(bytes("key expired or revoked"));
+        acct.raiseLimit(agent, CAP, 2 ether, expiry, rx, s);
+        vm.warp(expiry - 1);
+        (uint256 rrx, uint256 rs) = schnorrSign(PHONE, revokeMsg(acct.nonce(), agent));
+        acct.revoke(agent, rrx, rs);
+        vm.expectRevert(bytes("key expired or revoked"));
+        acct.raiseLimit(agent, CAP, 2 ether, expiry, rx, s);
+    }
+
+    function test_RaiseRequiresManagerAndUnchangedExpiry() public {
+        doGrant(CAP);
+        (uint256 rx, uint256 s) = limitSig(CAP, 2 ether, expiry, PHONE);
+        vm.expectRevert(bytes("bad signature"));
+        acct.raiseLimit(agent, CAP, 2 ether, expiry, rx, s);
+        vm.expectRevert(bytes("session changed"));
+        acct.raiseLimit(agent, CAP, 2 ether, expiry + 1, rx, s);
+        vm.expectRevert(bytes("limit must increase"));
+        acct.raiseLimit(agent, CAP, CAP, expiry, rx, s);
+    }
+
     // ---- spend ---------------------------------------------------------------------------
 
     function test_SpendUnderCap() public {

@@ -74,6 +74,7 @@ static bool dirty = true;
 
 // Exposure, as last reported by the phone.
 static double expLeft = 0, expCap = 0, expSpent = 0;
+static String expUnit = "USD";  // "ETH" for a real Sepolia session
 static int expKeys = 0;
 static bool warned80 = false;
 
@@ -177,6 +178,23 @@ static String shortHex(const String& h, int head, int tail) {
   String s = h.startsWith("0x") ? h.substring(2) : h;
   if ((int)s.length() <= head + tail) return "0x" + s;
   return "0x" + s.substring(0, head) + ".." + s.substring(s.length() - tail);
+}
+
+// ETH with no trailing zeros: 0.000020 -> "0.00002 ETH".
+static String ethStr(double eth) {
+  char b[32];
+  snprintf(b, sizeof b, "%.6f", eth);
+  String s(b);
+  while (s.endsWith("0")) s.remove(s.length() - 1);
+  if (s.endsWith(".")) s.remove(s.length() - 1);
+  return s + " ETH";
+}
+
+static String minutesLeft(const String& expS) {
+  time_t now = time(nullptr);
+  if (now < 1700000000) return "";
+  long long mins = (atoll(expS.c_str()) - (long long)now) / 60;
+  return mins <= 0 ? String("expired") : mins < 120 ? String((long)mins) + " min left" : String((long)(mins / 60)) + " h left";
 }
 
 static String dollars(double v) {
@@ -466,7 +484,7 @@ static void drawHome() {
   canvas.drawString(expCap > 0 ? "Agents can spend" : "No keys yet", x, 38);
   canvas.setFont(&fonts::FreeSansBold12pt7b);
   canvas.setTextColor(expCap == 0 ? C_FAINT : hot ? C_AMBER : C_TEXT);
-  canvas.drawString(dollars(expCap > 0 ? expLeft : 0), x, 60);
+  canvas.drawString(expUnit == "ETH" ? ethStr(expCap > 0 ? expLeft : 0) : dollars(expCap > 0 ? expLeft : 0), x, 60);
   canvas.setFont(&fonts::FreeSans9pt7b);
   canvas.setTextColor(C_FAINT);
   canvas.drawString(expCap > 0 ? String(expKeys) + (expKeys == 1 ? " live key" : " live keys") : "Issue one in the app", x, 94);
@@ -487,7 +505,12 @@ static void drawPrompt() {
   canvas.drawString(prompt.amount, 14 + off, 34);
   canvas.setFont(&fonts::FreeSans9pt7b);
   canvas.setTextColor(C_MUTED);
-  canvas.drawString(prompt.line1, 14 + off, 72);
+  canvas.drawString(prompt.line1, 14 + off, 70);
+  if (prompt.line2.length()) {
+    canvas.setFont(&fonts::Font0);
+    canvas.setTextColor(C_FAINT);
+    canvas.drawString(prompt.line2, 14 + off, 90);
+  }
   if (off == 0) {
     int ringX = A_ON_RIGHT ? W - 34 : 34;
     canvas.drawCircle(ringX, 108, 14, C_CELL);
@@ -809,6 +832,39 @@ static void onSign(JsonDocument& in) {
     p.amount = dollars(strtoull(capMicro.c_str(), nullptr, 10) / 1e6);
     p.line1 = "for " + agent + ", " + String(hours) + "h";
     p.line2 = "agent key " + shortHex(pubkey, 4, 4);
+  } else if (p.kind == "evm_limit") {
+    // Raising a session key's total allowance. Rebuild the contract's preimage:
+    // "LEASH/limit" || chainid || account || nonce || agent || oldCap || newCap || expiry
+    String chain = String(in["chainId"] | "");
+    String account = in["account"] | "";
+    String nonceS = in["nonce"] | "";
+    String agentAddr = in["agentAddress"] | "";
+    String oldS = in["oldCap"] | "";
+    String newS = in["newCap"] | "";
+    String expS = in["expiry"] | "";
+    uint8_t pre[11 + 32 + 20 + 32 + 20 + 32 + 32 + 32];
+    memcpy(pre, "LEASH/limit", 11);
+    if (!frost::u256FromDecimal(chain.c_str(), pre + 11) || !unhex(account.c_str(), pre + 43, 20) ||
+        !frost::u256FromDecimal(nonceS.c_str(), pre + 63) || !unhex(agentAddr.c_str(), pre + 95, 20) ||
+        !frost::u256FromDecimal(oldS.c_str(), pre + 115) || !frost::u256FromDecimal(newS.c_str(), pre + 147) ||
+        !frost::u256FromDecimal(expS.c_str(), pre + 179))
+      return reject(id, "bad_request");
+    frost::sha256(pre, sizeof pre, p.msg);
+    p.title = "Raise " + agent + "'s total";
+    p.amount = ethStr(strtod(newS.c_str(), nullptr) / 1e18);
+    p.line1 = "was " + ethStr(strtod(oldS.c_str(), nullptr) / 1e18);
+    String left = minutesLeft(expS);
+    p.line2 = "same expiry" + (left.length() ? ", " + left : String(""));
+    prompt = p;
+    prompt.shownAt = millis();
+    mode = Mode::Prompt;
+    dirty = true;
+    draw();
+    buzz(2);
+#ifdef LEASH_AUTO_APPROVE
+    autoAt = millis() + 3000;  // long enough to read the prompt
+#endif
+    return;
   } else if (p.kind == "evm_grant") {
     // A session key grant on the Leash account. Rebuild the contract's preimage:
     // "LEASH/grant" || chainid || account || nonce || agent || cap || expiry
@@ -825,11 +881,9 @@ static void onSign(JsonDocument& in) {
         !frost::u256FromDecimal(capS.c_str(), pre + 115) || !frost::u256FromDecimal(expS.c_str(), pre + 147))
       return reject(id, "bad_request");
     frost::sha256(pre, sizeof pre, p.msg);
-    p.title = "New key " + String(chain == "11155111" ? "Sepolia" : "chain " + chain);
-    char eth[32];
-    snprintf(eth, sizeof eth, "%.6f ETH", strtod(capS.c_str(), nullptr) / 1e18);
-    p.amount = eth;
-    p.line1 = agent + " " + shortHex(agentAddr, 4, 4);
+    p.title = "New key for " + agent;
+    p.amount = ethStr(strtod(capS.c_str(), nullptr) / 1e18);
+    p.line1 = "total allowance, key " + shortHex(agentAddr, 4, 4);
     // How long it lasts, from the signed expiry and the wrist's own clock.
     time_t now = time(nullptr);
     long long exp = atoll(expS.c_str());
@@ -935,6 +989,7 @@ static void approvePrompt() {
 }
 
 static void onExposure(JsonDocument& in) {
+  expUnit = String(in["unit"] | "USD");
   expLeft = in["left"] | 0.0;
   expCap = in["cap"] | 0.0;
   expSpent = in["spent"] | 0.0;

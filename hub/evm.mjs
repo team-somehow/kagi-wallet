@@ -11,7 +11,8 @@ const url = (f) => new URL(f, import.meta.url);
 const RPC = process.env.SEPOLIA_RPC ?? 'https://ethereum-sepolia-rpc.publicnode.com';
 const art = JSON.parse(readFileSync(url('./LeashAccount.json'), 'utf8'));
 const STATE = url('./.evm.json');
-const VERSION = 3;
+// 4: the account has raiseLimit. Older wallets redeploy.
+const VERSION = 4;
 const relayer = existsSync(url('./.relayer')) ? privateKeyToAccount(readFileSync(url('./.relayer'), 'utf8').trim()) : null;
 const pub = createPublicClient({ chain: sepolia, transport: http(RPC) });
 const wallet = relayer ? createWalletClient({ account: relayer, chain: sepolia, transport: http(RPC) }) : null;
@@ -94,13 +95,10 @@ export async function info(gk) {
 
 export async function deploy(gk, phoneKey, fundWei) {
   if (!wallet) throw new Error('No relayer key in hub/.relayer.');
-  const hash = await wallet.deployContract({
-    abi: art.abi,
-    bytecode: `${art.bytecode}${gk.padStart(64, '0')}${String(phoneKey).padStart(64, '0')}`,
-    value: BigInt(fundWei ?? 0),
-    gas: 1_100_000n,
-    ...(await fees()),
-  });
+  const data = `${art.bytecode}${gk.padStart(64, '0')}${String(phoneKey).padStart(64, '0')}`;
+  const value = BigInt(fundWei ?? 0);
+  const est = await pub.estimateGas({ account: relayer, data, value });
+  const hash = await wallet.sendTransaction({ data, value, gas: (est * 120n) / 100n, ...(await fees()) });
   const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
   if (r.status !== 'success' || !r.contractAddress) throw new Error(`Deploy failed in ${hash}`);
   const st = load();
@@ -189,3 +187,52 @@ export async function rootSubmit(rk, m) {
   const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
   return { t: 'evm_result', what: 'root_execute', hash, status: r.status, gasUsed: r.gasUsed.toString(), block: r.blockNumber.toString() };
 }
+
+
+// ---- agent sessions, for the MCP and the web chat --------------------------------------
+
+export const CHAIN_ID = sepolia.id;
+export const relayerAddress = () => relayer?.address ?? null;
+
+/** Which wallet a session key belongs to. A raw key doesn't encode its account, so look it up. */
+export function findAgent(agentAddr) {
+  const want = String(agentAddr).toLowerCase();
+  const st = load();
+  let hit = null;
+  for (const [gk, e] of Object.entries(st)) {
+    if (e?.version !== VERSION) continue;
+    const a = (e.agents ?? []).find((x) => x.address.toLowerCase() === want);
+    // The newest grant wins if a key was ever granted twice.
+    if (a) hit = { gk, account: e.account, name: a.name ?? 'agent', address: a.address };
+  }
+  return hit;
+}
+
+export async function sessionOf(account, agentAddr) {
+  const [[cap, spent, expiry, sn], balance, block] = await Promise.all([
+    pub.readContract({ address: account, abi: art.abi, functionName: 'session', args: [agentAddr] }),
+    pub.getBalance({ address: account }),
+    pub.getBlock(),
+  ]);
+  const now = block.timestamp;
+  const status = expiry === 0n && cap > 0n ? 'revoked' : expiry <= now ? (cap === 0n ? 'unknown' : 'expired') : 'active';
+  return { cap, spent, expiry, nonce: sn, balance, now, status, remaining: cap > spent ? cap - spent : 0n };
+}
+
+export async function accountNonce(account) {
+  return pub.readContract({ address: account, abi: art.abi, functionName: 'nonce' });
+}
+
+/** A spend the agent signed itself. The hub never sees the agent's key. */
+export async function spendSigned(account, m) {
+  const r = await send(account, 'spend', [m.agent, m.to, BigInt(m.value), Number(m.v), m.r, m.s], 110_000n);
+  return { t: 'evm_result', what: 'spend', ...r };
+}
+
+/** Raise a session's total allowance, signed by phone and wrist. Keeps spent, expiry and nonce. */
+export async function raiseLimit(account, m) {
+  const r = await send(account, 'raiseLimit', [m.agent, BigInt(m.oldCap), BigInt(m.newCap), BigInt(m.expiry), ...split(m.sig)], 90_000n);
+  return { t: 'evm_result', what: 'raise_limit', ...r };
+}
+
+export { reason as revertReason };

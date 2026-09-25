@@ -1,7 +1,7 @@
 /**
  * The phone's link to the sticks and the hub.
  *   Sticks: Bluetooth LE first (lib/ble.ts); the hub (WiFi, relay or USB) as the fallback.
- *   Chain (evm_*): always the hub.
+ *   Chain (evm_*) and limit requests (limit_*): always the hub.
  * Everything is merged into one message stream. Vault messages carry "from": "vault", and
  * the {t: "hub"} status reports a stick connected if it is up on either path.
  */
@@ -95,7 +95,9 @@ class Link {
       }
       // A stick that is on Bluetooth speaks for itself; ignore its copy through the hub.
       const b = ble.state();
-      if ((m.from === 'vault' && b.vault) || (m.from !== 'vault' && b.wrist && m.t !== 'evm_info' && !String(m.t).startsWith('evm_') && m.reqId === undefined)) return;
+      // Hub-originated events (limit requests, agent activity, chain replies) always pass.
+      const fromHub = m.src === 'hub' || m.reqId !== undefined || String(m.t).startsWith('evm_');
+      if (!fromHub && ((m.from === 'vault' && b.vault) || (m.from !== 'vault' && b.wrist))) return;
       this.listeners.forEach((l) => l(m));
     };
     ws.onclose = () => {
@@ -115,7 +117,8 @@ class Link {
 
   send(m: Msg): boolean {
     const line = JSON.stringify(m);
-    if (!String(m.t).startsWith('evm_')) {
+    const t = String(m.t);
+    if (!t.startsWith('evm_') && !t.startsWith('limit_')) {
       const role: Role = m.to === 'vault' ? 'vault' : 'wrist';
       if (ble.state()[role]) {
         void ble.send(role, line).then((ok) => {
@@ -173,3 +176,6 @@ class Link {
 }
 
 export const link = new Link();
+
+/** Where the agent chat is served: the same hub, over http. */
+export const chatUrl = () => URL.replace(/^ws/, 'http').replace(/\/+$/, '');

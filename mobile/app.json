@@ -49,6 +49,14 @@
           "modes": [],
           "bluetoothAlwaysPermission": "Leash talks to your wrist and vault over Bluetooth."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
     ],
     "scheme": "leash",

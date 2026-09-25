@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { colors, space } from '../theme';
 import { unlockShard } from '../lib/biometrics';
 import { success, warn } from '../lib/haptics';
-import { combine, evmGrantMessage, evmMessage, grantCanonical, messageFor, nonces, txCanonical } from '../lib/frost';
+import { combine, evmGrantMessage, evmLimitMessage, evmMessage, grantCanonical, messageFor, nonces, txCanonical } from '../lib/frost';
 import { link, type Msg } from '../lib/link';
 import { loadShard, rand } from '../lib/shard';
 import { uid } from '../store/mock';
@@ -17,7 +17,8 @@ export type SignPayload =
   | { kind: 'grant'; agent: string; pubkey: string; capUsdc: number; hours: number }
   | { kind: 'tx'; agent: string; contract: string; calldata: string }
   | { kind: 'evm'; agent: string; chainId: number; account: string; nonce: bigint; to: string; value: bigint; data: string }
-  | { kind: 'evm_grant'; agent: string; chainId: number; account: string; nonce: bigint; agentAddress: string; cap: bigint; expiry: bigint };
+  | { kind: 'evm_grant'; agent: string; chainId: number; account: string; nonce: bigint; agentAddress: string; cap: bigint; expiry: bigint }
+  | { kind: 'evm_limit'; agent: string; chainId: number; account: string; nonce: bigint; agentAddress: string; oldCap: bigint; newCap: bigint; expiry: bigint };
 
 type Phase = 'idle' | 'unlocking' | 'wrist' | 'combining' | 'done' | 'error';
 
@@ -26,6 +27,10 @@ interface Props {
   phoneDetail: string;
   payload: SignPayload;
   onPhoneSigned?: () => void;
+  /** Start as soon as the screen shows, for requests the owner is already expecting. */
+  autoStart?: boolean;
+  /** The owner declined on the wrist (B, or the hold timed out). */
+  onReject?: (reason: string) => void;
   /** Called with the verified 64 byte BIP340 signature, hex. */
   onDone: (signature: string) => void;
 }
@@ -47,7 +52,7 @@ const REJECT_TEXT: Record<string, string> = {
  * from the raw bytes, and signs its half only when you press A. The phone checks
  * the wrist's half and the final signature before anything counts as signed.
  */
-export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onDone }: Props) {
+export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onReject, onDone, autoStart }: Props) {
   const { state } = useStore();
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +88,8 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onDon
         ? evmMessage(payload)
         : payload.kind === 'evm_grant'
           ? evmGrantMessage({ ...payload, agent: payload.agentAddress })
+          : payload.kind === 'evm_limit'
+          ? evmLimitMessage({ ...payload, agent: payload.agentAddress })
           : messageFor(
             payload.kind === 'grant'
               ? grantCanonical(payload.agent, payload.pubkey, payload.capUsdc, payload.hours)
@@ -99,7 +106,19 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onDon
       75000,
     );
     const wire =
-      payload.kind === 'evm_grant'
+      payload.kind === 'evm_limit'
+        ? {
+            kind: 'evm_limit',
+            agent: payload.agent,
+            chainId: String(payload.chainId),
+            account: payload.account,
+            nonce: payload.nonce.toString(),
+            agentAddress: payload.agentAddress,
+            oldCap: payload.oldCap.toString(),
+            newCap: payload.newCap.toString(),
+            expiry: payload.expiry.toString(),
+          }
+        : payload.kind === 'evm_grant'
         ? {
             kind: 'evm_grant',
             agent: payload.agent,
@@ -139,7 +158,10 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onDon
       return fail(e instanceof Error ? e.message : 'No answer from the wrist.');
     }
     pendingId.current = null;
-    if (reply.t === 'sign_reject') return fail(REJECT_TEXT[String(reply.reason)] ?? `The wrist refused: ${String(reply.reason)}.`);
+    if (reply.t === 'sign_reject') {
+      onReject?.(String(reply.reason));
+      return fail(REJECT_TEXT[String(reply.reason)] ?? `The wrist refused: ${String(reply.reason)}.`);
+    }
 
     setPhase('combining');
     // Let the spinner paint before the curve math blocks the JS thread.
@@ -154,6 +176,14 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onDon
       fail(e instanceof Error ? e.message : 'The signature did not verify.');
     }
   };
+
+  const started = useRef(false);
+  useEffect(() => {
+    if (!autoStart || started.current || !status.ok) return;
+    started.current = true;
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, status.ok]);
 
   const phoneFailed = phase === 'error' && phaseBeforeWrist(error);
   const wristFailed = phase === 'error' && !phoneFailed;

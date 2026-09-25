@@ -114,6 +114,32 @@ export function evmGrantMessage(g: EvmGrant): Uint8Array {
   );
 }
 
+export interface EvmLimit {
+  chainId: number;
+  account: string;
+  nonce: bigint;
+  agent: string;
+  oldCap: bigint;
+  newCap: bigint;
+  expiry: bigint;
+}
+
+/** sha256("LEASH/limit" || chainid || account || nonce || agent || oldCap || newCap || expiry) */
+export function evmLimitMessage(l: EvmLimit): Uint8Array {
+  return sha256(
+    concatBytes(
+      utf8ToBytes('LEASH/limit'),
+      u256(BigInt(l.chainId)),
+      addr(l.account),
+      u256(l.nonce),
+      addr(l.agent),
+      u256(l.oldCap),
+      u256(l.newCap),
+      u256(l.expiry),
+    ),
+  );
+}
+
 /** sha256("LEASH/revoke" || chainid || account || nonce || agent). The phone signs this alone. */
 export function evmRevokeMessage(chainId: number, account: string, nonce: bigint, agent: string): Uint8Array {
   return sha256(concatBytes(utf8ToBytes('LEASH/revoke'), u256(BigInt(chainId)), addr(account), u256(nonce), addr(agent)));
