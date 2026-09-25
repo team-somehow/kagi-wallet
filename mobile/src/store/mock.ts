@@ -112,7 +112,7 @@ export const initialState: State = {
   hydrated: false,
   onboarded: false,
   address: null,
-  wrist: { id: null, hub: false, connected: false, onArm: false, battery: 0, paired: false, groupKey: null },
+  wrist: { id: null, hub: false, connected: false, onArm: false, battery: 0, paired: false, groupKey: null, via: null, ssid: null },
   managerRaiseLimit: 2000,
   keys: [],
   requests: [],

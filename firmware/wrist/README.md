@@ -6,6 +6,25 @@ revoke every key. Goes to sleep as a signer after 2 minutes without motion.
 
 Development firmware: no secure boot, no flash encryption, reflashable any time.
 
+## WiFi
+
+The wrist joins a 2.4 GHz network and dials out to the hub on TCP port 8788. It never
+listens. It finds the laptop by mDNS name first, then falls back to a fixed IP. USB
+serial still works when the stick is plugged in.
+
+```bash
+cp src/secrets.example.h src/secrets.h   # gitignored: SSID, password, hub name and IP
+```
+
+The laptop and the stick must be on the same network. A phone hotspot works: the
+firmware forces WPA2 without PMF, because the stick fails WPA2/WPA3 transition mode.
+The top right of the wrist screen shows the link: wifi, no hub, or no wifi. Status
+messages carry the WiFi address and the last disconnect reason for debugging.
+
+The link is plain TCP on the local network, with no encryption. Anything on that
+network can send requests, so pairing, signing and erasing the shard all need a
+press of A on the wrist.
+
 ```bash
 pip install platformio
 pio run -e sticks3 -t upload        # flash

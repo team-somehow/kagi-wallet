@@ -44,7 +44,7 @@ export default function Home() {
           Leash
         </Txt>
         <View style={styles.barRight}>
-          <WristChip wrist={state.wrist} address={state.address} />
+          <WristChip wrist={state.wrist} address={state.address} onPress={() => router.push('/wrist')} />
           <Pressable
             accessibilityRole="button"
             hitSlop={8}

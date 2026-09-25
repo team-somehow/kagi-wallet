@@ -2,11 +2,25 @@
  * WebSocket link to the hub on the laptop, which relays to the wrist over USB serial.
  * On a USB-connected Android phone, `adb reverse tcp:8787 tcp:8787` makes localhost work.
  */
+import Constants from 'expo-constants';
+
 export type Msg = { t: string; [k: string]: unknown };
 type Listener = (m: Msg) => void;
 type StateListener = (open: boolean) => void;
 
-const URL = process.env.EXPO_PUBLIC_HUB_URL ?? 'ws://localhost:8787';
+/**
+ * The hub runs on the same laptop that serves the app, so use whatever host the app
+ * was loaded from: the laptop's WiFi address on a phone over the network, or localhost
+ * through `adb reverse`. EXPO_PUBLIC_HUB_URL overrides it.
+ */
+function hubUrl(): string {
+  if (process.env.EXPO_PUBLIC_HUB_URL) return process.env.EXPO_PUBLIC_HUB_URL;
+  const hostUri = Constants.expoConfig?.hostUri ?? '';
+  const host = hostUri.split(':')[0];
+  return `ws://${host || 'localhost'}:8787`;
+}
+
+const URL = hubUrl();
 
 class Link {
   private ws: WebSocket | null = null;

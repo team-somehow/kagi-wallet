@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { colors, radius } from '../theme';
 import type { Wrist } from '../store/types';
 import { wristMatches } from './WristBridge';
@@ -13,10 +13,15 @@ export function wristStatus(wrist: Wrist, address: string | null): { text: strin
   return { text: 'On wrist', color: colors.text, ok: true };
 }
 
-export function WristChip({ wrist, address }: { wrist: Wrist; address: string | null }) {
+export function WristChip({ wrist, address, onPress }: { wrist: Wrist; address: string | null; onPress?: () => void }) {
   const status = wristStatus(wrist, address);
   return (
-    <View style={styles.chip}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${status.text}. Wrist settings`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+    >
       <View style={[styles.dot, { backgroundColor: status.color }]} />
       <Txt size={13} weight="medium" color={status.color}>
         {status.text}
@@ -26,7 +31,7 @@ export function WristChip({ wrist, address }: { wrist: Wrist; address: string | 
           {wrist.battery}%
         </Txt>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -42,4 +47,5 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   dot: { width: 7, height: 7, borderRadius: 4 },
+  pressed: { opacity: 0.6 },
 });

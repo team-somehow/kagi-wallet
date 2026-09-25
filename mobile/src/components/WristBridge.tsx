@@ -26,7 +26,10 @@ export function WristBridge() {
     const off = link.on((m) => {
       switch (m.t) {
         case 'hub':
-          dispatch({ type: 'WRIST', patch: { hub: true, connected: Boolean(m.wrist) } });
+          dispatch({
+            type: 'WRIST',
+            patch: { hub: true, connected: Boolean(m.wrist), via: m.via === 'wifi' || m.via === 'usb' ? m.via : null },
+          });
           break;
         case 'hello':
           dispatch({
@@ -44,7 +47,14 @@ export function WristBridge() {
         case 'status':
           dispatch({
             type: 'WRIST',
-            patch: { connected: true, onArm: Boolean(m.onArm), battery: Number(m.battery), paired: Boolean(m.paired) },
+            patch: {
+              connected: true,
+              onArm: Boolean(m.onArm),
+              battery: Number(m.battery),
+              paired: Boolean(m.paired),
+              via: m.via === 'wifi' ? 'wifi' : 'usb',
+              ssid: typeof m.ssid === 'string' ? m.ssid : null,
+            },
           });
           break;
         case 'dkg':

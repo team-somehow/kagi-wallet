@@ -1,16 +1,29 @@
 // Leash wrist shard, M5StickS3.
 //
-// Talks newline-delimited JSON over USB serial. On the laptop, hub/ relays that to the
-// phone app. The wrist never initiates anything except a revoke and status reports.
+// Talks newline-delimited JSON to the hub on the laptop, which relays to the phone app.
+// Over WiFi the wrist dials out to the hub (it never listens). USB serial still works as
+// a fallback. The wrist never initiates anything except a revoke and status reports.
 //
 // Buttons: A (front) approves, B (side) rejects. Hold B for 2 seconds to revoke every key.
 
 #include <Arduino.h>
+#include <algorithm>
 #include <ArduinoJson.h>
 #include <M5Unified.h>
+#include <ESPmDNS.h>
 #include <Preferences.h>
+#include <WebSocketsClient.h>
+#include <WiFi.h>
+#include <esp_wifi.h>
+#include <bootloader_random.h>
 
 #include "frost.h"
+
+#if __has_include("secrets.h")
+#include "secrets.h"
+#else
+#include "secrets.example.h"
+#endif
 
 static const char* FW = "0.1.0";
 
@@ -22,7 +35,7 @@ static const int W = 240, H = 135;
 
 // ---- state ----------------------------------------------------------------
 
-enum class Mode { Unpaired, Pairing, Home, Prompt, Result, Revoked };
+enum class Mode { Unpaired, Pairing, Home, Prompt, Result, Revoked, ConfirmWipe, ConfirmWifi };
 
 struct Prompt {
   String id;
@@ -64,7 +77,46 @@ static float lastA[3] = {0, 0, 0};
 static const uint32_t STILL_MS = 120000;
 
 static uint32_t lastStatus = 0;
-static String rx;
+static String rx;     // USB serial line buffer
+static String rxTcp;  // WiFi line buffer
+
+// WiFi link to the hub.
+static WiFiClient tcp;
+static bool mdnsUp = false;
+static IPAddress hubIp;
+static uint32_t lastDial = 0;
+static uint32_t lastTcpRx = 0;
+
+// Relay through the public tunnel: works from any network with internet.
+static WebSocketsClient relay;
+static bool relayUp = false;
+static bool relayStarted = false;
+static String relayUrl;  // wss://host/wrist?token=..., learned from the hub
+
+static bool tcpUp() { return tcp.connected() || relayUp; }
+static int wifiReason = 0;  // last disconnect reason from the WiFi driver
+
+// Saved networks. Added from the phone and confirmed on the wrist, kept in flash.
+struct Net {
+  String ssid, pass, hub;  // hub: last hub address that worked on this network
+};
+static const int MAX_NETS = 6;
+static Net nets[MAX_NETS];
+static int netCount = 0;
+static int netIdx = -1;  // network we are on or trying
+static uint32_t benchedUntil[MAX_NETS];  // joined fine but no hub there; skip for a while
+
+enum class WState { Scan, Trying, Up, Backoff };
+static WState wstate = WState::Scan;
+static int candidates[MAX_NETS];
+static int candCount = 0, candPos = 0;
+static bool strictWpa2 = false;  // second attempt on a network: WPA2 without PMF
+static uint32_t wstateAt = 0;
+static int dialStep = 0;          // which hub address to try next
+static String hintHost;           // hub address the phone told us about
+
+// A network the phone asked to add, waiting for a press of A.
+static Net pendingNet;
 
 // ---- helpers --------------------------------------------------------------
 
@@ -111,9 +163,14 @@ static String dollars(double v) {
   return String(b);
 }
 
+// Replies go to WiFi when the hub is reachable there, otherwise to USB.
 static void send(JsonDocument& doc) {
-  serializeJson(doc, Serial);
-  Serial.print('\n');
+  String line;
+  serializeJson(doc, line);
+  line += '\n';
+  if (relayUp) relay.sendTXT(line);
+  else if (tcp.connected()) tcp.print(line);
+  else Serial.print(line);
 }
 
 static void buzz(int times = 3) {
@@ -177,7 +234,8 @@ static void header(const char* left, uint16_t leftColor) {
   canvas.setFont(&fonts::Font0);
   canvas.setTextDatum(top_right);
   canvas.setTextColor(phoneUp ? C_MUTED : C_RED);
-  String s = String(phoneUp ? "phone" : "no phone") + "  " + String(M5.Power.getBatteryLevel()) + "%";
+  const char* via = relayUp ? "relay" : tcp.connected() ? "wifi" : WiFi.status() == WL_CONNECTED ? "no hub" : "no wifi";
+  String s = String(phoneUp ? via : (tcpUp() ? "no phone" : via)) + "  " + String(M5.Power.getBatteryLevel()) + "%";
   canvas.drawString(s, W - 8, 10);
 }
 
@@ -268,6 +326,37 @@ static void draw() {
       canvas.drawString(resultText, 8, 70);
       break;
     }
+    case Mode::ConfirmWipe: {
+      header("Wipe", C_RED);
+      canvas.setFont(&fonts::FreeSansBold12pt7b);
+      canvas.setTextDatum(top_left);
+      canvas.setTextColor(C_RED);
+      canvas.drawString("Erase this shard?", 8, 40);
+      canvas.setFont(&fonts::FreeSans9pt7b);
+      canvas.setTextColor(C_MUTED);
+      canvas.drawString("The wallet can't sign again.", 8, 78);
+      canvas.setTextColor(C_TEXT);
+      canvas.drawString("A: erase", 8, 108);
+      canvas.setTextDatum(top_right);
+      canvas.setTextColor(C_MUTED);
+      canvas.drawString("B: keep", W - 8, 108);
+      break;
+    }
+    case Mode::ConfirmWifi: {
+      header("WiFi", C_AMBER);
+      canvas.setFont(&fonts::FreeSansBold12pt7b);
+      canvas.setTextDatum(top_left);
+      canvas.setTextColor(C_AMBER);
+      canvas.drawString("Join network?", 8, 32);
+      canvas.setFont(&fonts::FreeSans9pt7b);
+      canvas.setTextColor(C_TEXT);
+      canvas.drawString(pendingNet.ssid.substring(0, 22), 8, 66);
+      canvas.drawString("A: save", 8, 108);
+      canvas.setTextDatum(top_right);
+      canvas.setTextColor(C_MUTED);
+      canvas.drawString("B: ignore", W - 8, 108);
+      break;
+    }
     case Mode::Revoked: {
       header("Leash", C_RED);
       canvas.setFont(&fonts::FreeSansBold12pt7b);
@@ -301,6 +390,7 @@ static void sendHello() {
   d["t"] = "hello";
   d["id"] = deviceId;
   d["fw"] = FW;
+  d["via"] = relayUp ? "relay" : tcp.connected() ? "wifi" : "usb";
   d["paired"] = paired;
   if (paired) d["groupKey"] = hex(groupKey, 32);
   d["battery"] = M5.Power.getBatteryLevel();
@@ -311,6 +401,12 @@ static void sendHello() {
 static void sendStatus() {
   JsonDocument d;
   d["t"] = "status";
+  d["wifi"] = WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("down ") + String((int)WiFi.status());
+  d["hubIp"] = hubIp.toString();
+  if (WiFi.status() == WL_CONNECTED) d["ssid"] = WiFi.SSID();
+  else d["reason"] = wifiReason;
+  d["networks"] = netCount;
+  d["via"] = relayUp ? "relay" : tcp.connected() ? "wifi" : "usb";
   d["battery"] = M5.Power.getBatteryLevel();
   d["onArm"] = onArm;
   d["paired"] = paired;
@@ -326,6 +422,9 @@ static void reject(const String& id, const char* reason) {
 }
 
 static void approvePrompt();
+static void saveNets();
+static void wifiRestart();
+static bool isIp(const String& s);
 
 static void onPair(JsonDocument& in) {
   uint8_t pn[16], wn[16];
@@ -503,6 +602,7 @@ static void handle(const String& line) {
   JsonDocument in;
   if (deserializeJson(in, line)) return;
   String t = in["t"] | "";
+  if (t == "hub_ping") return;  // keeps the WiFi socket alive, says nothing about the phone
   lastPhone = millis();
   if (t == "hello?") sendHello();
   else if (t == "ping") {
@@ -518,10 +618,72 @@ static void handle(const String& line) {
     mode = paired ? Mode::Revoked : Mode::Unpaired;
     expLeft = expCap = expSpent = 0;
     expKeys = 0;
+  } else if (t == "hub_hint") {
+    // The phone knows which laptop served it. Remember that address for this network.
+    String r = in["relay"] | "";
+    if (r.startsWith("wss://") && r != relayUrl) {
+      relayUrl = r;
+      Preferences p;
+      p.begin("wifi", false);
+      p.putString("relay", relayUrl);
+      p.end();
+      relayStarted = false;  // reconnect to the new address
+      relay.disconnect();
+      relayUp = false;
+    }
+    String h = in["host"] | "";
+    if (isIp(h)) {
+      hintHost = h;
+      if (netIdx >= 0 && WiFi.status() == WL_CONNECTED && nets[netIdx].hub != h) {
+        nets[netIdx].hub = h;
+        saveNets();
+      }
+    }
+  } else if (t == "wifi_add") {
+    String ssid = in["ssid"] | "";
+    String pass = in["pass"] | "";
+    if (ssid.length() == 0 || ssid.length() > 32 || pass.length() > 63) {
+      JsonDocument d;
+      d["t"] = "wifi_add_reject";
+      d["reason"] = "bad_network";
+      send(d);
+    } else {
+      pendingNet = {ssid, pass, String(in["hub"] | "")};
+      mode = Mode::ConfirmWifi;
+      buzz(1);
+    }
+  } else if (t == "wifi_scan?") {
+    // Nearby networks, strongest first, so the phone can offer a pick list.
+    JsonDocument d;
+    d["t"] = "wifi_scan";
+    JsonArray a = d["networks"].to<JsonArray>();
+    if (mode != Mode::Prompt) {
+      int n = WiFi.scanNetworks();
+      for (int i = 0; i < n && i < 20; i++) {
+        if (WiFi.SSID(i).length() == 0) continue;
+        JsonObject o = a.add<JsonObject>();
+        o["ssid"] = WiFi.SSID(i);
+        o["rssi"] = WiFi.RSSI(i);
+        o["open"] = WiFi.encryptionType(i) == WIFI_AUTH_OPEN;
+      }
+      WiFi.scanDelete();
+    }
+    send(d);
+  } else if (t == "wifi_list?") {
+    JsonDocument d;
+    d["t"] = "wifi_list";
+    JsonArray a = d["networks"].to<JsonArray>();
+    for (int i = 0; i < netCount; i++) a.add(nets[i].ssid);
+    d["current"] = WiFi.status() == WL_CONNECTED ? WiFi.SSID() : String("");
+    send(d);
   } else if (t == "wipe") {
-    wipeShare();
-    mode = Mode::Unpaired;
-    sendHello();
+    // Anyone on the network can ask, so erasing needs a press on the wrist.
+    if (paired) {
+      mode = Mode::ConfirmWipe;
+      buzz(1);
+    } else {
+      sendHello();
+    }
   }
   dirty = true;
 }
@@ -549,6 +711,277 @@ static void pollImu() {
     }
     dirty = true;
     sendStatus();
+  }
+}
+
+// ---- wifi -----------------------------------------------------------------
+//
+// The wrist knows up to six networks. It scans, tries the known ones it can see from
+// strongest to weakest, and on each one tries WPA3 first and WPA2 without PMF second
+// (phone hotspots in WPA2/WPA3 transition mode need the second). Once on a network it
+// dials the hub: the address last seen working there, the phone's hint, mDNS, then the
+// build-time fallback.
+
+static bool isIp(const String& s) {
+  IPAddress ip;
+  return s.length() >= 7 && ip.fromString(s);
+}
+
+static void loadNets() {
+  Preferences p;
+  p.begin("wifi", true);
+  relayUrl = p.getString("relay", "");
+  netCount = std::min((int)p.getUChar("n", 0), MAX_NETS);
+  for (int i = 0; i < netCount; i++) {
+    nets[i].ssid = p.getString(("s" + String(i)).c_str(), "");
+    nets[i].pass = p.getString(("p" + String(i)).c_str(), "");
+    nets[i].hub = p.getString(("h" + String(i)).c_str(), "");
+  }
+  p.end();
+#ifdef WIFI_SSID
+  // Seed with the build-time network the first time only.
+  if (netCount == 0 && strlen(WIFI_SSID) > 0) {
+    nets[0] = {WIFI_SSID, WIFI_PASS, HUB_IP};
+    netCount = 1;
+    saveNets();
+  }
+#endif
+}
+
+static void saveNets() {
+  Preferences p;
+  p.begin("wifi", false);
+  p.clear();
+  if (relayUrl.length()) p.putString("relay", relayUrl);
+  p.putUChar("n", netCount);
+  for (int i = 0; i < netCount; i++) {
+    p.putString(("s" + String(i)).c_str(), nets[i].ssid);
+    p.putString(("p" + String(i)).c_str(), nets[i].pass);
+    p.putString(("h" + String(i)).c_str(), nets[i].hub);
+  }
+  p.end();
+}
+
+static void setWState(WState st) {
+  wstate = st;
+  wstateAt = millis();
+  dirty = true;
+}
+
+static void wifiRestart() {
+  tcp.stop();
+  if (relayStarted) relay.disconnect();
+  relayStarted = false;
+  relayUp = false;
+  WiFi.disconnect(false, false);
+  setWState(WState::Scan);
+}
+
+static void beginNet(int i, bool wpa2Only) {
+  netIdx = i;
+  strictWpa2 = wpa2Only;
+  WiFi.disconnect(false, false);
+  WiFi.begin(nets[i].ssid.c_str(), nets[i].pass.c_str());
+  if (wpa2Only) {
+    esp_wifi_disconnect();
+    wifi_config_t conf;
+    esp_wifi_get_config(WIFI_IF_STA, &conf);
+    conf.sta.pmf_cfg.capable = false;
+    conf.sta.pmf_cfg.required = false;
+    conf.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+    esp_wifi_set_config(WIFI_IF_STA, &conf);
+    esp_wifi_connect();
+  }
+  setWState(WState::Trying);
+}
+
+static void scanAndPick() {
+  candCount = candPos = 0;
+  if (netCount == 0) {
+    setWState(WState::Backoff);
+    return;
+  }
+  int n = WiFi.scanNetworks();
+  int best[MAX_NETS];
+  int rssi[MAX_NETS];
+  for (int k = 0; k < netCount; k++) {
+    rssi[k] = -1000;
+    for (int i = 0; i < n; i++)
+      if (WiFi.SSID(i) == nets[k].ssid) rssi[k] = std::max(rssi[k], (int)WiFi.RSSI(i));
+  }
+  WiFi.scanDelete();
+  uint32_t now = millis();
+  for (int k = 0; k < netCount; k++)
+    if (rssi[k] > -1000 && (int32_t)(benchedUntil[k] - now) <= 0) best[candCount++] = k;
+  // Everything in range is benched: try them anyway rather than sit idle.
+  if (candCount == 0)
+    for (int k = 0; k < netCount; k++)
+      if (rssi[k] > -1000) best[candCount++] = k;
+  std::sort(best, best + candCount, [&](int a, int b) { return rssi[a] > rssi[b]; });
+  memcpy(candidates, best, sizeof(int) * candCount);
+  if (candCount == 0) setWState(WState::Backoff);
+  else beginNet(candidates[0], false);
+}
+
+static void startWifi() {
+  // The ADC entropy source and the radio can't run together. With the radio on,
+  // the hardware RNG is fed by RF noise instead.
+  bootloader_random_disable();
+  WiFi.mode(WIFI_STA);
+  WiFi.onEvent([](WiFiEvent_t, WiFiEventInfo_t info) { wifiReason = info.wifi_sta_disconnected.reason; },
+               ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  WiFi.setHostname(deviceId.c_str());
+  WiFi.setAutoReconnect(false);  // we pick the network ourselves
+  WiFi.setSleep(true);
+  loadNets();
+  setWState(WState::Scan);
+}
+
+static void stepWifi() {
+  uint32_t now = millis();
+  bool up = WiFi.status() == WL_CONNECTED;
+  switch (wstate) {
+    case WState::Scan:
+      scanAndPick();
+      break;
+    case WState::Trying:
+      if (up) {
+        setWState(WState::Up);
+        dialStep = 0;
+        lastDial = 0;
+      } else if (now - wstateAt > 12000) {
+        if (!strictWpa2) beginNet(netIdx, true);  // same network, WPA2 only
+        else if (++candPos < candCount) beginNet(candidates[candPos], false);
+        else setWState(WState::Backoff);
+      }
+      break;
+    case WState::Up:
+      if (!up) {
+        tcp.stop();
+        if (relayStarted) relay.disconnect();
+        relayStarted = relayUp = false;
+        setWState(WState::Scan);
+      } else if (!tcpUp() && now - wstateAt > 30000 && netCount > 1) {
+        // On a network but no hub here. Bench it for a minute and look again.
+        benchedUntil[netIdx] = now + 60000;
+        wifiRestart();
+      }
+      break;
+    case WState::Backoff:
+      if (now - wstateAt > 15000) setWState(WState::Scan);
+      break;
+  }
+}
+
+static IPAddress nextHubAddress() {
+  // Rotate through every way we know of finding the hub.
+  for (int tries = 0; tries < 4; tries++) {
+    int step = dialStep++ % 4;
+    IPAddress ip;
+    if (step == 0 && netIdx >= 0 && isIp(nets[netIdx].hub)) ip.fromString(nets[netIdx].hub);
+    if (step == 1 && isIp(hintHost)) ip.fromString(hintHost);
+    if (step == 2) {
+      if (!mdnsUp) mdnsUp = MDNS.begin(deviceId.c_str());
+      if (mdnsUp) ip = MDNS.queryHost(HUB_MDNS, 1500);
+    }
+    if (step == 3) ip.fromString(HUB_IP);
+    if (ip != IPAddress(0, 0, 0, 0)) return ip;
+  }
+  return IPAddress(0, 0, 0, 0);
+}
+
+static void startRelay() {
+  // wss://host[:port]/path?query
+  String u = relayUrl.substring(6);
+  int slash = u.indexOf('/');
+  String hostPort = slash < 0 ? u : u.substring(0, slash);
+  String path = slash < 0 ? "/" : u.substring(slash);
+  int colon = hostPort.indexOf(':');
+  String host = colon < 0 ? hostPort : hostPort.substring(0, colon);
+  uint16_t port = colon < 0 ? 443 : hostPort.substring(colon + 1).toInt();
+  relay.beginSSL(host.c_str(), port, path.c_str());
+  relay.setReconnectInterval(4000);
+  relay.enableHeartbeat(10000, 4000, 2);
+  relay.onEvent([](WStype_t type, uint8_t* payload, size_t len) {
+    switch (type) {
+      case WStype_CONNECTED:
+        relayUp = true;
+        wstateAt = millis();
+        dirty = true;
+        sendHello();
+        break;
+      case WStype_DISCONNECTED:
+        if (relayUp) dirty = true;
+        relayUp = false;
+        break;
+      case WStype_TEXT: {
+        String msg((const char*)payload, len);
+        int start = 0;
+        while (start < (int)msg.length()) {
+          int nl = msg.indexOf('\n', start);
+          if (nl < 0) nl = msg.length();
+          String line = msg.substring(start, nl);
+          line.trim();
+          if (line.length()) handle(line);
+          start = nl + 1;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  });
+  relayStarted = true;
+}
+
+static void pollWifi() {
+  uint32_t now = millis();
+  // With a relay address, use it: it works from any network with internet.
+  if (relayUrl.length() && wstate == WState::Up) {
+    if (!relayStarted) startRelay();
+    relay.loop();
+    if (relayUp) {
+      if (tcp.connected()) tcp.stop();
+      return;
+    }
+  }
+  if (tcpUp()) {
+    while (tcp.available()) {
+      char c = (char)tcp.read();
+      lastTcpRx = now;
+      if (c == '\n') {
+        if (rxTcp.length()) handle(rxTcp);
+        rxTcp = "";
+      } else if (c != '\r' && rxTcp.length() < 4000) {
+        rxTcp += c;
+      }
+    }
+    // The hub pings every few seconds. Silence means a dead socket.
+    if (now - lastTcpRx > 20000) {
+      tcp.stop();
+      dirty = true;
+    }
+    return;
+  }
+  stepWifi();
+  if (wstate != WState::Up || now - lastDial < 2000) return;
+  lastDial = now;
+  IPAddress ip = nextHubAddress();
+  if (ip == IPAddress(0, 0, 0, 0)) return;
+  hubIp = ip;
+  tcp.setTimeout(3);
+  if (tcp.connect(ip, HUB_PORT, 1500)) {
+    wstateAt = now;
+    tcp.setNoDelay(true);
+    lastTcpRx = now;
+    rxTcp = "";
+    dirty = true;
+    // Remember what worked on this network.
+    if (netIdx >= 0 && nets[netIdx].hub != ip.toString()) {
+      nets[netIdx].hub = ip.toString();
+      saveNets();
+    }
+    sendHello();
   }
 }
 
@@ -581,6 +1014,7 @@ void setup() {
 
   frost::init();
   loadShare();
+  startWifi();
   mode = restingMode();
   lastMotion = millis();
   draw();
@@ -600,6 +1034,8 @@ void loop() {
     }
   }
 
+  pollWifi();
+
   static uint32_t lastImu = 0;
   if (millis() - lastImu > 100) {
     lastImu = millis();
@@ -607,7 +1043,46 @@ void loop() {
   }
 
   // Buttons.
-  if (mode == Mode::Pairing && !pairWaitingPhone) {
+  if (mode == Mode::ConfirmWifi) {
+    if (M5.BtnA.wasPressed()) {
+      // Replace a network with the same name, otherwise add it, dropping the oldest if full.
+      int at = -1;
+      for (int i = 0; i < netCount; i++)
+        if (nets[i].ssid == pendingNet.ssid) at = i;
+      if (at < 0) {
+        if (netCount == MAX_NETS) {
+          for (int i = 1; i < MAX_NETS; i++) nets[i - 1] = nets[i];
+          netCount--;
+        }
+        at = netCount++;
+      }
+      nets[at] = pendingNet;
+      saveNets();
+      JsonDocument d;
+      d["t"] = "wifi_added";
+      d["ssid"] = pendingNet.ssid;
+      send(d);
+      showResult("Saved " + pendingNet.ssid.substring(0, 14), C_TEXT);
+      if (!tcpUp()) wifiRestart();
+    } else if (M5.BtnB.wasPressed()) {
+      JsonDocument d;
+      d["t"] = "wifi_add_reject";
+      d["reason"] = "user";
+      send(d);
+      mode = restingMode();
+      dirty = true;
+    }
+  } else if (mode == Mode::ConfirmWipe) {
+    if (M5.BtnA.wasPressed()) {
+      wipeShare();
+      mode = Mode::Unpaired;
+      showResult("Shard erased", C_MUTED);
+      sendHello();
+    } else if (M5.BtnB.wasPressed()) {
+      mode = restingMode();
+      dirty = true;
+    }
+  } else if (mode == Mode::Pairing && !pairWaitingPhone) {
     if (M5.BtnA.wasPressed()) {
       pairWaitingPhone = true;
       chirp();

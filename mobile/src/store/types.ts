@@ -66,6 +66,10 @@ export interface Wrist {
   paired: boolean;
   /** Group key the wrist holds a share of, if any. */
   groupKey: string | null;
+  /** How the wrist reaches the hub right now. */
+  via: 'wifi' | 'usb' | null;
+  /** WiFi network the wrist is on, if any. */
+  ssid: string | null;
 }
 
 export interface State {

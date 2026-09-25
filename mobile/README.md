@@ -10,7 +10,7 @@ simulated in `src/store`, driven from the Demo screen.
 ## Run on a USB-connected Android phone
 
 ```bash
-# 1. hub, with the wrist plugged into the laptop
+# 1. hub. The wrist reaches it over WiFi (see firmware/wrist/README.md) or USB.
 cd ../hub && npm install && npm start
 
 # 2. tunnel hub and Metro to the phone over USB

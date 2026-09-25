@@ -66,6 +66,7 @@ export default function RootLayout() {
           <Stack.Screen name="sign/[id]" options={{ presentation: 'modal', gestureEnabled: false }} />
           <Stack.Screen name="revoke" options={{ presentation: 'modal', gestureEnabled: false }} />
           <Stack.Screen name="demo" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="wrist" options={{ presentation: 'modal' }} />
         </Stack>
         <IncomingWatcher />
         <WristBridge />
