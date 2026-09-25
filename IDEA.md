@@ -7,7 +7,7 @@ An MPC wallet where the AI agent gets a capped, expiring key it can spend freely
 Agents need money to be useful. Today you either hand them a hot key (they can drain you) or approve every tx (they're useless). Session keys help but the root that issues them is still a hot wallet on a server or a phone.
 
 ## Architecture
-- Root wallet: MPC (FROST, secp256k1), no full key anywhere. Owns a smart account (4337 / 7702)
+- Root wallet: MPC (FROST, secp256k1), no full key anywhere. Owns a smart account: a plain Solidity contract that verifies BIP340 with the ecrecover trick, submitted by our relayer. Speaks ERC-1271, ERC-721/1155 receiver and ERC-165. Not 4337 yet
 - Shard 1: Android app, Android Keystore / StrongBox, biometric gated
 - Shard 2: M5StickS3 on the wrist. Secure boot v2, flash encryption, eFuses burned, JTAG and USB download off. WiFi to phone and agent
 - Shard 3: second M5StickS3, the vault. Lives at home. IR only after a one-time reshare
@@ -33,6 +33,14 @@ One FROST key has one threshold and a signature doesn't say who signed, so roles
 - Gas counts against cap, or paymaster with its own cap
 - No self-calls: can't add owners, swap validators, upgrade
 
+## Standards the account speaks
+- ERC-1271: `isValidSignature` says yes only for the manager key, over sha256("LEASH/1271" || chainid || account || hash). Unlocks SIWE, Permit2, CoW / UniswapX / Seaport orders, Snapshot
+- Why manager only: a Permit2 or order signature moves money without going through `spend`, so an agent key that could sign one would walk around the cap
+- Chainid and account are in the signed message, so a signature can't be replayed on another account or chain that shares the group key. No nonce: replay protection is the verifying app's job, same as an EOA
+- ERC-721 / ERC-1155 receiver hooks: `safeTransferFrom` and `safeMint` into the account work. Only the manager's `execute` can move NFTs out
+- ERC-165 `supportsInterface`: advertises itself, both receivers, and 1271
+- Not 4337: no EntryPoint, no bundlers or paymasters, our relayer pays gas. Contracts aren't upgradeable, so adding 4337 later means a new address
+
 ## Channels and what each one is for
 - Agent ↔ wrist ↔ phone: WiFi. Wrist never listens, outbound only to a pinned endpoint over Noise. Treat the network as hostile
 - Vault reshare: WiFi, one 2-minute window opened by holding both buttons, encrypted to the vault's device key, fingerprint compared on screens, radio dies after, no OTA ever
@@ -54,6 +62,7 @@ One FROST key has one threshold and a signature doesn't say who signed, so roles
 - Phone + wrist stolen together: manager key falls. Vault holds everything above X. The cap on the manager key is what makes a mugging survivable
 - Any remote attacker: vault is unreachable. No packet gets there
 - Firmware: signed only, OTA off on the vault. If the network can push firmware, the story collapses
+- Signed messages (1271): the wrist signs an opaque hash, not calldata it can render. It must decode the common EIP-712 types (Permit2, Seaport, CoW) and show them, and refuse or loudly flag anything it can't. Until then the wrist has no 1271 signing path at all
 - Honest caveat: secure storage on both Android and S3 protects shards at rest and guarantees firmware integrity. FROST math runs in RAM, so the shard is in memory for a few hundred ms per signature. Say it before they ask
 
 ## Demo, two acts
@@ -78,6 +87,7 @@ Act 2
 ## Build risks
 - IR receiver: the stick family ships TX only. Confirm the S3 or add a Grove IR unit
 - FROST on ESP32-S3 is fine. Threshold ECDSA is not. Schnorr verifier in the smart account via the ecrecover trick
+- Wrist-side EIP-712 decoding for 1271 signatures: Permit2 first, since that's what approve-then-swap needs
 - Balance-delta validator across arbitrary calls is the hairy contract. Prototype with USDC and ETH only
 - Nonce commitments in RTC memory with a counter, never reuse
 
