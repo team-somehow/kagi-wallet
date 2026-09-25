@@ -119,6 +119,11 @@ export function evmRevokeMessage(chainId: number, account: string, nonce: bigint
   return sha256(concatBytes(utf8ToBytes('LEASH/revoke'), u256(BigInt(chainId)), addr(account), u256(nonce), addr(agent)));
 }
 
+/** sha256("LEASH/1271" || chainid || account || hash). What the manager signs for ERC-1271. */
+export function evm1271Message(chainId: number, account: string, hash: Hex): Uint8Array {
+  return sha256(concatBytes(utf8ToBytes('LEASH/1271'), u256(BigInt(chainId)), addr(account), hexToBytes(hash.replace(/^0x/, ''))));
+}
+
 /** A plain BIP340 signature by the phone's shard alone. The contract accepts it for revoking only. */
 export function phoneOnlySign(s: Share, m: Uint8Array, rand: RandomBytes): Hex {
   return bytesToHex(schnorr.sign(m, hexToBytes(s.share), rand(32)));

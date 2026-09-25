@@ -1,4 +1,4 @@
-// LeashAccount v2, in Yul so deploying it is cheap.
+// LeashAccount v3, in Yul so deploying it is cheap.
 //
 // A smart account with three kinds of signer:
 //   manager key  2-of-2 threshold Schnorr (phone + wrist), BIP340. Moves anything, grants keys.
@@ -12,16 +12,24 @@
 //   spend(address agent, address to, uint256 value, uint8 v, bytes32 r, bytes32 s)   agent
 //   session(address agent) -> (cap, spent, expiry, nonce)
 //   groupKey() phoneKey() nonce()        plain ETH transfers are accepted
+//   isValidSignature(bytes32 hash, bytes sig) -> 0x1626ba7e                          ERC-1271, manager only
+//   onERC721Received / onERC1155Received / onERC1155BatchReceived, supportsInterface  accept NFTs
 //
 // Signed messages (sha256 for Schnorr, keccak256 for the agent's ECDSA)
 //   execute  sha256("LEASH/evm"    || chainid || this || nonce || to || value || data)
 //   grant    sha256("LEASH/grant"  || chainid || this || nonce || agent || cap || expiry)
 //   revoke   sha256("LEASH/revoke" || chainid || this || nonce || agent)
 //   spend    keccak256("LEASH/spend" || chainid || this || agent || sessionNonce || to || value)
+//   1271     sha256("LEASH/1271"   || chainid || this || hash), sig = rx || s (64 bytes)
 // The wrist rebuilds the manager messages itself from what it shows before it signs.
 //
 // Limits: the cap counts ETH value only, a session can't call contracts or this account,
 // and one session lives at most as long as its expiry (so one cap per key lifetime).
+// ERC-1271 answers yes for the manager key only. A Permit2 or order signature moves money
+// without passing through spend, so an agent's key must never be able to produce one.
+// The 1271 message binds chainid and this account, so a signature can't be replayed on
+// another account or chain that shares the group key. It has no nonce: replay protection
+// for signed orders and permits is the verifying app's job, as with any EOA signature.
 //
 // Storage: 0 nonce, 1 groupKey, 2 phoneKey, sessions at keccak(agent . 3) + 0..3
 // Constructor args (appended to the init code): groupKey x, phoneKey x (both even y).
@@ -140,6 +148,31 @@ object "LeashAccount" {
         // Plain ETH only: no calldata, so a session can't approve tokens or call out.
         if iszero(call(gas(), to, value, 0, 0, 0, 0)) { fail("transfer failed", 15) }
         stop()
+      }
+      case 0x1626ba7e {                                       // isValidSignature(bytes32,bytes)
+        let off := add(4, calldataload(36))
+        let ok := 0
+        if eq(calldataload(off), 64) {
+          let p := head(0x100, "LEASH/1271", 10)
+          mstore(p, calldataload(4))
+          let m := sha(0x100, add(sub(p, 0x100), 32))
+          ok := schnorr(m, calldataload(add(off, 32)), calldataload(add(off, 64)), sload(1))
+        }
+        switch ok
+        case 1 { mstore(0x00, shl(224, 0x1626ba7e)) }
+        default { mstore(0x00, shl(224, 0xffffffff)) }
+        return(0x00, 32)
+      }
+      // NFTs sent with safeTransferFrom / safeMint call these and revert unless they get the
+      // selector back. Only the manager's execute can move them out again.
+      case 0x150b7a02 { mstore(0x00, shl(224, 0x150b7a02)) return(0x00, 32) }  // onERC721Received
+      case 0xf23a6e61 { mstore(0x00, shl(224, 0xf23a6e61)) return(0x00, 32) }  // onERC1155Received
+      case 0xbc197c81 { mstore(0x00, shl(224, 0xbc197c81)) return(0x00, 32) }  // onERC1155BatchReceived
+      case 0x01ffc9a7 {                                       // supportsInterface(bytes4)
+        let id := shr(224, calldataload(4))
+        // ERC-165, ERC-721 receiver, ERC-1155 receiver, ERC-1271
+        mstore(0x00, or(or(eq(id, 0x01ffc9a7), eq(id, 0x150b7a02)), or(eq(id, 0x4e2312e0), eq(id, 0x1626ba7e))))
+        return(0x00, 32)
       }
       default { revert(0, 0) }
 

@@ -11,7 +11,7 @@ const url = (f) => new URL(f, import.meta.url);
 const RPC = process.env.SEPOLIA_RPC ?? 'https://ethereum-sepolia-rpc.publicnode.com';
 const art = JSON.parse(readFileSync(url('./LeashAccount.json'), 'utf8'));
 const STATE = url('./.evm.json');
-const VERSION = 2;
+const VERSION = 3;
 const relayer = existsSync(url('./.relayer')) ? privateKeyToAccount(readFileSync(url('./.relayer'), 'utf8').trim()) : null;
 const pub = createPublicClient({ chain: sepolia, transport: http(RPC) });
 const wallet = relayer ? createWalletClient({ account: relayer, chain: sepolia, transport: http(RPC) }) : null;
@@ -85,7 +85,7 @@ export async function info(gk) {
     accountBalance: accountBalance.toString(),
     nonce: nonce.toString(),
     sessions,
-    deployCost: (440_000n * f).toString(),
+    deployCost: (500_000n * f).toString(),
     grantCost: (110_000n * f).toString(),
     spendCost: (90_000n * f).toString(),
     explorer: EXPLORER,
@@ -98,7 +98,7 @@ export async function deploy(gk, phoneKey, fundWei) {
     abi: art.abi,
     bytecode: `${art.bytecode}${gk.padStart(64, '0')}${String(phoneKey).padStart(64, '0')}`,
     value: BigInt(fundWei ?? 0),
-    gas: 470_000n,
+    gas: 560_000n,
     ...(await fees()),
   });
   const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });

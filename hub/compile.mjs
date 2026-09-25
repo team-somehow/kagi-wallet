@@ -34,6 +34,15 @@ const abi = [
   { type: 'function', name: 'groupKey', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'phoneKey', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'nonce', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'isValidSignature', stateMutability: 'view', inputs: [
+    { name: 'hash', type: 'bytes32' }, { name: 'signature', type: 'bytes' }], outputs: [{ type: 'bytes4' }] },
+  { type: 'function', name: 'onERC721Received', stateMutability: 'nonpayable', inputs: [
+    { type: 'address' }, { type: 'address' }, { type: 'uint256' }, { type: 'bytes' }], outputs: [{ type: 'bytes4' }] },
+  { type: 'function', name: 'onERC1155Received', stateMutability: 'nonpayable', inputs: [
+    { type: 'address' }, { type: 'address' }, { type: 'uint256' }, { type: 'uint256' }, { type: 'bytes' }], outputs: [{ type: 'bytes4' }] },
+  { type: 'function', name: 'onERC1155BatchReceived', stateMutability: 'nonpayable', inputs: [
+    { type: 'address' }, { type: 'address' }, { type: 'uint256[]' }, { type: 'uint256[]' }, { type: 'bytes' }], outputs: [{ type: 'bytes4' }] },
+  { type: 'function', name: 'supportsInterface', stateMutability: 'view', inputs: [{ name: 'id', type: 'bytes4' }], outputs: [{ type: 'bool' }] },
 ];
 const init = c.evm.bytecode.object;
 const runtime = c.evm.deployedBytecode?.object ?? '';

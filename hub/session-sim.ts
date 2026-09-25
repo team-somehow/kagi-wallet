@@ -2,10 +2,10 @@
 // storage each step would have left behind. Signatures come from the real protocol code.
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { createPublicClient, encodeAbiParameters, encodeFunctionData, encodePacked, http, keccak256, parseEther, toHex } from 'viem';
+import { createPublicClient, encodeAbiParameters, encodeFunctionData, encodePacked, hexToBytes, http, keccak256, parseEther, toHex } from 'viem';
 import { generatePrivateKey, privateKeyToAccount, sign } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
-import { combine, dkgFinish, dkgStart, evmGrantMessage, evmMessage, evmRevokeMessage, nonces, phoneKey, phoneOnlySign, reference } from '../mobile/src/lib/frost';
+import { combine, dkgFinish, dkgStart, evm1271Message, evmGrantMessage, evmMessage, evmRevokeMessage, nonces, phoneKey, phoneOnlySign, reference } from '../mobile/src/lib/frost';
 
 const art = JSON.parse(readFileSync(new URL('./LeashAccount.json', import.meta.url), 'utf8'));
 const client = createPublicClient({ chain: sepolia, transport: http('https://ethereum-sepolia-rpc.publicnode.com') });
@@ -90,6 +90,44 @@ await check('agent spends after revoke', await spendData(agentKey, 0n, 1n), stat
 // manager execute still works
 const [erx, es] = managerSign(evmMessage({ chainId, account, nonce: 2n, to, value: 1n, data: '0x' }));
 await check('manager execute', encodeFunctionData({ abi: art.abi, functionName: 'execute', args: [to, 1n, '0x', erx, es] }), state(2n), true);
+
+// ERC-1271: yes for the manager key over the wrapped message, no for anything else
+const MAGIC = '0x1626ba7e';
+async function read(fn: string, args: unknown[], ov: ReturnType<typeof state>) {
+  const r = await client.call({ to: account, data: encodeFunctionData({ abi: art.abi, functionName: fn, args }), stateOverride: ov } as never);
+  return (r.data ?? '0x').slice(0, 10);
+}
+async function expect(label: string, got: Promise<string>, want: string) {
+  const g = await got.catch((e) => `reverted: ${String(e.shortMessage ?? e).split('\n')[0]}`);
+  const ok = g === want;
+  if (!ok) fails++;
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${label}: ${g}`);
+}
+const orderHash = keccak256(toHex('some EIP-712 digest'));
+const packSig = (rx: bigint, s: bigint) => `0x${rx.toString(16).padStart(64, '0')}${s.toString(16).padStart(64, '0')}` as `0x${string}`;
+const [orx, os] = managerSign(evm1271Message(chainId, account, orderHash));
+await expect('1271 manager signature', read('isValidSignature', [orderHash, packSig(orx, os)], state(2n)), MAGIC);
+await expect('1271 same signature, other hash', read('isValidSignature', [keccak256(toHex('other')), packSig(orx, os)], state(2n)), '0xffffffff');
+const [rawRx, rawS] = managerSign(hexToBytes(orderHash.slice(2)));
+await expect('1271 unwrapped hash signed directly', read('isValidSignature', [orderHash, packSig(rawRx, rawS)], state(2n)), '0xffffffff');
+const phone1271 = phoneOnlySign(share, evm1271Message(chainId, account, orderHash), rand);
+await expect('1271 phone shard alone', read('isValidSignature', [orderHash, `0x${phone1271}`], state(2n)), '0xffffffff');
+const agentSig = await sign({ hash: orderHash, privateKey: agentKey, to: 'hex' });
+await expect('1271 agent ECDSA key', read('isValidSignature', [orderHash, agentSig], state(2n, live)), '0xffffffff');
+await expect('1271 wrong length', read('isValidSignature', [orderHash, `${packSig(orx, os)}00`], state(2n)), '0xffffffff');
+
+// receiver hooks and ERC-165
+const z = '0x0000000000000000000000000000000000000000' as const;
+await expect('onERC721Received', read('onERC721Received', [z, z, 1n, '0x'], state(2n)), '0x150b7a02');
+await expect('onERC1155Received', read('onERC1155Received', [z, z, 1n, 1n, '0x'], state(2n)), '0xf23a6e61');
+await expect('onERC1155BatchReceived', read('onERC1155BatchReceived', [z, z, [1n], [1n], '0x'], state(2n)), '0xbc197c81');
+const supports = async (id: string) => {
+  const r = await client.call({ to: account, data: encodeFunctionData({ abi: art.abi, functionName: 'supportsInterface', args: [id] }), stateOverride: state(2n) } as never);
+  return BigInt(r.data ?? '0x0') === 1n ? 'true' : 'false';
+};
+for (const [id, want] of [['0x01ffc9a7', 'true'], ['0x150b7a02', 'true'], ['0x4e2312e0', 'true'], ['0x1626ba7e', 'true'], ['0xffffffff', 'false']]) {
+  await expect(`supportsInterface(${id})`, supports(id), want);
+}
 
 const deployGas = await client.estimateGas({ account: '0xD130448ff0c82Cd4f8044E41ACE6cA5289A88107', data: `${art.bytecode}${share.groupKey}${phoneKey(share)}` as `0x${string}` }).catch((e) => `failed: ${e.shortMessage}`);
 console.log(`\ndeploy estimate: ${deployGas} gas`);
