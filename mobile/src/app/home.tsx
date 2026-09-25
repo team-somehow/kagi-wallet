@@ -1,44 +1,81 @@
-import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
 import { Screen } from '../components/Screen';
 import { Txt } from '../components/Txt';
 import { Button } from '../components/Button';
 import { HoldButton } from '../components/HoldButton';
 import { LedBar } from '../components/LedBar';
-import { KeyRow } from '../components/KeyRow';
 import { WristChip } from '../components/WristChip';
-import { useExposure, useStore } from '../store/store';
-import { useNow } from '../lib/useNow';
-import { hours, usdc } from '../lib/format';
-import { tap } from '../lib/haptics';
-import { link } from '../lib/link';
+import { useStore } from '../store/store';
+import { fmtEth, useChain } from '../store/chain';
+import { chatUrl, link, type Msg } from '../lib/link';
+import { loadSessionKey } from '../lib/session';
+import { loadShard } from '../lib/shard';
+import { phoneKey } from '../lib/frost';
+import { shortAddr } from '../lib/format';
+import { success, tap, warn } from '../lib/haptics';
 import { revokeAllOnChain } from '../lib/chainRevoke';
 import { colors, radius, space } from '../theme';
 
+const FUND = 50_000_000_000_000n; // 0.00005 ETH
+
+/** The wallet at a glance: the account, the agent's access, and what it did. */
 export default function Home() {
-  const { state, dispatch } = useStore();
-  const { live, cap, spent, ratio } = useExposure();
-  const now = useNow(10000);
-  const pending = state.requests.filter((r) => r.status === 'pending');
-  const earlier = state.keys.filter((k) => k.status !== 'live');
-  const hot = ratio >= 0.8;
+  const { state } = useStore();
+  const { info, hubUp, error, primary, activity, limits, refresh } = useChain();
+  const [copied, setCopied] = useState(false);
+  const [deploying, setDeploying] = useState(false);
+  const [deployError, setDeployError] = useState<string | null>(null);
+  const waiting = Object.values(limits).filter((l) => l.status === 'waiting' || l.status === 'submitting');
+  const explorer = info?.explorer ?? 'https://sepolia.etherscan.io';
+
+  const deploy = async () => {
+    const s = await loadShard();
+    if (!s) return;
+    setDeploying(true);
+    setDeployError(null);
+    try {
+      const r = await link.request<Msg>({ t: 'evm_deploy', groupKey: s.groupKey, phoneKey: phoneKey(s), fund: FUND.toString() }, 200000);
+      if (r.t === 'evm_error') throw new Error(String(r.reason));
+      void success();
+      await refresh();
+    } catch (e) {
+      setDeployError(e instanceof Error ? e.message : 'Could not reach Sepolia.');
+      void warn();
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  const copy = async () => {
+    if (!primary) return;
+    const k = await loadSessionKey(primary.address);
+    if (!k) return;
+    await Clipboard.setStringAsync(k.privateKey);
+    setCopied(true);
+    void success();
+    setTimeout(() => setCopied(false), 2500);
+  };
 
   const revokeAll = () => {
-    dispatch({ type: 'REVOKE_ALL' });
-    link.send({ t: 'revoked' });
-    void revokeAllOnChain(state.address);
-    router.push('/revoke');
+    void revokeAllOnChain(state.address).then(() => refresh());
   };
+
+  const left = primary ? (primary.cap > primary.spent ? primary.cap - primary.spent : 0n) : 0n;
+  const ratio = primary && primary.cap > 0n ? Number(primary.spent) / Number(primary.cap) : 0;
+  const minutes = primary && info ? Math.max(0, Math.round(Number(primary.expiry - info.now) / 60)) : 0;
 
   return (
     <Screen
       scroll
-      edges={['top', 'bottom']}
       footer={
-        <View style={styles.footer}>
-          <HoldButton label="Hold to revoke every key" onComplete={revokeAll} disabled={live.length === 0} />
-        </View>
+        primary ? (
+          <View style={styles.footer}>
+            <HoldButton label="Hold to revoke agent access" onComplete={revokeAll} />
+          </View>
+        ) : null
       }
     >
       <View style={styles.bar}>
@@ -54,91 +91,145 @@ export default function Home() {
               void tap();
               router.push('/demo');
             }}
-            style={({ pressed }) => [styles.demo, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.more, pressed && styles.pressed]}
           >
             <Txt size={13} weight="medium" color={colors.muted}>
-              Demo
+              More
             </Txt>
           </Pressable>
         </View>
       </View>
 
-      <View style={styles.exposure}>
-        <Txt size={15} color={colors.muted}>
-          Agents can still spend
+      {!hubUp ? (
+        <Txt size={14} color={colors.red} style={styles.top}>
+          Not connected to the hub. Showing the last known state.
         </Txt>
-        <Txt mono size={48} weight="bold" lineHeight={56} color={cap === 0 ? colors.faint : hot ? colors.amber : colors.text}>
-          {usdc(Math.max(cap - spent, 0))}
+      ) : error && !info ? (
+        <Txt size={14} color={colors.red} style={styles.top}>
+          {error}
         </Txt>
-        <View style={styles.barWrap}>
-          <LedBar ratio={ratio} />
-        </View>
-        <View style={styles.exposureFoot}>
-          <Txt mono size={13} color={colors.muted}>
-            {usdc(spent)} spent of {usdc(cap)}
-          </Txt>
-          <Txt mono size={13} color={colors.muted}>
-            {live.length} {live.length === 1 ? 'key' : 'keys'}
-          </Txt>
-        </View>
-        <Txt size={14} color={hot ? colors.amber : colors.faint}>
-          {cap === 0
-            ? 'No live keys. Nothing can leave this wallet until you issue one.'
-            : hot
-              ? 'Past the 80% mark. The wrist buzzed.'
-              : 'Rolling 24 hour window. The wrist buzzes at the amber mark.'}
-        </Txt>
-      </View>
+      ) : null}
 
-      {pending.map((r) => (
-        <View key={r.id} style={styles.request}>
-          <View style={styles.requestText}>
-            <Txt size={17} weight="medium">
-              {r.agent} asks for a {usdc(r.capUsdc)} key
-            </Txt>
-            <Txt size={14} color={colors.muted}>
-              For {hours(r.durationH)}. It will spend on its own under that cap.
-            </Txt>
-          </View>
-          <Button label="Review" variant="amber" onPress={() => router.push(`/request/${r.id}`)} style={styles.reviewBtn} />
-        </View>
+      {waiting.map((l) => (
+        <Pressable key={l.id} onPress={() => router.push(`/limit/${l.id}`)} style={({ pressed }) => [styles.request, pressed && styles.pressed]}>
+          <Txt size={17} weight="medium">
+            {l.status === 'waiting' ? `${l.name} is waiting for approval` : 'New limit confirming on Sepolia'}
+          </Txt>
+          <Txt size={14} color={colors.muted}>
+            Raise its total from {fmtEth(l.oldCap)} to {fmtEth(l.newCap)}
+          </Txt>
+        </Pressable>
       ))}
 
-      <View style={styles.section}>
-        <View style={styles.sectionHead}>
-          <Txt size={15} weight="medium" color={colors.muted}>
-            Live keys
-          </Txt>
-          <Pressable
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={() => {
-              void tap();
-              router.push('/issue');
-            }}
-            style={({ pressed }) => pressed && styles.pressed}
-          >
-            <Txt size={15} weight="medium" color={colors.amber}>
-              Issue a key
+      <View style={styles.account}>
+        <Txt size={15} color={colors.muted}>
+          Wallet on Sepolia
+        </Txt>
+        {info?.account ? (
+          <>
+            <Txt mono size={40} weight="bold" lineHeight={50}>
+              {fmtEth(info.balance)}
             </Txt>
-          </Pressable>
-        </View>
-        {live.length === 0 ? (
-          <Txt size={16} color={colors.faint} style={styles.empty}>
-            None yet. Issue one, or wait for an agent to ask.
-          </Txt>
+            <Pressable onPress={() => void Linking.openURL(`${explorer}/address/${info.account}`)}>
+              <Txt mono size={13} color={colors.muted}>
+                {shortAddr(info.account)}  view on Etherscan
+              </Txt>
+            </Pressable>
+          </>
+        ) : info ? (
+          <View style={styles.gap}>
+            <Txt size={16} color={colors.faint}>
+              This wallet is not on Sepolia yet.
+            </Txt>
+            {deployError ? (
+              <Txt size={14} color={colors.red}>
+                {deployError}
+              </Txt>
+            ) : null}
+            <Button label={deploying ? 'Creating account' : 'Create Sepolia account'} loading={deploying} onPress={() => void deploy()} />
+          </View>
         ) : (
-          live.map((k) => <KeyRow key={k.id} k={k} now={now} onPress={() => router.push(`/key/${k.id}`)} />)
+          <Txt size={16} color={colors.faint}>
+            Reading Sepolia
+          </Txt>
         )}
       </View>
 
-      {earlier.length > 0 ? (
+      {info?.account ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHead}>
+            <Txt size={15} weight="medium" color={colors.muted}>
+              Agent access
+            </Txt>
+            <Pressable accessibilityRole="button" hitSlop={8} onPress={() => router.push('/agent')} style={({ pressed }) => pressed && styles.pressed}>
+              <Txt size={15} weight="medium" color={colors.amber}>
+                New agent key
+              </Txt>
+            </Pressable>
+          </View>
+          {primary ? (
+            <View style={styles.card}>
+              <View style={styles.row}>
+                <Txt size={18} weight="medium">
+                  {primary.name}
+                </Txt>
+                <Txt size={13} color={colors.muted}>
+                  {minutes} min left
+                </Txt>
+              </View>
+              <Txt mono size={28} weight="bold" color={ratio >= 0.8 ? colors.amber : colors.text}>
+                {fmtEth(left)}
+              </Txt>
+              <LedBar ratio={ratio} />
+              <Txt mono size={13} color={colors.muted}>
+                {fmtEth(primary.spent)} spent of {fmtEth(primary.cap)}
+              </Txt>
+              {primary.local ? (
+                <>
+                  <Button label={copied ? 'Copied' : 'Copy session key'} variant="secondary" onPress={() => void copy()} />
+                  <Txt size={13} color={colors.faint}>
+                    Paste it into the agent chat at {chatUrl()}
+                  </Txt>
+                </>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.card}>
+              <Txt size={16} color={colors.faint}>
+                No agent can spend. Give one a key with a total allowance and an expiry.
+              </Txt>
+              <Button label="Give an agent a key" onPress={() => router.push('/agent')} />
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      {activity.length > 0 ? (
         <View style={styles.section}>
           <Txt size={15} weight="medium" color={colors.muted}>
-            Earlier
+            Activity
           </Txt>
-          {earlier.map((k) => (
-            <KeyRow key={k.id} k={k} now={now} onPress={() => router.push(`/key/${k.id}`)} />
+          {activity.map((a) => (
+            <Pressable
+              key={a.key}
+              disabled={!a.hash}
+              onPress={() => a.hash && void Linking.openURL(`${explorer}/tx/${a.hash}`)}
+              style={({ pressed }) => [styles.act, pressed && styles.pressed]}
+            >
+              <View style={styles.row}>
+                <Txt size={15} color={a.status === 'failed' ? colors.red : colors.text}>
+                  {a.text}
+                </Txt>
+                <Txt size={12} color={colors.faint}>
+                  {new Date(a.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Txt>
+              </View>
+              <Txt size={13} color={colors.muted}>
+                {a.name}
+                {a.to ? ` to ${shortAddr(a.to)}` : ''}
+                {a.hash ? `  ${shortAddr(a.hash, 8, 4)}` : ''}
+              </Txt>
+            </Pressable>
           ))}
         </View>
       ) : null}
@@ -150,24 +241,16 @@ const styles = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
   barRight: { flexDirection: 'row', alignItems: 'center', gap: space.s },
   mark: { letterSpacing: -0.5 },
-  demo: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: radius.m, borderWidth: 1, borderColor: colors.line },
+  more: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: radius.m, borderWidth: 1, borderColor: colors.line },
   pressed: { opacity: 0.5 },
-  exposure: { marginTop: space.xl, gap: space.s },
-  barWrap: { marginTop: space.s, paddingRight: 1 },
-  exposureFoot: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
-  request: {
-    marginTop: space.l,
-    padding: space.m,
-    gap: space.m,
-    borderRadius: radius.m,
-    backgroundColor: colors.panel,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.amber,
-  },
-  requestText: { gap: 4 },
-  reviewBtn: { minHeight: 44 },
-  section: { marginTop: space.xl, gap: 4 },
+  top: { marginTop: space.m },
+  gap: { gap: space.m },
+  account: { marginTop: space.xl, gap: space.xs },
+  request: { marginTop: space.l, padding: space.m, gap: 4, borderRadius: radius.m, backgroundColor: colors.panel, borderLeftWidth: 3, borderLeftColor: colors.amber },
+  section: { marginTop: space.xl, gap: space.s },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  empty: { paddingVertical: space.m },
+  card: { backgroundColor: colors.panel, borderRadius: radius.m, padding: space.m, gap: space.s },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  act: { paddingVertical: space.s, borderBottomWidth: 1, borderBottomColor: colors.line, gap: 2 },
   footer: { paddingTop: space.s },
 });

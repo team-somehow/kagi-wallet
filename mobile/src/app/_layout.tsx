@@ -10,6 +10,7 @@ import { DarkTheme, Stack, ThemeProvider, router, useRootNavigationState } from 
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { StoreProvider, useStore } from '../store/store';
+import { ChainProvider } from '../store/chain';
 import { colors } from '../theme';
 import { buzz } from '../lib/haptics';
 import { WristBridge } from '../components/WristBridge';
@@ -67,6 +68,7 @@ export default function RootLayout() {
 
   return (
     <StoreProvider>
+      <ChainProvider>
       <ThemeProvider value={theme}>
         <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
@@ -82,11 +84,14 @@ export default function RootLayout() {
           <Stack.Screen name="wrist" options={{ presentation: 'modal' }} />
           <Stack.Screen name="chain" options={{ presentation: 'modal' }} />
           <Stack.Screen name="vault" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="agent" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="limit/[id]" options={{ presentation: 'modal', gestureEnabled: false }} />
         </Stack>
         {AUTOTEST ? <AutotestBanner /> : null}
         <IncomingWatcher />
         <WristBridge />
       </ThemeProvider>
+      </ChainProvider>
     </StoreProvider>
   );
 }

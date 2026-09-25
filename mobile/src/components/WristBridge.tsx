@@ -3,15 +3,14 @@ import { router, useRootNavigationState } from 'expo-router';
 import { link } from '../lib/link';
 import { buzz } from '../lib/haptics';
 import { revokeAllOnChain } from '../lib/chainRevoke';
-import { useExposure, useStore } from '../store/store';
+import { useStore } from '../store/store';
 
 /**
  * Keeps the store in step with the real wrist: link state, battery, wear, pairing,
- * and revokes started on the wrist. Sends the exposure readout back to it.
+ * and revokes started on the wrist. The allowance readout comes from the chain store.
  */
 export function WristBridge() {
   const { state, dispatch } = useStore();
-  const { live, cap, spent } = useExposure();
   const ready = Boolean(useRootNavigationState()?.key);
   const readyRef = useRef(ready);
   const addressRef = useRef(state.address);
@@ -85,11 +84,7 @@ export function WristBridge() {
     if (state.wrist.connected) link.send({ t: 'hello?' });
   }, [state.wrist.connected]);
 
-  useEffect(() => {
-    if (!state.wrist.connected || !state.onboarded) return;
-    const r2 = (n: number) => Math.round(n * 100) / 100;
-    link.send({ t: 'exposure', left: r2(Math.max(cap - spent, 0)), cap: r2(cap), spent: r2(spent), keys: live.length });
-  }, [cap, spent, live.length, state.wrist.connected, state.onboarded]);
+  // The allowance readout on the wrist comes from the real session (store/chain.tsx).
 
   return null;
 }

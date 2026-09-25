@@ -44,6 +44,7 @@ contract LeashAccount is LeashBase {
     mapping(address agent => Session) private _sessions;
 
     event Granted(address indexed agent, uint256 cap, uint256 expiry);
+    event LimitRaised(address indexed agent, uint256 oldCap, uint256 newCap);
     event Revoked(address indexed agent);
     event Spent(address indexed agent, address indexed to, uint256 value);
 
@@ -70,6 +71,21 @@ contract LeashAccount is LeashBase {
         sess.spent = 0;
         sess.expiry = expiry;
         emit Granted(agent, cap, expiry);
+    }
+
+    /// Raises the lifetime allowance without resetting spend, expiry or the agent nonce.
+    /// Bind the displayed old cap and expiry, so stale approvals cannot revive a revoked key.
+    function raiseLimit(address agent, uint256 oldCap, uint256 newCap, uint256 expiry, uint256 rx, uint256 s) external {
+        Session storage sess = _sessions[agent];
+        require(sess.expiry > block.timestamp, "key expired or revoked");
+        require(sess.cap == oldCap && sess.expiry == expiry, "session changed");
+        require(newCap > oldCap, "limit must increase");
+        uint256 n = nonce;
+        bytes32 m = sha256(abi.encodePacked("LEASH/limit", block.chainid, address(this), n, agent, oldCap, newCap, expiry));
+        require(Bip340.verify(m, rx, s, groupKey), "bad signature");
+        nonce = n + 1;
+        sess.cap = newCap;
+        emit LimitRaised(agent, oldCap, newCap);
     }
 
     /// Any single shard can stop a key: the phone alone, or phone and wrist together.

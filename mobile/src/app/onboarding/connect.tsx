@@ -10,20 +10,26 @@ import { Radar } from '../../components/Radar';
 import { StickArt } from '../../components/StickArt';
 import { LeashFlow } from '../../components/Leash';
 import { useStore } from '../../store/store';
-import { dkgFinish, dkgStart, type Pop, type Share } from '../../lib/frost';
+import { dkgFinish, dkgStart, phoneKey, type Pop, type Share } from '../../lib/frost';
 import { link, type Msg } from '../../lib/link';
 import { rand, saveShard } from '../../lib/shard';
 import { unlockShard } from '../../lib/biometrics';
 import { success, tap, warn } from '../../lib/haptics';
 import { colors, space } from '../../theme';
 
-type Phase = 'search' | 'hold' | 'keygen' | 'lock' | 'error';
+type Phase = 'search' | 'hold' | 'keygen' | 'lock' | 'account' | 'ready' | 'accountError' | 'error';
+
+// Starting balance for the Sepolia account, from the hub's relayer. Tiny: testnet ETH is scarce.
+const FUND = 50_000_000_000_000n; // 0.00005 ETH
 
 const COPY: Record<Phase, { title: string; body: string }> = {
   search: { title: 'Wake your stick', body: 'Switch it on and keep it close. The phone finds it over Bluetooth.' },
   hold: { title: 'Press and hold A', body: 'Hold the A button on your stick until its ring fills.' },
   keygen: { title: 'Creating your key', body: 'Phone and stick each make half. Neither side ever holds the whole key.' },
   lock: { title: 'Wallet created', body: 'Last step: lock your half of the key to your fingerprint.' },
+  account: { title: 'Creating your account', body: 'Putting your wallet on Sepolia. This takes about 20 seconds.' },
+  ready: { title: 'Your wallet is ready', body: 'It holds 0.00005 test ETH on Sepolia. Next, give an agent its own key.' },
+  accountError: { title: 'The account is not on Sepolia yet', body: '' },
   error: { title: 'Something went wrong', body: '' },
 };
 
@@ -103,6 +109,32 @@ export default function Connect() {
     if (!u.ok) return;
     if (!share.current) return;
     dispatch({ type: 'ONBOARDED', address: share.current.groupKey });
+    void deploy();
+  };
+
+  // 3. Put the wallet on Sepolia in the same journey.
+  const deploy = async () => {
+    const s = share.current;
+    if (!s) return;
+    setError('');
+    setPhase('account');
+    try {
+      const info = await link.request<Msg>({ t: 'evm_info?', groupKey: s.groupKey }, 20000);
+      if (info.t === 'evm_error') throw new Error(String(info.reason));
+      if (!info.account) {
+        const r = await link.request<Msg>({ t: 'evm_deploy', groupKey: s.groupKey, phoneKey: phoneKey(s), fund: FUND.toString() }, 200000);
+        if (r.t === 'evm_error') throw new Error(String(r.reason));
+      }
+      void success();
+      setPhase('ready');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not reach Sepolia.');
+      setPhase('accountError');
+      void warn();
+    }
+  };
+
+  const open = () => {
     router.dismissAll();
     router.replace('/home');
   };
@@ -120,25 +152,34 @@ export default function Connect() {
       footer={
         phase === 'lock' ? (
           <Button label="Lock with fingerprint" onPress={() => void finish()} />
+        ) : phase === 'ready' ? (
+          <Button label="Open wallet" onPress={open} />
+        ) : phase === 'accountError' ? (
+          <>
+            <Button label="Try again" onPress={() => void deploy()} />
+            <Button label="Finish later" variant="ghost" onPress={open} />
+          </>
         ) : phase === 'error' ? (
           <Button label="Try again" onPress={retry} />
         ) : null
       }
     >
       <TopBar
-        left={phase === 'keygen' || phase === 'lock' ? undefined : { label: 'Back', onPress: () => (link.send({ t: 'pair_cancel' }), router.back()) }}
+        left={phase !== 'search' && phase !== 'hold' && phase !== 'error' ? undefined : { label: 'Back', onPress: () => (link.send({ t: 'pair_cancel' }), router.back()) }}
       />
       <Txt size={32} weight="bold" lineHeight={36}>
         {c.title}
       </Txt>
-      <Txt size={17} color={phase === 'error' ? colors.red : colors.muted} style={styles.body}>
-        {phase === 'error' ? error : c.body}
+      <Txt size={17} color={phase === 'error' || phase === 'accountError' ? colors.red : colors.muted} style={styles.body}>
+        {phase === 'error' || phase === 'accountError' ? error : c.body}
       </Txt>
       <View style={styles.art}>
         {phase === 'search' ? <Radar /> : null}
         {phase === 'hold' ? <StickArt pointToA screen="Pair with this phone?" /> : null}
         {phase === 'keygen' ? <LeashFlow /> : null}
-        {phase === 'lock' ? <StickArt screen="Wallet ready" /> : null}
+        {phase === 'lock' || phase === 'accountError' ? <StickArt screen="Wallet ready" /> : null}
+        {phase === 'account' ? <LeashFlow /> : null}
+        {phase === 'ready' ? <StickArt screen="Wallet ready" /> : null}
       </View>
       {phase === 'search' ? (
         <Txt size={14} color={colors.faint} align="center">

@@ -19,6 +19,11 @@ import { fileURLToPath } from 'node:url';
 import { SerialPort } from 'serialport';
 import { WebSocketServer } from 'ws';
 import * as evm from './evm.mjs';
+import http from 'node:http';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import * as limits from './limits.mjs';
+import { createServer as createMcp, onActivity } from './mcp.mjs';
+import { buildChat } from './web/build.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WS_PORT = Number(process.env.HUB_PORT ?? 8787);
@@ -145,7 +150,51 @@ function tokenOk(given) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-const wss = new WebSocketServer({ port: WS_PORT });
+// ---- HTTP: the web chat and the Leash MCP; WebSockets ride on the same port -------------
+
+const WEB = new URL('./web/', import.meta.url);
+async function serveFile(res, file, type) {
+  try {
+    const body = readFileSync(new URL(file, WEB));
+    res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
+    res.end(body);
+  } catch {
+    res.writeHead(404).end('not found');
+  }
+}
+
+const server = http.createServer(async (req, res) => {
+  const u = new URL(req.url ?? '/', 'http://x');
+  if (u.pathname === '/mcp') {
+    // Stateless: a fresh server and transport per request.
+    const mcp = createMcp();
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    res.on('close', () => {
+      void transport.close();
+      void mcp.close();
+    });
+    try {
+      await mcp.connect(transport);
+      let body;
+      if (req.method === 'POST') {
+        const chunks = [];
+        for await (const c of req) chunks.push(c);
+        body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined;
+      }
+      await transport.handleRequest(req, res, body);
+    } catch (e) {
+      log('mcp error', e?.message ?? e);
+      if (!res.headersSent) res.writeHead(500).end();
+    }
+    return;
+  }
+  if (u.pathname === '/' || u.pathname === '/index.html') return serveFile(res, 'index.html', 'text/html; charset=utf-8');
+  if (u.pathname === '/chat.js') return serveFile(res, 'dist/chat.js', 'text/javascript; charset=utf-8');
+  res.writeHead(404).end('not found');
+});
+server.listen(WS_PORT, '0.0.0.0');
+
+const wss = new WebSocketServer({ server });
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url ?? '/', 'http://x');
   // Cloudflare adds cf-ray to everything it forwards. Local connections have none.
@@ -183,6 +232,7 @@ wss.on('connection', (ws, req) => {
 
   phones.add(ws);
   log(`phone connected ${where}`);
+  for (const r of limits.pending()) ws.send(JSON.stringify(r));
   ws.send(JSON.stringify(hubStatus()));
   toWrist(JSON.stringify({ t: 'hello?' }));
   ws.on('message', (m) => {
@@ -190,6 +240,7 @@ wss.on('connection', (ws, req) => {
     if (!line.includes('"ping"')) log('phone →', short(line));
     // Chain requests are handled here; everything else goes to a device.
     if (line.includes('"t":"evm_')) return void handleEvm(ws, line);
+    if (line.includes('"t":"limit_')) return void handleLimit(ws, line);
     const role = line.includes('"to":"vault"') ? 'vault' : 'wrist';
     if (!toDevice(role, line)) ws.send(JSON.stringify(hubStatus()));
   });
@@ -198,6 +249,38 @@ wss.on('connection', (ws, req) => {
     log('phone disconnected');
   });
   ws.on('error', () => undefined);
+});
+
+async function handleLimit(ws, line) {
+  let msg;
+  try {
+    msg = JSON.parse(line);
+  } catch {
+    return;
+  }
+  if (msg.t === 'limit_pending?') {
+    for (const r of limits.pending()) ws.send(JSON.stringify(r));
+    return;
+  }
+  if (msg.t === 'limit_decision') {
+    log(`limit ${msg.id}: phone says ${msg.approved ? 'approve' : 'decline'}`);
+    try {
+      const r = await limits.decide(msg.id, { approved: Boolean(msg.approved), sig: msg.sig });
+      log(`limit ${msg.id}: ${r.status}${r.hash ? ` ${evm.EXPLORER}/tx/${r.hash}` : ''}${r.error ? ` (${r.error})` : ''}`);
+    } catch (e) {
+      ws.send(JSON.stringify({ t: 'limit_error', src: 'hub', id: msg.id, reason: e?.message ?? String(e) }));
+    }
+  }
+}
+
+// Push limit requests and agent activity to every phone, whichever way it is connected.
+limits.onUpdate((v) => {
+  log(`limit ${v.id} ${v.status}: ${v.name} ${v.oldCap} -> ${v.newCap}`);
+  broadcastPhones(v);
+});
+onActivity((a) => {
+  log(`agent ${a.name} ${a.kind} ${a.status}${a.hash ? ` ${a.hash}` : ''}`);
+  broadcastPhones(a);
 });
 
 async function handleEvm(ws, line) {
@@ -351,7 +434,8 @@ function quickTunnel(port, name) {
   });
 }
 
-log(`hub up. phone: ws://localhost:${WS_PORT}  wrist: tcp ${lanAddress() ?? '?'}:${TCP_PORT}`);
+await buildChat();
+log(`hub up. chat: http://localhost:${WS_PORT}  mcp: http://localhost:${WS_PORT}/mcp  wrist: tcp ${lanAddress() ?? '?'}:${TCP_PORT}`);
 
 if (TUNNEL) {
   const [hubUrl, metroUrl] = await Promise.all([quickTunnel(WS_PORT, 'hub'), quickTunnel(METRO_PORT, 'metro')]);
