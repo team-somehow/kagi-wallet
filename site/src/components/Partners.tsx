@@ -28,10 +28,11 @@ const FLOW = [
   { n: '01', who: 'Agent', what: 'Asks to pay', how: 'send_eth through the Kagi MCP, with its own capped key' },
   { n: '02', who: 'Intercepta', what: 'Screens the recipient', how: 'Quick scan, then a deep scan on anything flagged' },
   { n: '03', who: 'Kagi', what: 'Pays, holds or refuses', how: 'Under the cap on its own. Held payments wait for phone + stick' },
-  { n: '04', who: 'Curvegrid', what: 'Indexes what happened', how: 'Every spend, request, approval and revoke, for get_activity' },
+  { n: '04', who: 'Curvegrid', what: 'Indexes and totals what happened', how: 'Every spend and approval, for the AI and the Spending screen' },
 ];
 
 type Partner = {
+  shot?: { src: string; alt: string; caption: string };
   id: string;
   logo: (typeof PARTNER_LOGOS)[number];
   role: string;
@@ -103,7 +104,12 @@ const PARTNERS: Partner[] = [
         h: 'Turn events into sentences.',
         p: 'get_activity reads Spent, LimitRequested, LimitRaised, LimitDeclined, Granted and Revoked, and tells the AI what happened in order: payments, asks for more, and the owner’s answers.',
       },
+      {
+        h: 'Total it with Event Queries.',
+        p: 'MultiBaas groups the spends by agent and by recipient and adds them up on its side. get_spending_summary gives the AI the numbers, and the app’s Spending screen shows the owner the same totals, with every approval and Intercepta hold.',
+      },
     ],
+    shot: { src: './app/spending.png', alt: 'The Spending screen in the Kagi app: agents spent 0.000002 ETH in 1 payment, limit raised from 0.000005 to 0.000007 ETH, top recipient, and approvals including one Intercepta hold.', caption: 'Home → Spending in the Kagi app, real testnet data' },
     record: {
       label: 'What get_activity reads',
       rows: [
@@ -117,9 +123,11 @@ const PARTNERS: Partner[] = [
     links: [
       { label: 'Read the MultiBaas client', href: src('agent-mcp/multibaas.mjs') },
       { label: 'See get_activity', href: src('agent-mcp/server.mjs') },
+      { label: 'See the Spending screen', href: src('mobile/src/app/spending.tsx') },
+      { label: 'How Kagi uses MultiBaas', href: src('docs/curvegrid-multibaas.md') },
     ],
     limits:
-      'The free plan indexes at most 100 blocks (about 20 minutes) into the past and links up to 10 wallets, so history starts just before a wallet’s first connection. MultiBaas is read-only here: it never signs or moves funds.',
+      'The free plan indexes at most 100 blocks (about 20 minutes) into the past and links up to 10 wallets, so history starts just before a wallet’s first connection, and an event query returns at most 50 rows. The MultiBaas key stays on the agent server; the app asks it for its own wallet’s totals. MultiBaas is read-only here: it never signs or moves funds.',
   },
 ];
 
@@ -178,6 +186,12 @@ export function Partners() {
                 </div>
 
                 <aside className="int-side">
+                  {p.shot ? (
+                    <figure className="int-shot">
+                      <img src={p.shot.src} alt={p.shot.alt} width={540} height={1100} loading="lazy" />
+                      <figcaption>{p.shot.caption}</figcaption>
+                    </figure>
+                  ) : null}
                   <div className="int-record">
                     <span className="int-label">{p.record.label}</span>
                     <dl>

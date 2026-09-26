@@ -505,3 +505,8 @@ p { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   .lcd-hold, .ir-beam path { animation: none; }
 }
+
+/* The app screen inside an integration panel: a real screenshot in a thin phone frame. */
+.int-shot { margin: 0 0 18px; display: grid; justify-items: center; gap: 10px; }
+.int-shot img { display: block; width: 100%; max-width: 250px; height: auto; border-radius: 26px; border: 6px solid var(--text); box-shadow: 0 24px 40px -24px var(--shadow); background: var(--ground); }
+.int-shot figcaption { color: var(--faint); font-size: 13px; text-align: center; }
