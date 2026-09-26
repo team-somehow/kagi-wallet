@@ -1,105 +1,201 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
-import { Screen } from '../../components/Screen';
-import { Txt } from '../../components/Txt';
-import { Button } from '../../components/Button';
-import { SpatialDevices } from '../../components/SpatialDevices';
-import { colors, radius, space } from '../../theme';
+import React from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { router } from "expo-router";
+import { Txt } from "../../components/Txt";
+import { StickModel } from "../../components/SpatialDevices";
+import { space } from "../../theme";
 
-// The spending ladder, one rung per step up in who has to agree. Amber marks a human.
-const LADDER: { who: string; when: string; what: string; human: boolean }[] = [
-  { who: 'Agent', when: 'Under the cap', what: 'Spends on its own. Nobody in the loop.', human: false },
-  { who: 'Phone + wrist', when: 'Over the cap', what: 'Unlock your phone, then hold A on your wrist.', human: true },
-  { who: 'Second stick', when: 'Optional', what: 'Add it later. Higher limits then need all three, over infrared.', human: true },
+// The welcome screen is the one light screen: the sticks sit on it like hardware on a desk.
+// Cool aluminium, not cream, so it reads as the devices' own material.
+const paper = "#E9EDF1";
+const ink = "#111820";
+const slate = "#5C6674";
+const rule = "#CBD2DA";
+const signer = "#B35F17"; // the app's amber, deepened to read on light: one of your devices signs
+
+// Who has to agree, from the agent alone up to every device. The dots are how many of your
+// own devices sign: none, phone and wrist, then all three with the second stick.
+const LADDER: { when: string; who: string; signers: number }[] = [
+  { when: "Under the cap", who: "The agent’s own key", signers: 0 },
+  { when: "Over the cap", who: "Your phone and wrist", signers: 2 },
+  { when: "Higher limits", who: "Plus a second stick", signers: 3 },
 ];
 
-export default function Welcome() {
+function Signers({ n }: { n: number }) {
   return (
-    <Screen
-      scroll
-      footer={
-        <>
-          <Txt size={13} color={colors.faint} style={styles.need}>
-            Keep your Kagi stick nearby. Setup takes about a minute.
-          </Txt>
-          <Button label="Create wallet" onPress={() => router.push('/onboarding/connect')} />
-        </>
+    <View
+      style={styles.dots}
+      accessibilityLabel={
+        n === 0 ? "none of your devices" : `${n} of your devices`
       }
     >
-      <View style={styles.brand}>
-        <Txt size={20} weight="bold" style={styles.mark}>
-          Kagi
-        </Txt>
-        <Txt mono size={11} color={colors.faint}>
-          THRESHOLD WALLET
-        </Txt>
-      </View>
-
-      <SpatialDevices two value="Kagi" detail="Your approval device" />
-
-      <View style={styles.hero}>
-        <Txt size={34} weight="bold" lineHeight={38} style={styles.headline}>
-          Give your agent a spending key.
-        </Txt>
-        <Txt size={34} weight="bold" lineHeight={38} color={colors.faint} style={styles.headline}>
-          Keep the wallet.
-        </Txt>
-      </View>
-
-      <View style={styles.ladder}>
-        {LADDER.map((r, i) => (
-          <View key={r.who} style={styles.rung}>
-            <View style={styles.rail}>
-              <View style={[styles.dot, r.human ? styles.dotHuman : null]}>
-                <Txt mono size={11} color={r.human ? colors.amberInk : colors.text}>
-                  {i + 1}
-                </Txt>
-              </View>
-              {i < LADDER.length - 1 ? <View style={styles.line} /> : null}
-            </View>
-            <View style={[styles.body, i === LADDER.length - 1 ? styles.bodyLast : null]}>
-              <View style={styles.head}>
-                <Txt size={16} weight="medium">
-                  {r.who}
-                </Txt>
-                <Txt mono size={11} color={r.human ? colors.amber : colors.muted}>
-                  {r.when.toUpperCase()}
-                </Txt>
-              </View>
-              <Txt size={14} color={colors.muted} lineHeight={20}>
-                {r.what}
-              </Txt>
-            </View>
-          </View>
-        ))}
-      </View>
-    </Screen>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={[styles.dot, i < n ? styles.dotOn : null]} />
+      ))}
+    </View>
   );
 }
 
-const DOT = 26;
+export default function Welcome() {
+  const { width } = useWindowDimensions();
+  const k = Math.min(1.2, Math.max(0.8, (width - 2 * space.l) / 340));
+  return (
+    <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
+      <StatusBar style="dark" />
+      <ScrollView
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+      >
+        <Txt size={22} weight="bold" color={ink} style={styles.mark}>
+          Kagi
+        </Txt>
+
+        <View
+          style={[styles.stage, { height: 200 * k }]}
+          accessibilityLabel="Your wrist stick and a second stick"
+        >
+          <View style={[styles.at, { left: 204 * k, top: 0 }]}>
+            <StickModel
+              width={144 * k}
+              tilt={9}
+              variant="red"
+              title="SECOND STICK"
+              value="Ready"
+              detail="Infrared"
+            />
+          </View>
+          <View style={[styles.at, { left: 0, top: 84 * k }]}>
+            <StickModel
+              width={190 * k}
+              tilt={-6}
+              title="WRIST"
+              value="Kagi"
+              detail="Hold A to approve"
+            />
+          </View>
+        </View>
+
+        <View style={styles.hero}>
+          <Txt
+            size={40}
+            weight="bold"
+            lineHeight={42}
+            color={ink}
+            style={styles.headline}
+          >
+            Give your agent a spending key.
+          </Txt>
+          <Txt
+            size={40}
+            weight="bold"
+            lineHeight={42}
+            color={slate}
+            style={styles.headline}
+          >
+            Keep the wallet.
+          </Txt>
+        </View>
+
+        <View style={styles.ladder}>
+          <Txt size={15} weight="medium" color={ink}>
+            Who has to agree
+          </Txt>
+          <View style={styles.rows}>
+            {LADDER.map((r) => (
+              <View key={r.when} style={styles.row}>
+                <Txt size={15} color={ink} style={styles.when}>
+                  {r.when}
+                </Txt>
+                <Signers n={r.signers} />
+                <Txt
+                  size={15}
+                  color={r.signers ? ink : slate}
+                  style={styles.who}
+                >
+                  {r.who}
+                </Txt>
+              </View>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Txt size={14} color={slate} lineHeight={20}>
+          Have your wrist stick nearby. It takes a minute.
+        </Txt>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/onboarding/connect")}
+          style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+        >
+          <Txt size={17} weight="medium" color={paper}>
+            Create wallet
+          </Txt>
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
-  brand: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: space.m },
-  mark: { letterSpacing: -0.5 },
-  hero: { marginTop: space.s },
-  headline: { letterSpacing: -1 },
-  ladder: { marginTop: space.xl, marginBottom: space.l, backgroundColor: colors.panel, borderRadius: radius.m, padding: space.m },
-  rung: { flexDirection: 'row', gap: space.m },
-  rail: { width: DOT, alignItems: 'center' },
-  dot: {
-    width: DOT,
-    height: DOT,
-    borderRadius: DOT / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.raised,
+  root: { flex: 1, backgroundColor: paper },
+  body: {
+    paddingHorizontal: space.l,
+    paddingTop: space.m,
+    paddingBottom: space.l,
   },
-  dotHuman: { backgroundColor: colors.amber },
-  line: { flex: 1, width: 1, backgroundColor: colors.line, marginVertical: space.xs },
-  body: { flex: 1, gap: 4, paddingBottom: space.l },
-  bodyLast: { paddingBottom: 0 },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s, minHeight: DOT },
-  need: { textAlign: 'center' },
+  mark: { letterSpacing: -0.6 },
+  stage: { marginTop: space.l, marginBottom: space.m },
+  at: { position: "absolute" },
+  hero: { marginTop: space.s },
+  headline: { letterSpacing: -1.6 },
+  ladder: { marginTop: space.xl },
+  rows: {
+    marginTop: space.s,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: rule,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.m,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: rule,
+  },
+  when: { width: 108 },
+  who: { flex: 1 },
+  dots: { flexDirection: "row", gap: 5 },
+  dot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: rule,
+  },
+  dotOn: { backgroundColor: signer, borderColor: signer },
+  footer: {
+    paddingHorizontal: space.l,
+    paddingTop: space.m,
+    paddingBottom: space.s,
+    gap: space.m,
+    backgroundColor: paper,
+  },
+  cta: {
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: ink,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ctaPressed: { opacity: 0.85 },
 });
