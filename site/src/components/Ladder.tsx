@@ -10,8 +10,8 @@ const DEVICES: { id: Who; name: string }[] = [
 ];
 const TIERS: { title: string; you: string; signs: Who[]; tone: 'quiet' | 'human' | 'stop' }[] = [
   { title: 'Spend under the cap', you: 'Nothing', signs: ['agent'], tone: 'quiet' },
-  { title: 'Issue a key, raise a limit', you: 'Unlock phone, then hold A', signs: ['phone', 'wrist'], tone: 'human' },
-  { title: 'Approve after adding a stick', you: 'Unlock phone, hold A on both', signs: ['phone', 'wrist', 'vault'], tone: 'human' },
+  { title: 'Issue a key, raise a limit', you: 'Unlock phone, then hold the stick’s button', signs: ['phone', 'wrist'], tone: 'human' },
+  { title: 'Approve after adding a stick', you: 'Unlock phone, hold the button on both', signs: ['phone', 'wrist', 'vault'], tone: 'human' },
   { title: 'Stop an agent', you: 'Hold to revoke', signs: ['phone'], tone: 'stop' },
 ];
 

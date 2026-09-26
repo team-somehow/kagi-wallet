@@ -29,7 +29,7 @@ const NEED = 2_000_000_000_000_000n; // 0.002 ETH
 
 const COPY: Record<Phase, { title: string; body: string }> = {
   search: { title: 'Wake your stick', body: 'Switch it on and keep it close. The phone finds it over Bluetooth.' },
-  hold: { title: 'Press and hold A', body: 'Hold the A button on your stick until its ring fills.' },
+  hold: { title: 'Press and hold', body: 'Hold the button on your stick until its ring fills.' },
   keygen: { title: 'Creating your key', body: 'Phone and stick each make half. Neither side ever holds the whole key.' },
   lock: { title: 'Wallet created', body: 'Last step: lock your half of the key to your fingerprint.' },
   fund: { title: 'Add gas money', body: 'The phone pays its own gas fees from a gas wallet. Send it at least 0.002 test ETH, from a faucet or another wallet. This continues by itself once it arrives.' },
@@ -39,7 +39,7 @@ const COPY: Record<Phase, { title: string; body: string }> = {
   error: { title: 'Something went wrong', body: '' },
 };
 
-/** Create a wallet with one stick: find it, hold A on it, done. */
+/** Create a wallet with one stick: find it, hold its button, done. */
 export default function Connect() {
   const { state, dispatch } = useStore();
   const [phase, setPhase] = useState<Phase>('search');

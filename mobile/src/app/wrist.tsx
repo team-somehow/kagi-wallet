@@ -68,7 +68,7 @@ export default function WristSettings() {
         link.send({ t: 'wifi_list?' });
       } else {
         setAdd('rejected');
-        setMessage(m.reason === 'user' ? 'You pressed B on the wrist, so it was not saved.' : 'The wrist refused that network name or password.');
+        setMessage(m.reason === 'user' ? 'You tapped the wrist’s button, so it was not saved.' : 'The wrist refused that network name or password.');
         void warn();
       }
     } catch {
@@ -144,7 +144,7 @@ export default function WristSettings() {
           Add a network
         </Txt>
         <Txt size={14} color={colors.faint}>
-          It has to be 2.4 GHz and the same network as the laptop running the hub. The wrist asks you to press A
+          It has to be 2.4 GHz and the same network as the laptop running the hub. The wrist asks you to hold its button
           before it saves anything.
         </Txt>
         {nearby === null ? (
@@ -215,7 +215,7 @@ export default function WristSettings() {
         ) : null}
         {add === 'waiting' ? (
           <Txt size={15} color={colors.amber}>
-            Press A on the wrist to save {ssid}.
+            Hold the wrist’s button to save {ssid}.
           </Txt>
         ) : (
           <Button

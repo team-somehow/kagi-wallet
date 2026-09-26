@@ -123,7 +123,7 @@ export default function PresentationSettings() {
             <Button label="Reset everything" variant="danger" onPress={() => setResetOpen(true)} />
           ) : resetStep === 'confirm_on_wrist' ? (
             <Txt size={15} color={colors.amber}>
-              Hold A on the wrist to erase its share. Press B to keep everything.
+              Hold the wrist’s button to erase its share. Tap it to keep everything.
             </Txt>
           ) : resetStep ? (
             <Txt size={15} color={colors.muted}>

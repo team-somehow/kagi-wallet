@@ -184,7 +184,7 @@ export function SpatialDevices({
             value={!connected ? 'Reconnect' : beam === 'out' ? 'Sending →' : beam === 'back' ? 'Reading ←' : value}
             detail={
               detail ??
-              (focus === 'wrist' ? 'HOLD A TO APPROVE' : connected ? 'Connected by BLE' : 'Waiting for connection')
+              (focus === 'wrist' ? 'HOLD TO APPROVE' : connected ? 'Connected by BLE' : 'Waiting for connection')
             }
             active={focus === 'wrist'}
           />
@@ -209,7 +209,7 @@ export function SpatialDevices({
                           ? 'IR idle'
                           : 'Ready'
               }
-              detail={focus === 'stick' ? 'HOLD A TO APPROVE' : 'Infrared approval'}
+              detail={focus === 'stick' ? 'HOLD TO APPROVE' : 'Infrared approval'}
               active={focus === 'stick'}
             />
           </View>

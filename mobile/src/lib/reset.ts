@@ -1,7 +1,7 @@
 /**
  * Reset everything: erase the wrist's share, then this phone's. The wrist goes first and must
  * confirm with a long press on A. Only once it reports itself unpaired does the phone delete
- * anything, so declining on the wrist (B), or losing the connection, leaves both halves intact.
+ * anything, so declining on the wrist (a tap), or losing the connection, leaves both halves intact.
  *
  * What it doesn't touch: the wallet contract and its funds stay on-chain (without both shares,
  * nobody can move them again), the gas wallet stays so the next wallet can be paid for, and
@@ -35,7 +35,7 @@ export async function resetEverything(onStep: (s: ResetStep) => void): Promise<v
   } catch (e) {
     throw new Error(
       e instanceof Error && e.message.startsWith('No answer')
-        ? 'The wrist did not confirm, so nothing was erased. Hold A on the wrist to erase, or B to keep everything.'
+        ? 'The wrist did not confirm, so nothing was erased. Hold the wrist’s button to erase, or tap it to keep everything.'
         : `${e instanceof Error ? e.message : String(e)} Nothing was erased.`,
     );
   }

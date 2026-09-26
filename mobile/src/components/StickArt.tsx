@@ -15,7 +15,7 @@ export function StickArt({
       <StickModel
         value={screen ?? 'Kagi'}
         active={pointToA || pressing}
-        detail={pointToA ? 'HOLD A TO APPROVE →' : 'Your approval device'}
+        detail={pointToA ? 'HOLD TO APPROVE →' : 'Your approval device'}
       />
     </View>
   );

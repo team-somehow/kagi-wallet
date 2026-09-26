@@ -71,7 +71,7 @@ const RUN: { who: 'you' | 'tool' | 'stick' | 'ai'; text: string; tone?: 'ok' | '
   { who: 'tool', text: `send_eth: Intercepta says clean (risk 0), 0.000002 sent`, tone: 'ok' },
   { who: 'you', text: `Send 0.000002 ETH to ${short(FLAGGED)}.` },
   { who: 'tool', text: `send_eth: Intercepta flags a fake phishing transfer (risk 45). Not signed, held for the owner`, tone: 'wait' },
-  { who: 'stick', text: 'The phone shows “Intercepta held this payment” with the reason. Hold A on the stick to pay anyway, B to refuse.' },
+  { who: 'stick', text: 'The phone shows “Intercepta held this payment” with the reason. Hold the stick’s button to pay anyway, tap it to refuse.' },
   { who: 'tool', text: 'wait_for_approval: approved, 0.000002 sent', tone: 'ok' },
   { who: 'ai', text: 'The first payment went straight through. The second was held until you approved it on your stick.' },
 ];
@@ -114,7 +114,7 @@ export function ConnectAgent() {
         <ol className="steps steps-3">
           <li>
             <b>Make an agent key</b>
-            <span>In the Kagi app, tap New agent key. Pick a total allowance and an expiry, then hold A on the stick.</span>
+            <span>In the Kagi app, tap New agent key. Pick a total allowance and an expiry, then hold the stick’s button.</span>
           </li>
           <li>
             <b>Copy the session key</b>

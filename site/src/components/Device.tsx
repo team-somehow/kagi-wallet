@@ -61,7 +61,7 @@ function Lcd({ screen, v }: { screen: Screen; v: Variant }) {
       <text x="14" y="62" fill={C.text} fontSize="27" fontWeight="700" fontFamily={F}>{screen.amount}</text>
       <text x="14" y="84" fill={C.muted} fontSize="13" fontFamily={F}>{screen.line1}</text>
       {screen.line2 && <text x="14" y="98" fill={C.faint} fontSize="9" fontFamily={F}>{screen.line2}</text>}
-      <text x="14" y="112" fill={C.faint} fontSize="9" fontFamily={F}>B: no</text>
+      <text x="14" y="112" fill={C.faint} fontSize="9" fontFamily={F}>Tap: no</text>
       <text className="lcd-hold" x="186" y="113" fill={t.accent} fontSize="12" fontWeight="700" textAnchor="end" fontFamily={F}>Hold to approve</text>
       <circle cx="206" cy="108" r={r} fill="none" stroke={t.cell} strokeWidth="1.4" />
       <circle
@@ -113,7 +113,7 @@ export function Device({
 }
 
 function describe(s: Screen) {
-  if (s.kind === 'prompt') return `${s.title}: ${s.amount}, ${s.line1}. Hold A to approve, B to decline.`;
+  if (s.kind === 'prompt') return `${s.title}: ${s.amount}, ${s.line1}. Hold the button to approve, tap it to decline.`;
   if (s.kind === 'ring') return `${s.top}: ${s.center}${s.centerSub ? ` ${s.centerSub}` : ''}. ${s.label} ${s.big}. ${s.sub}`;
   return `${s.top}: ${s.big}. ${s.sub}`;
 }

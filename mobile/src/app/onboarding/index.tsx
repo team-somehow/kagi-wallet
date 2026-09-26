@@ -46,7 +46,7 @@ export default function Welcome() {
             <StickModel width={144 * k} tilt={9} variant="red" title="SECOND STICK" value="Ready" detail="Infrared" />
           </View>
           <View style={[styles.at, { left: 0, top: 84 * k }]}>
-            <StickModel width={190 * k} tilt={-6} title="WRIST" value="Kagi" detail="Hold A to approve" />
+            <StickModel width={190 * k} tilt={-6} title="WRIST" value="Kagi" detail="Hold to approve" />
           </View>
         </View>
 

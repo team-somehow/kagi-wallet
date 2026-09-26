@@ -36,9 +36,9 @@ const after: Partial<Record<Phase, Phase>> = {
 };
 const labels: Record<Phase, string> = {
   request: 'Unlock phone',
-  unlocked: 'Hold A on your wrist',
+  unlocked: 'Hold the button on your wrist',
   'ir-out': 'Sending by infrared',
-  second: 'Hold A on second stick',
+  second: 'Hold the second stick’s button',
   'ir-back': 'Returning signature',
   confirming: 'Confirming on-chain',
   done: 'Add a second stick',
@@ -216,7 +216,7 @@ export function Demo() {
     if (active) {
       top = 'RAISE LIMIT?';
       value = `${old} → ${cap}`;
-      detail = 'µETH · HOLD A';
+      detail = 'µETH · HOLD';
     }
     if (join) {
       top = second ? 'SECOND STICK' : 'WRIST';
@@ -266,7 +266,7 @@ export function Demo() {
           </div>
           <button
             className="kg-physical"
-            aria-label={`Hold A on ${second ? 'second' : 'wrist'} stick to approve`}
+            aria-label={`Hold the button on the ${second ? 'second' : 'wrist'} stick to approve`}
             disabled={!active}
             data-held={active && hold > 0}
             onPointerDown={(e) => {

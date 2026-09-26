@@ -207,7 +207,7 @@ export default function LimitRequestScreen() {
                   expiry: r.expiry,
                 }}
                 onReject={(reason) => {
-                  // B on the stick is a decision. A timeout is not: the owner can try again.
+                  // A tap on the stick is a decision. A timeout is not: the owner can try again.
                   if (reason === 'user' || reason === 'vault_rejected') void decline();
                 }}
                 onDone={(sig) => void approve(sig)}

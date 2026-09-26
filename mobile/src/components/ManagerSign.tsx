@@ -103,7 +103,7 @@ const REJECT_TEXT: Record<string, string> = {
 /**
  * The manager key is 2 of 2: phone shard, then wrist shard.
  * Biometrics unlock the phone's share. The wrist shows what it is signing, decoded
- * from the raw bytes, and signs its half only when you press A. The phone checks
+ * from the raw bytes, and signs its half only when you hold its button. The phone checks
  * the wrist's half and the final signature before anything counts as signed.
  */
 export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneSigned, onReject, onDone, autoStart }: Props) {
@@ -433,14 +433,14 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
       : three && wristState === 'done' && phase !== 'done'
         ? 'Signed its part and passed it on over infrared'
         : phase === 'wrist'
-          ? 'It buzzed. Check the amount on the wrist, then hold A to sign or B to reject.'
+          ? 'It buzzed. Check the amount on the wrist, then hold its button to sign, or tap it to reject.'
           : phase === 'combining'
             ? 'Pressed. Checking both halves.'
             : phase === 'done' && sig
               ? `Signature ${sig.slice(0, 8)}…${sig.slice(-8)} verified`
               : !status.ok
                 ? `${status.text}.`
-                : 'Hold A on the wrist when it chimes';
+                : 'Hold the wrist’s button when it chimes';
 
   const stickText =
     phase === 'retry'
@@ -452,7 +452,7 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
           : phase === 'ir_out'
             ? 'Sending to the second stick over infrared'
             : phase === 'stick'
-              ? 'Check the second stick, then hold A on it'
+              ? 'Check the second stick, then hold its button'
               : phase === 'ir_back'
                 ? 'Its signature is coming back over infrared'
                 : phase === 'combining'

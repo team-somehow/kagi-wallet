@@ -53,7 +53,7 @@ export function Hero() {
       <div className="hero-stage" onPointerMove={onMove} onPointerLeave={() => { mx.set(0); my.set(0); }}>
         <div className="stage-glow" aria-hidden="true" />
         <div className="stage-orbit" aria-hidden="true" />
-        <div className="stage-phone" aria-hidden="true"><i />Unlock phone, then hold A</div>
+        <div className="stage-phone" aria-hidden="true"><i />Unlock phone, then hold the button</div>
         <motion.div className="stage-3d" style={{ rotateX: reduce ? 20 : rx, rotateY: reduce ? -16 : ry }}>
           <Device
             className="hero-second" variant="red"

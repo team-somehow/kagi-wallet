@@ -53,7 +53,7 @@ export default function SecondStick() {
     });
   }, [state.address]);
 
-  // The second stick answers only while its radio window is open (hold A on it for 2 s).
+  // The second stick answers only while its radio window is open (hold its button for 2 s).
   useEffect(() => {
     const off = link.on((m) => {
       if (m.t !== 'hello' || m.from !== 'vault') return;
@@ -139,7 +139,7 @@ export default function SecondStick() {
       step('Second stick', 'Received the phone’s sealed piece');
       link.send({ t: 'root_reshare', id: joinId, vaultPub: vault.devPub });
       setFocus('wrist');
-      step('Wrist', `Check it shows ${vault.fingerprint}, then hold A`);
+      step('Wrist', `Check it shows ${vault.fingerprint}, then hold the wrist’s button`);
       const w = await wristDone;
       if (w.t !== 'root_reshare') throw new Error(String(w.reason) === 'user' ? 'You said no on the wrist. Nothing was changed.' : `The wrist refused: ${String(w.reason)}.`);
       step('Wrist', 'Sent its sealed piece', 'done');
@@ -147,7 +147,7 @@ export default function SecondStick() {
       setPieces(2);
       const v = await vaultDone;
       stopProgress();
-      if (v.t !== 'reshare_vault') throw new Error(v.reason === 'window_closed' ? 'The second stick’s window closed. Hold A on it again, then retry.' : 'The second stick could not open a piece.');
+      if (v.t !== 'reshare_vault') throw new Error(v.reason === 'window_closed' ? 'The second stick’s window closed. Hold its button again, then retry.' : 'The second stick could not open a piece.');
       step('Second stick', 'Joined', 'done');
 
       // 3. All three shares must still add up to the same key before anyone switches.
@@ -204,10 +204,10 @@ export default function SecondStick() {
             Wake the second stick
           </Txt>
           <Txt size={15} color={colors.muted} lineHeight={22}>
-            Hold A on it for 2 seconds. Its radio turns on for two minutes, just for this.
+            Hold its button for 2 seconds. Its radio turns on for two minutes, just for this.
           </Txt>
           <View style={styles.art}>
-            <StickArt pointToA screen="Hold A" />
+            <StickArt pointToA screen="Hold" />
           </View>
           <Txt size={13} color={colors.faint} align="center">
             Looking for it over Bluetooth
