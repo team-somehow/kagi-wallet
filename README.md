@@ -82,7 +82,7 @@ firmware/    ESP32-S3 firmware (PlatformIO). One build runs as wrist or vault
   wrist/       the shard firmware: FROST, display, buttons, BLE, WiFi, IR
   irprobe/     bench tool for the IR link
 mobile/      Expo / React Native app. The phone shard, the control surface, and its own on-chain client
-agent-mcp/   Node. A bare-bones MCP server that gives ChatGPT or Claude an agent wallet
+agent-mcp/   Node. A bare-bones MCP server that gives ChatGPT, Claude, Claude Code, Codex, Cursor or VS Code an agent wallet
 site/        the landing page, live at https://kagiwallet.web.app
 IDEA.md      the full design, threat model and demo script
 ```
@@ -147,7 +147,7 @@ npm install
 npm test                # anvil end to end: spend, ask for more, approve, decline
 ```
 
-See [`agent-mcp/README.md`](agent-mcp/README.md) to connect ChatGPT or Claude.
+See [`agent-mcp/README.md`](agent-mcp/README.md) to connect ChatGPT, Claude, Claude Code, Codex, Cursor or VS Code.
 
 To screen every payment with Intercepta, set `INTERCEPTA_API_KEY` (a free key from [intercepta.io/ethglobal](https://intercepta.io/ethglobal)). To turn on `get_activity`, the history tool backed by Curvegrid MultiBaas, set `MULTIBAAS_URL` and `MULTIBAAS_API_KEY` before `npm start` (see [Curvegrid MultiBaas](#curvegrid-multibaas)).
 

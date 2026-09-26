@@ -27,6 +27,8 @@ function toLink(raw: string): string | null {
 type Target = {
   id: string;
   name: string;
+  // The app's own mark, in site/public/ai.
+  logo: string;
   how: string;
   // open: a link the app installs from. copy: text to paste. Both can apply.
   open?: (url: string) => string;
@@ -38,14 +40,34 @@ const TARGETS: Target[] = [
   {
     id: 'chatgpt',
     name: 'ChatGPT',
+    logo: './ai/chatgpt.svg',
     how: 'Developer mode',
     copy: (u) => u,
     open: () => 'https://chatgpt.com/#settings/Connectors',
     after: 'Link copied. Turn on Developer mode under Advanced, create a connector, paste, and pick No authentication.',
   },
   {
+    id: 'claude',
+    name: 'Claude',
+    logo: './ai/claude.svg',
+    how: 'Custom connector',
+    copy: (u) => u,
+    // Claude has no way to pre-fill a custom connector from a link, so the URL is copied instead.
+    open: () => 'https://claude.ai/new#customize/connectors',
+    after: 'Link copied. Claude can’t pre-fill it: choose Add custom connector, type kagi as the name, paste the link as the URL and add it. It then works in Claude on the web, desktop and phone.',
+  },
+  {
+    id: 'claude-code',
+    name: 'Claude Code',
+    logo: './ai/claude-code.svg',
+    how: 'Terminal or IDE extension',
+    copy: (u) => `claude mcp add --transport http ${NAME} ${u}`,
+    after: 'Command copied. Run it in your terminal, then start claude. The Claude Code extension for VS Code and JetBrains picks it up too.',
+  },
+  {
     id: 'codex',
     name: 'Codex',
+    logo: './ai/codex.svg',
     how: 'Terminal',
     copy: (u) => `codex mcp add ${NAME} --url ${u}`,
     after: 'Command copied. Run it in your terminal, then start codex.',
@@ -53,6 +75,7 @@ const TARGETS: Target[] = [
   {
     id: 'cursor',
     name: 'Cursor',
+    logo: './ai/cursor.svg',
     how: 'One click',
     open: (u) => `cursor://anysphere.cursor-deeplink/mcp/install?name=${NAME}&config=${btoa(JSON.stringify({ url: u }))}`,
     after: 'Cursor asks you to confirm the install.',
@@ -60,6 +83,7 @@ const TARGETS: Target[] = [
   {
     id: 'vscode',
     name: 'VS Code',
+    logo: './ai/vscode.svg',
     how: 'One click',
     open: (u) => `vscode:mcp/install?${encodeURIComponent(JSON.stringify({ name: NAME, type: 'http', url: u }))}`,
     after: 'VS Code asks you to confirm the install.',
@@ -158,6 +182,7 @@ export function ConnectAgent() {
             <div className="connect-targets">
               {TARGETS.map((t) => (
                 <button key={t.id} type="button" className="connect-target" disabled={!link} onClick={() => void add(t)}>
+                  <img src={t.logo} alt="" width={28} height={28} />
                   <b>Add to {t.name}</b>
                   <span>{t.how}</span>
                 </button>
