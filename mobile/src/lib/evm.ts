@@ -329,3 +329,44 @@ export async function rootSubmit(rk: string, m: { to: Addr; value: bigint; sig: 
   if (!account) throw new Error('No root treasury deployed for this root key.');
   return call(account, RootTreasuryAbi as Abi, 'execute', [m.to, m.value, '0x', ...split(m.sig)]);
 }
+
+// ---- sweeping ---------------------------------------------------------------------------
+// The sponsor key ships in the APK, so anything sent to it can be taken: the owner sweeps it
+// home. On mainnet the phone's own gas wallet can be swept too, to take back unspent gas.
+
+export const OWNER_ADDRESS = '0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E' as const;
+
+export type SweepSource = 'sponsor' | 'gas';
+
+async function sweepAccount(source: SweepSource) {
+  if (source === 'sponsor') {
+    if (!BUILD_GAS_KEY || !/^0x[0-9a-fA-F]{64}$/.test(BUILD_GAS_KEY)) return null;
+    return privateKeyToAccount(BUILD_GAS_KEY as Hex);
+  }
+  return gasWallet();
+}
+
+/** What a sweep would move: the whole balance minus the worst-case fee of one transfer. */
+export async function sweepQuote(source: SweepSource) {
+  const acct = await sweepAccount(source);
+  if (!acct) return null;
+  const [balance, fees] = await Promise.all([pub.getBalance({ address: acct.address }), pub.estimateFeesPerGas()]);
+  const fee = 21_000n * fees.maxFeePerGas;
+  return { address: acct.address, balance, fee, value: balance > fee ? balance - fee : 0n, maxFeePerGas: fees.maxFeePerGas, maxPriorityFeePerGas: fees.maxPriorityFeePerGas };
+}
+
+/** Send everything from the sponsor or the gas wallet to the owner. */
+export async function sweep(source: SweepSource, to: Addr = OWNER_ADDRESS): Promise<Sent> {
+  const acct = await sweepAccount(source);
+  const q = await sweepQuote(source);
+  if (!acct || !q) throw new Error('This build has no sponsor key.');
+  if (q.value <= 0n) throw new Error('Nothing to sweep: the balance does not cover the fee.');
+  const w = createWalletClient({ account: acct, chain: CHAIN, transport: http(RPC) });
+  const hash = await w.sendTransaction({ to, value: q.value, gas: 21_000n, maxFeePerGas: q.maxFeePerGas, maxPriorityFeePerGas: q.maxPriorityFeePerGas, chain: CHAIN });
+  try {
+    const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
+    return { hash, status: r.status };
+  } catch {
+    throw new PendingTransactionError(hash);
+  }
+}

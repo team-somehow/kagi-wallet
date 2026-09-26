@@ -10,6 +10,7 @@ import { DEMO_RECIPIENT, restoreAgentDemo, runAgentDemo, useAgentDemo } from '..
 import * as evm from '../../lib/evm';
 import { EXPLORER } from '../../lib/evm';
 import { usePresentation } from '../../components/Presentation';
+import { SweepCard } from '../../components/SweepCard';
 import { resetEverything, type ResetStep } from '../../lib/reset';
 import { useStore } from '../../store/store';
 import { colors, radius, space } from '../../theme';
@@ -104,6 +105,20 @@ export default function PresentationSettings() {
             <Button label="Stay on testnet" variant="ghost" onPress={() => setConfirmMainnet(false)} />
           </View>
         ) : null}
+
+        <Txt size={15} color={colors.muted} style={styles.sectionLabel}>
+          Sweep to {'0x7aa2…f67E'}
+        </Txt>
+        <SweepCard
+          source="sponsor"
+          title="Gas sponsor"
+          note={
+            net === 'mainnet'
+              ? 'Its key ships in the app, so anyone can take what lands here. Sweep it after demos.'
+              : 'Pays gas and seeds new wallets on testnet. Emptying it stops that until it is refilled.'
+          }
+        />
+        {net === 'mainnet' ? <SweepCard source="gas" title="This phone’s gas wallet" note="Takes back unspent gas. The phone needs gas again before its next approval." /> : null}
 
         {net === 'mainnet' ? null : (
         <View style={styles.testAgent}>
@@ -202,6 +217,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.m,
   },
   copy: { flex: 1, gap: 5 },
+  sectionLabel: { marginTop: space.s },
   rowMainnet: { borderWidth: 1, borderColor: colors.red },
   confirm: { borderWidth: 1, borderColor: colors.red, borderRadius: radius.m, padding: space.m, gap: space.m, backgroundColor: colors.panel },
   reset: { borderWidth: 1, borderColor: colors.red, borderRadius: radius.m, padding: space.m, gap: space.m, marginTop: space.l },
