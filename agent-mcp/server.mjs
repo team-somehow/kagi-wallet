@@ -54,16 +54,42 @@ const PORT = Number(process.env.PORT ?? 8790);
 const HOST = process.env.HOST ?? '0.0.0.0';
 const PATH = TOKEN ? `/mcp/${TOKEN}` : '/mcp';
 
-// "kagi:<account>:<key>", or a bare key with KAGI_ACCOUNT.
+/**
+ * A session key in any of the shapes it arrives in: "kagi:<account>:<key>" as the app copies it,
+ * the 104-hex connector token, or the whole connector link. An AI often retypes a key on its way
+ * to use_my_key, so forgive the usual damage: spaces and line breaks inside it, quotes or
+ * backticks around it, a dropped 0x, other case. A bare key works only with KAGI_ACCOUNT set.
+ */
 function parseKey(raw) {
-  const v = String(raw ?? '').trim();
-  const m = /^kagi:(0x[0-9a-fA-F]{40}):(0x[0-9a-fA-F]{64})$/.exec(v);
-  if (m) return { account: getAddress(m[1]), key: m[2] };
-  const h = /^(?:0x)?([0-9a-fA-F]{40})([0-9a-fA-F]{64})$/.exec(v);
-  if (h) return { account: getAddress(`0x${h[1]}`), key: `0x${h[2]}` };
+  let v = String(raw ?? '').replace(/[\s"'`<>]/g, '');
+  const k = v.toLowerCase().lastIndexOf('/k/');
+  if (k >= 0) {
+    v = v.slice(k + 3).replace(/[/?#].*$/, '');
+    try {
+      v = decodeURIComponent(v);
+    } catch {
+      // not percent-encoded
+    }
+  }
+  const m = /^(?:kagi:)?(?:0x)?([0-9a-f]{40})[:,;|]?(?:0x)?([0-9a-f]{64})$/i.exec(v);
+  if (m) return { account: getAddress(`0x${m[1]}`), key: `0x${m[2].toLowerCase()}` };
   const acct = process.env.KAGI_ACCOUNT?.trim();
-  if (/^0x[0-9a-fA-F]{64}$/.test(v) && acct && isAddress(acct)) return { account: getAddress(acct), key: v };
+  if (/^(?:0x)?[0-9a-f]{64}$/i.test(v) && acct && isAddress(acct)) return { account: getAddress(acct), key: `0x${v.replace(/^0x/i, '')}` };
   return null;
+}
+
+/** Why a key didn't parse, for the AI and the log. Never includes the key itself. */
+function keyProblem(raw) {
+  const v = String(raw ?? '').replace(/[\s"'`<>]/g, '');
+  const hex = v.replace(/^kagi:/i, '').replace(/0x/gi, '').replace(/[:,;|]/g, '');
+  if (!v) return { shape: 'empty', message: 'No key was given. Ask the user to copy the session key from the Kagi app (Copy session key only).' };
+  if (/^[0-9a-f]+$/i.test(hex) && hex.length === 64) {
+    return { shape: 'bare private key', message: 'That is only the private key; the wallet address is missing. Ask the user for the whole session key from the Kagi app. It starts with kagi: and has two parts.' };
+  }
+  if (/^[0-9a-f]+$/i.test(hex)) {
+    return { shape: `${hex.length} hex chars`, message: `That key has ${hex.length} hex characters; a full one has 104 (a 40-character wallet address and a 64-character key). Part of it is missing or extra. Ask the user to copy it again from the Kagi app, and pass it exactly as copied.` };
+  }
+  return { shape: `not hex (${v.length} chars)`, message: 'That is not a Kagi session key. It looks like kagi:0x…:0x…, copied from the Kagi app. Pass it exactly as the user gave it.' };
 }
 // The single-key endpoint's key, if this deployment has one.
 const OWN = parseKey(process.env.SESSION_KEY);
@@ -332,8 +358,10 @@ const NO_KEY = {
   ok: false,
   status: 'not_configured',
   error:
-    'No wallet is connected yet. Ask the user for the session key from the Kagi phone app (Copy session key only, ' +
-    'it starts with kagi:) and call use_my_key with it, or have them add their own connector link instead.',
+    'No wallet is connected on this connection. If the user already gave you a Kagi session key (kagi:0x…:0x…) ' +
+    'earlier in this chat, call use_my_key again with that same key: the server restarted and forgot it, the key is ' +
+    'still fine. Otherwise ask the user for the session key from the Kagi phone app (Copy session key only) and call ' +
+    'use_my_key with it, or have them add their own connector link instead.',
 };
 
 /**
@@ -385,7 +413,11 @@ function buildServer(current, setKey) {
       },
       async ({ session_key }) => {
         const parsed = parseKey(session_key);
-        if (!parsed) return reply({ ok: false, status: 'bad_key', error: 'That is not a Kagi session key. It looks like kagi:0x…:0x…, copied from the Kagi app.' });
+        if (!parsed) {
+          const p = keyProblem(session_key);
+          log(`use_my_key rejected: ${p.shape}`);
+          return reply({ ok: false, status: 'bad_key', error: p.message });
+        }
         const a = forKey(parsed);
         let w;
         try {
@@ -393,7 +425,10 @@ function buildServer(current, setKey) {
         } catch (e) {
           return reply({ ok: false, status: 'error', error: why(e) });
         }
-        if (!w.ok) return reply(w);
+        if (!w.ok) {
+          log(`use_my_key: key parsed but ${w.error}`);
+          return reply(w);
+        }
         setKey(a);
         log('a connection switched to its own key');
         return reply({ ...w, connected: true, note: 'Connected to your wallet for this connection. Next time, add your connector link from the Kagi app so the key stays out of the chat.' });
