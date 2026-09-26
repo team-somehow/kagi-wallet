@@ -23,47 +23,21 @@ Every piece is a standard, stacked so that each layer only sees the layer below 
 ### Diagram 2: the cryptography
 
 ```mermaid
-flowchart TB
-    subgraph KG["1 · Key generation (once, at pairing)"]
-        direction LR
-        P1["Phone<br/>random share x₁<br/>X₁ = x₁·G + proof of possession"]
-        W1["Kagi Wallet<br/>random share x₂<br/>X₂ = x₂·G + proof of possession"]
-        GK(["Group key P = X₁ + X₂<br/>forced to even y · only P.x is public"])
-        P1 --> GK
-        W1 --> GK
-    end
+flowchart LR
+    Pair["Pairing<br/>FROST key generation"]
+    Shares["Key shares<br/>phone · Kagi Wallet"]
+    Sign["FROST signing<br/>2 rounds"]
+    Sig["One BIP340<br/>signature"]
+    Verify["Bip340.sol<br/>ecrecover trick"]
+    Account["KagiAccount"]
+    ERCs["ERC-1271 · ERC-165<br/>ERC-721 · ERC-1155"]
 
-    subgraph SG["2 · FROST signing (every approval)"]
-        direction TB
-        M["Message m = sha256(KAGI/tag ‖ chainid ‖ account ‖ nonce ‖ fields)<br/>the Kagi Wallet rebuilds m from what it shows"]
-        C["Round 1: each device commits two nonces<br/>Dᵢ = dᵢ·G, Eᵢ = eᵢ·G"]
-        B["Binding factor ρᵢ = H(KAGI/rho ‖ i ‖ m ‖ all D, E)<br/>Rᵢ = Dᵢ + ρᵢ·Eᵢ · R = Σ Rᵢ"]
-        Z["Round 2: challenge c = H_BIP340(R.x ‖ P.x ‖ m)<br/>partial zᵢ = dᵢ + ρᵢ·eᵢ + c·xᵢ<br/>phone checks zᵢ·G = Rᵢ + c·Xᵢ"]
-        S(["One BIP340 signature (R.x, s = Σ zᵢ)<br/>indistinguishable from a single-key signature"])
-        M --> C --> B --> Z --> S
-    end
+    AgentKey["Agent key<br/>ECDSA"]
+    Ecrecover["ecrecover"]
+    Spend["spend"]
 
-    subgraph CH["3 · On-chain verification (Bip340.sol)"]
-        direction TB
-        E["e = sha256(tag ‖ tag ‖ R.x ‖ P.x ‖ m) mod n"]
-        EC["ecrecover(−s·P.x, 27, P.x, −e·P.x)<br/>returns the address of s·G − e·P"]
-        SQ["modexp precompile: lift R.x to its even-y point<br/>compare addresses"]
-        OK{"valid?"}
-        E --> EC --> SQ --> OK
-    end
-
-    subgraph AC["4 · What a valid signature unlocks (KagiAccount)"]
-        direction LR
-        MGR["grant · raiseLimit · execute"]
-        ERC["ERC-1271 isValidSignature<br/>SIWE, Permit2, orders"]
-        RVK["revoke · declineLimit<br/>(phone's share alone also works)"]
-    end
-
-    AGT["Agent session key<br/>ECDSA over keccak256(KAGI/spend ‖ …)"] -- "plain ecrecover" --> SPD["spend: ETH within the cap"]
-
-    GK -. "P.x stored as groupKey" .-> CH
-    S --> CH
-    OK -- yes --> AC
+    Pair --> Shares --> Sign --> Sig --> Verify --> Account --> ERCs
+    AgentKey --> Ecrecover --> Spend
 ```
 
 ## 2. FROST: one key, split across devices

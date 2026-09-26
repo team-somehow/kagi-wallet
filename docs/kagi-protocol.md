@@ -38,45 +38,34 @@ Four contracts, 277 lines of Solidity.
 ### Diagram 1: the protocol
 
 ```mermaid
-flowchart TB
-    subgraph Owner["The owner's devices"]
-        direction LR
-        P["Phone<br/>share behind a fingerprint"]
-        W["Kagi Wallet<br/>share, hold to approve"]
-        V["Second stick<br/>share, infrared only"]
+flowchart LR
+    Agent["AI agent"]
+    Phone["Phone"]
+    Kagi["Kagi Wallet"]
+    Second["Second stick"]
+
+    subgraph Account["KagiAccount"]
+        Spend["spend"]
+        Request["requestLimit"]
+        Admin["grant · raise limit · execute"]
+        Stop["revoke · decline"]
     end
 
-    MK(["Manager key<br/>2-of-2 FROST"])
-    PK(["Phone key<br/>the phone's share alone"])
-    RK(["Root key<br/>3-of-3 FROST"])
+    Manager["Manager key<br/>2-of-2"]
+    Root["Root key<br/>3-of-3"]
+    Treasury["RootTreasury"]
 
-    P --> MK
-    W --> MK
-    P --> PK
-    P --> RK
-    W --> RK
-    V --> RK
-
-    A["AI agent<br/>session key (ECDSA)"]
-
-    subgraph KA["KagiAccount: the wallet"]
-        direction LR
-        SP["spend<br/>plain ETH, within cap,<br/>before expiry"]
-        RQ["requestLimit<br/>emits LimitRequested"]
-        MG["grant · raiseLimit · execute<br/>ERC-1271 signatures"]
-        ST["revoke · declineLimit"]
-    end
-
-    RT[["RootTreasury<br/>funds above the manager's reach"]]
-    OUT(("recipient"))
-
-    A -- "signs each payment" --> SP
-    A -- "asks for more" --> RQ
-    SP -- "ETH" --> OUT
-    MK -- "one BIP340 signature" --> MG
-    PK -- "stop only" --> ST
-    RK -- "one BIP340 signature" --> RT
-    RQ -. "the phone and stick buzz" .-> P
+    Agent -- "pays under the cap" --> Spend
+    Agent -- "asks for more" --> Request
+    Request -. "alert" .-> Phone
+    Phone --> Manager
+    Kagi --> Manager
+    Manager --> Admin
+    Phone -- "alone" --> Stop
+    Phone --> Root
+    Kagi --> Root
+    Second --> Root
+    Root --> Treasury
 ```
 
 The arrows are the only ways in. The agent can reach two functions, and one of them only emits an event. Every other function needs a signature from keys the owner's devices hold.
