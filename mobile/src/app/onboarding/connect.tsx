@@ -20,7 +20,7 @@ import { unlockShard } from '../../lib/biometrics';
 import { success, tap, warn } from '../../lib/haptics';
 import { colors, space } from '../../theme';
 
-type Phase = 'search' | 'hold' | 'keygen' | 'lock' | 'seed' | 'fund' | 'account' | 'ready' | 'accountError' | 'error';
+type Phase = 'search' | 'hold' | 'keygen' | 'lock' | 'fund' | 'account' | 'ready' | 'accountError' | 'error';
 
 // Starting balance for the Sepolia account, from the phone's gas wallet. Tiny: testnet ETH is scarce.
 const FUND = 50_000_000_000_000n; // 0.00005 ETH
@@ -32,7 +32,6 @@ const COPY: Record<Phase, { title: string; body: string }> = {
   hold: { title: 'Press and hold A', body: 'Hold the A button on your stick until its ring fills.' },
   keygen: { title: 'Creating your key', body: 'Phone and stick each make half. Neither side ever holds the whole key.' },
   lock: { title: 'Wallet created', body: 'Last step: lock your half of the key to your fingerprint.' },
-  seed: { title: 'Adding gas money', body: 'Sending the phone a little Sepolia ETH for its fees. A few seconds.' },
   fund: { title: 'Add gas money', body: 'The phone pays its own Sepolia fees from a gas wallet. Send it at least 0.002 Sepolia ETH, from a faucet or another wallet. This continues by itself once it arrives.' },
   account: { title: 'Creating your account', body: 'Putting your wallet on Sepolia. This takes about 20 seconds.' },
   ready: { title: 'Your wallet is ready', body: 'It holds 0.00005 test ETH on Sepolia. Next, give an agent its own key.' },
@@ -130,16 +129,7 @@ export default function Connect() {
       const existing = await evm.accountOf(s.groupKey);
       if (!existing) {
         const w = await evm.gasWallet();
-        let balance = await evm.pub.getBalance({ address: w.address });
-        if (balance < NEED && evm.hasSponsor) {
-          setPhase('seed');
-          try {
-            await evm.seedGas();
-            balance = await evm.pub.getBalance({ address: w.address });
-          } catch {
-            // The sponsor is empty or unreachable: ask for gas money by hand instead.
-          }
-        }
+        const balance = await evm.pub.getBalance({ address: w.address });
         setGas({ address: w.address, balance });
         if (balance < NEED) {
           setPhase('fund');
@@ -216,7 +206,7 @@ export default function Connect() {
         {phase === 'hold' ? <StickArt pointToA screen="Pair with this phone?" /> : null}
         {phase === 'keygen' ? <TetherFlow /> : null}
         {phase === 'lock' || phase === 'accountError' ? <StickArt screen="Wallet ready" /> : null}
-        {phase === 'account' || phase === 'seed' ? <TetherFlow /> : null}
+        {phase === 'account' ? <TetherFlow /> : null}
         {phase === 'fund' && gas ? (
           <View style={styles.fund}>
             <Txt mono size={15} selectable align="center">

@@ -30,8 +30,6 @@ export default function Home() {
   const earlier = sessions.filter((x) => x.status !== 'active');
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
-  const [toppingUp, setToppingUp] = useState(false);
-  const [topUpError, setTopUpError] = useState<string | null>(null);
   const waiting = Object.values(limits).filter((l) => l.status === 'waiting' || l.status === 'submitting');
   const explorer = info?.explorer ?? 'https://sepolia.etherscan.io';
 
@@ -41,7 +39,6 @@ export default function Home() {
     setDeploying(true);
     setDeployError(null);
     try {
-      if (evm.hasSponsor) await evm.seedGas().catch(() => undefined);
       await evm.deploy(s.groupKey, phoneKey(s), FUND);
       void success();
       await refresh();
@@ -50,21 +47,6 @@ export default function Home() {
       void warn();
     } finally {
       setDeploying(false);
-    }
-  };
-
-  const topUp = async () => {
-    setToppingUp(true);
-    setTopUpError(null);
-    try {
-      await evm.seedGas();
-      void success();
-      await refresh();
-    } catch (e) {
-      setTopUpError(`The gas sponsor couldn't pay: ${evm.reason(e)}`);
-      void warn();
-    } finally {
-      setToppingUp(false);
     }
   };
 
@@ -229,24 +211,9 @@ export default function Home() {
             </View>
             <Txt size={13} color={info.gasBalance < LOW_GAS ? colors.amber : colors.faint}>
               {info.gasBalance < LOW_GAS
-                ? evm.hasSponsor
-                  ? 'Running low. Top it up, or the phone cannot grant, revoke or decide limits.'
-                  : 'Running low. Send Sepolia ETH to this address, or the phone cannot grant, revoke or decide limits.'
+                ? 'Running low. Send Sepolia ETH to this address, or the phone cannot grant, revoke or decide limits.'
                 : 'Pays the phone’s Sepolia fees. It has no power over your wallet.'}
             </Txt>
-            {evm.hasSponsor && info.gasBalance < LOW_GAS ? (
-              <Button
-                label={toppingUp ? 'Topping up…' : `Top up to ${fmtEth(evm.SEED_GAS)}`}
-                variant="secondary"
-                disabled={toppingUp}
-                onPress={() => void topUp()}
-              />
-            ) : null}
-            {topUpError ? (
-              <Txt size={13} color={colors.red}>
-                {topUpError}
-              </Txt>
-            ) : null}
           </View>
         </View>
       ) : null}

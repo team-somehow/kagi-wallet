@@ -18,13 +18,13 @@ npm install && npx expo run:android
 A release build needs no computer at all: `cd android && ./gradlew :app:assembleRelease`.
 Set `EXPO_PUBLIC_SEPOLIA_RPC` to use another RPC.
 
-## Gas sponsor
+## Gas wallet
 
-The phone pays its own Sepolia fees from a gas wallet in its secure store. To skip the
-"Add gas money" step, give the build a sponsor key: copy `.env.example` to `.env.local`
-and set `EXPO_PUBLIC_GAS_SPONSOR_KEY`. The app then tops the gas wallet up to 0.003 ETH
-during onboarding, before creating an agent key, and from Top up on Home. Without it, or
-once the sponsor runs dry, the app falls back to asking for Sepolia ETH by hand.
+The phone pays its Sepolia fees from a gas wallet. Give the build a funded key and every
+phone uses it, so onboarding never stops at "Add gas money": copy `.env.example` to
+`.env.local` and set `EXPO_PUBLIC_GAS_SPONSOR_KEY`. Home shows that wallet's address and
+balance. A build without the key falls back to a wallet each phone makes for itself, which
+you fund by hand.
 
 The key is compiled into the app, so anyone with the APK can read it. Use a Sepolia-only
 wallet with a small balance.
