@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { TopBar } from '../components/TopBar';
 import { Txt } from '../components/Txt';
 import { Fact } from '../components/Fact';
@@ -10,6 +9,7 @@ import { fmtEth, useChain } from '../store/chain';
 import { MCP_URL } from '../lib/session';
 import { shortAddr } from '../lib/format';
 import { colors, radius, space } from '../theme';
+import { goBack } from '../lib/nav';
 
 /** What the agent server returns: this wallet's totals, from Curvegrid MultiBaas Event Queries. */
 interface Summary {
@@ -64,7 +64,7 @@ export default function Spending() {
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <View style={styles.bar}>
-        <TopBar title="Spending" left={{ label: 'Close', onPress: () => router.back() }} />
+        <TopBar title="Spending" left={{ label: 'Close', onPress: () => goBack() }} />
       </View>
       <ScrollView contentContainerStyle={styles.body} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}>
         {!account ? (

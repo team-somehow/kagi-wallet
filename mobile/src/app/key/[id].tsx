@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Screen } from '../../components/Screen';
 import { Txt } from '../../components/Txt';
 import { TopBar } from '../../components/TopBar';
@@ -12,6 +12,7 @@ import { useNow } from '../../lib/useNow';
 import { clock, shortAddr, timeLeft, usdc } from '../../lib/format';
 import type { Tx } from '../../store/types';
 import { colors, space } from '../../theme';
+import { goBack } from '../../lib/nav';
 
 const KIND: Record<Tx['kind'], string> = { transfer: 'Sent', swap: 'Swapped', approve: 'Allowed', call: 'Called' };
 
@@ -44,7 +45,7 @@ export default function KeyDetail() {
   if (!k) {
     return (
       <Screen>
-        <TopBar left={{ label: 'Back', onPress: () => router.back() }} />
+        <TopBar left={{ label: 'Back', onPress: () => goBack() }} />
         <Txt size={17} color={colors.muted}>
           This key is gone.
         </Txt>
@@ -71,7 +72,7 @@ export default function KeyDetail() {
         ) : null
       }
     >
-      <TopBar left={{ label: 'Back', onPress: () => router.back() }} />
+      <TopBar left={{ label: 'Back', onPress: () => goBack() }} />
       <Txt size={32} weight="bold" lineHeight={36}>
         {k.agent}
       </Txt>

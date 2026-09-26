@@ -19,6 +19,7 @@ import { rand, saveShard } from '../../lib/shard';
 import { unlockShard } from '../../lib/biometrics';
 import { success, tap, warn } from '../../lib/haptics';
 import { colors, space } from '../../theme';
+import { goBack } from '../../lib/nav';
 
 type Phase = 'search' | 'hold' | 'keygen' | 'lock' | 'fund' | 'account' | 'ready' | 'accountError' | 'error';
 
@@ -193,7 +194,7 @@ export default function Connect() {
       }
     >
       <TopBar
-        left={phase !== 'search' && phase !== 'hold' && phase !== 'error' ? undefined : { label: 'Back', onPress: () => (link.send({ t: 'pair_cancel' }), router.back()) }}
+        left={phase !== 'search' && phase !== 'hold' && phase !== 'error' ? undefined : { label: 'Back', onPress: () => (link.send({ t: 'pair_cancel' }), goBack('/onboarding')) }}
       />
       <Txt size={32} weight="bold" lineHeight={36}>
         {c.title}

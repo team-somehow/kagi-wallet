@@ -1,6 +1,5 @@
 import React from 'react';
 import { Linking, View } from 'react-native';
-import { router } from 'expo-router';
 import { Screen } from '../components/Screen';
 import { Txt } from '../components/Txt';
 import { Button } from '../components/Button';
@@ -9,6 +8,7 @@ import { useChain } from '../store/chain';
 import { revokeAllOnChain, useRevocation } from '../lib/chainRevoke';
 import { EXPLORER } from '../lib/evm';
 import { colors, space } from '../theme';
+import { goBack } from '../lib/nav';
 
 export default function Revoked() {
   const { state } = useStore();
@@ -22,7 +22,7 @@ export default function Revoked() {
           label="Back to wallet"
           onPress={() => {
             void refresh();
-            router.back();
+            goBack();
           }}
         />
       }

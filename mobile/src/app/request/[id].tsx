@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Screen } from '../../components/Screen';
 import { Txt } from '../../components/Txt';
 import { Button } from '../../components/Button';
@@ -11,6 +11,7 @@ import { useStore } from '../../store/store';
 import { makeKey } from '../../store/mock';
 import { hours, shortAddr, usdc } from '../../lib/format';
 import { colors, space } from '../../theme';
+import { goBack } from '../../lib/nav';
 
 export default function Request() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -21,7 +22,7 @@ export default function Request() {
   if (!req) {
     return (
       <Screen>
-        <TopBar left={{ label: 'Close', onPress: () => router.back() }} />
+        <TopBar left={{ label: 'Close', onPress: () => goBack() }} />
         <Txt size={17} color={colors.muted}>
           This request is gone.
         </Txt>
@@ -37,7 +38,7 @@ export default function Request() {
 
   const deny = () => {
     dispatch({ type: 'GRANT_DECIDE', id: req.id, status: 'denied' });
-    router.back();
+    goBack();
   };
 
   return (
@@ -46,13 +47,13 @@ export default function Request() {
       edges={['top', 'bottom']}
       footer={
         issued ? (
-          <Button label="Done" onPress={() => router.back()} />
+          <Button label="Done" onPress={() => goBack()} />
         ) : (
           <Button label="Deny" variant="ghost" onPress={deny} />
         )
       }
     >
-      <TopBar left={issued ? undefined : { label: 'Close', onPress: () => router.back() }} />
+      <TopBar left={issued ? undefined : { label: 'Close', onPress: () => goBack() }} />
       <Txt size={32} weight="bold" lineHeight={36}>
         {issued ? 'Key issued' : `${req.agent} wants a key`}
       </Txt>

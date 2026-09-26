@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Screen } from '../../components/Screen';
 import { TopBar } from '../../components/TopBar';
 import { Txt } from '../../components/Txt';
@@ -16,6 +16,7 @@ import { unlockShard } from '../../lib/biometrics';
 import { success } from '../../lib/haptics';
 import { shortAddr } from '../../lib/format';
 import { colors, radius, space } from '../../theme';
+import { goBack } from '../../lib/nav';
 
 /**
  * An agent hit its allowance and asks for a higher total. This is more future access,
@@ -59,7 +60,7 @@ export default function LimitRequestScreen() {
   if (!r) {
     return (
       <Screen>
-        <TopBar left={{ label: 'Close', onPress: () => router.back() }} />
+        <TopBar left={{ label: 'Close', onPress: () => goBack() }} />
         <Txt size={16} color={colors.muted}>
           This request is no longer open.
         </Txt>
@@ -122,7 +123,7 @@ export default function LimitRequestScreen() {
 
   return (
     <Screen scroll>
-      <TopBar title="Limit request" left={{ label: 'Close', onPress: () => router.back() }} />
+      <TopBar title="Limit request" left={{ label: 'Close', onPress: () => goBack() }} />
       <View style={styles.gap}>
         <Txt size={26} weight="bold" lineHeight={32}>
           {flag === 'blocked'
@@ -231,13 +232,13 @@ export default function LimitRequestScreen() {
           <>
             <Status title="New limit confirmed" body={`${r.name} can now spend up to ${fmtAmount(r.newCap)} in total. It will retry its transfer.`} />
             {r.hash ? <Button label="View on Etherscan" variant="secondary" onPress={() => void Linking.openURL(`${explorer}/tx/${r.hash}`)} /> : null}
-            <Button label="Done" onPress={() => router.back()} />
+            <Button label="Done" onPress={() => goBack()} />
           </>
         ) : null}
         {r.status === 'rejected' ? (
           <>
             <Status title="Declined" body={`The limit stays at ${fmtAmount(r.oldCap)}. The waiting transfer was not sent.`} />
-            <Button label="Done" onPress={() => router.back()} />
+            <Button label="Done" onPress={() => goBack()} />
           </>
         ) : null}
         {r.status === 'expired' ? <Status title="Request expired" body={`Nobody answered in time. The limit stays at ${fmtAmount(r.oldCap)}.`} /> : null}

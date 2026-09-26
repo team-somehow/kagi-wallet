@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Screen } from '../../components/Screen';
 import { Txt } from '../../components/Txt';
 import { Button } from '../../components/Button';
@@ -11,6 +11,7 @@ import { useStore } from '../../store/store';
 import { shortAddr, usdc } from '../../lib/format';
 import { success, tap } from '../../lib/haptics';
 import { colors, radius, space } from '../../theme';
+import { goBack } from '../../lib/nav';
 
 export default function Sign() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,7 +35,7 @@ export default function Sign() {
   if (!req || !key || !status) {
     return (
       <Screen>
-        <TopBar left={{ label: 'Close', onPress: () => router.back() }} />
+        <TopBar left={{ label: 'Close', onPress: () => goBack() }} />
         <Txt size={17} color={colors.muted}>
           This request is gone.
         </Txt>
@@ -47,7 +48,7 @@ export default function Sign() {
 
   const reject = () => {
     dispatch({ type: 'SIGN_UPDATE', id: req.id, status: 'rejected' });
-    router.back();
+    goBack();
   };
 
   const title =
@@ -59,7 +60,7 @@ export default function Sign() {
       edges={['top', 'bottom']}
       footer={
         settled ? (
-          <Button label="Done" onPress={() => router.back()} />
+          <Button label="Done" onPress={() => goBack()} />
         ) : status === 'pending' || status === 'phone-signed' ? (
           <Button label="Reject" variant="ghost" onPress={reject} />
         ) : null

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Linking, StyleSheet, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { Screen } from '../components/Screen';
 import { TopBar } from '../components/TopBar';
@@ -15,6 +14,7 @@ import { connectionString, connectorLink, newSessionKey, saveSessionKey, type Se
 import { shortAddr } from '../lib/format';
 import { success, warn } from '../lib/haptics';
 import { colors, fonts, radius, space } from '../theme';
+import { goBack } from '../lib/nav';
 
 type Phase = 'form' | 'sign' | 'submitting' | 'done' | 'error' | 'pending';
 
@@ -134,7 +134,7 @@ export default function NewAgentKey() {
 
   return (
     <Screen scroll>
-      <TopBar title="Agent access" left={{ label: phase === 'done' ? 'Done' : 'Cancel', onPress: () => router.back() }} />
+      <TopBar title="Agent access" left={{ label: phase === 'done' ? 'Done' : 'Cancel', onPress: () => goBack() }} />
 
       {phase === 'form' ? (
         <View style={styles.gap}>

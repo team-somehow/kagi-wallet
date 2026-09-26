@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
 import { Screen } from '../components/Screen';
 import { Txt } from '../components/Txt';
 import { Button } from '../components/Button';
@@ -13,6 +12,7 @@ import { AGENTS, makeKey, makePubkey } from '../store/mock';
 import { hours, shortAddr, usdc } from '../lib/format';
 import { tap } from '../lib/haptics';
 import { colors, fonts, radius, space } from '../theme';
+import { goBack } from '../lib/nav';
 
 const CAPS = [100, 250, 500, 1000];
 const LIVES = [6, 12, 24];
@@ -98,12 +98,12 @@ export default function Issue() {
     phase === 'form' ? (
       <Button label="Ask the agent for its key" onPress={() => setPhase('agent')} disabled={!ready} />
     ) : phase === 'issued' ? (
-      <Button label="Done" onPress={() => router.back()} />
+      <Button label="Done" onPress={() => goBack()} />
     ) : null;
 
   return (
     <Screen scroll edges={['top', 'bottom']} footer={footer}>
-      <TopBar left={phase === 'issued' ? undefined : { label: 'Close', onPress: () => router.back() }} />
+      <TopBar left={phase === 'issued' ? undefined : { label: 'Close', onPress: () => goBack() }} />
       <Txt size={32} weight="bold" lineHeight={36}>
         {phase === 'issued' ? 'Key issued' : 'Issue a key'}
       </Txt>

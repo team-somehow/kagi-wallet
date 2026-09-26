@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
 import { Screen } from '../components/Screen';
 import { Txt } from '../components/Txt';
 import { Button } from '../components/Button';
@@ -15,6 +14,7 @@ import { unlockShard } from '../lib/biometrics';
 import { success, warn } from '../lib/haptics';
 import { useStore } from '../store/store';
 import { colors, fonts, radius, space } from '../theme';
+import { goBack } from '../lib/nav';
 
 type Phase = 'intro' | 'wake' | 'code' | 'split' | 'done' | 'error';
 type Vault = { id: string; fingerprint: string; devPub: string; window: number };
@@ -174,7 +174,7 @@ export default function SecondStick() {
 
   return (
     <Screen scroll>
-      <TopBar title="Second stick" left={phase === 'split' ? undefined : { label: 'Close', onPress: () => router.back() }} />
+      <TopBar title="Second stick" left={phase === 'split' ? undefined : { label: 'Close', onPress: () => goBack() }} />
 
       <Trio wrist={wristLink} stick={stickLink} beam="off" setup={phase === 'split' && pieces > 0 && !three} focus={focus} joined={three} />
 
@@ -264,7 +264,7 @@ export default function SecondStick() {
           <Txt size={15} color={colors.muted} lineHeight={22}>
             New agent keys and higher limits now need your phone and both sticks. Agent transfers within their allowance stay automatic. For infrared approval, face the sticks toward each other at least 30 cm apart.
           </Txt>
-          <Button label="Done" onPress={() => router.back()} />
+          <Button label="Done" onPress={() => goBack()} />
         </View>
       ) : null}
     </Screen>

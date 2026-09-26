@@ -11,6 +11,7 @@ import { useStore } from '../store/store';
 import { link, type Msg } from '../lib/link';
 import { success, tap, warn } from '../lib/haptics';
 import { colors, fonts, radius, space } from '../theme';
+import { goBack } from '../lib/nav';
 
 type AddState = 'idle' | 'waiting' | 'saved' | 'rejected' | 'failed';
 
@@ -91,7 +92,7 @@ export default function WristSettings() {
 
   return (
     <Screen scroll edges={['top', 'bottom']}>
-      <TopBar left={{ label: 'Close', onPress: () => router.back() }} />
+      <TopBar left={{ label: 'Close', onPress: () => goBack() }} />
       <Txt size={32} weight="bold" lineHeight={36}>
         Wrist
       </Txt>

@@ -12,6 +12,7 @@ import { usePresentation } from '../components/Presentation';
 import { resetEverything, type ResetStep } from '../lib/reset';
 import { useStore } from '../store/store';
 import { colors, radius, space } from '../theme';
+import { goBack } from '../lib/nav';
 
 /** Presentation settings operate the real app, plus a reset that the Kagi Wallet has to confirm. */
 export default function PresentationSettings() {
@@ -41,7 +42,7 @@ export default function PresentationSettings() {
   };
   return (
     <Screen scroll>
-      <TopBar title="Presentation" left={{ label: 'Close', onPress: () => router.back() }} />
+      <TopBar title="Presentation" left={{ label: 'Close', onPress: () => goBack() }} />
       <View style={styles.body}>
         <Txt size={32}>Make it physical.</Txt>
         <Txt size={15} color={colors.muted}>

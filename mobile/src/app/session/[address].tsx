@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { Screen } from '../../components/Screen';
 import { TopBar } from '../../components/TopBar';
@@ -18,6 +18,7 @@ import { connectionString, connectorLink, loadSessionKey } from '../../lib/sessi
 import { shortAddr } from '../../lib/format';
 import { success, warn } from '../../lib/haptics';
 import { colors, radius, space } from '../../theme';
+import { goBack } from '../../lib/nav';
 
 type RevokeState = { phase: 'idle' } | { phase: 'working' } | { phase: 'done'; hash: string } | { phase: 'error'; reason: string };
 
@@ -36,7 +37,7 @@ export default function SessionDetail() {
   if (!s || !info?.account) {
     return (
       <Screen>
-        <TopBar left={{ label: 'Close', onPress: () => router.back() }} />
+        <TopBar left={{ label: 'Close', onPress: () => goBack() }} />
         <Txt size={16} color={colors.muted}>
           {info ? 'This key is not on this wallet.' : 'Reading the chain'}
         </Txt>
@@ -99,7 +100,7 @@ export default function SessionDetail() {
         ) : null
       }
     >
-      <TopBar title="Agent key" left={{ label: 'Close', onPress: () => router.back() }} />
+      <TopBar title="Agent key" left={{ label: 'Close', onPress: () => goBack() }} />
       <View style={styles.gap}>
         <View style={styles.row}>
           <Txt size={28} weight="bold">
