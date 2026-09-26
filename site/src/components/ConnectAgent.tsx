@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import { MCP_SRC_URL, MCP_URL, REPO_URL } from '../data';
 
-const TO = '0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E';
-const SHORT = `${TO.slice(0, 6)}…${TO.slice(-4)}`;
-const PROMPT = `Send 0.000002 ETH to ${TO}, then send 0.000008 ETH to the same address.`;
+// Two recipients the live server screens with Intercepta before the key signs: one clean, one
+// flagged for phishing transfers, so the second payment waits for the owner's stick.
+const CLEAN = '0xD130448ff0c82Cd4f8044E41ACE6cA5289A88107';
+const FLAGGED = '0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E';
+const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+const PROMPTS = [
+  { id: 'clean', label: 'Goes straight through', text: `Send 0.000002 ETH to ${CLEAN}.` },
+  { id: 'held', label: 'Held by Intercepta for your stick', text: `Send 0.000002 ETH to ${FLAGGED}.` },
+];
 const NAME = 'kagi';
 // Where the box starts: the public demo wallet, so every button works before anyone types.
 const DEMO = `${MCP_URL}/demo`;
@@ -61,12 +67,13 @@ const TARGETS: Target[] = [
 
 // What the demo prompt does, tool call by tool call.
 const RUN: { who: 'you' | 'tool' | 'stick' | 'ai'; text: string; tone?: 'ok' | 'wait' }[] = [
-  { who: 'you', text: `Send 0.000002 ETH to ${SHORT}, then send 0.000008 ETH to the same address.` },
-  { who: 'tool', text: `send_eth 0.000002 to ${SHORT}`, tone: 'ok' },
-  { who: 'tool', text: `send_eth 0.000008 to ${SHORT}: over the allowance, asks for 0.00002 in total`, tone: 'wait' },
-  { who: 'stick', text: 'Unlock the phone. Wrist shows Raise Agent’s total, 5 → 20 µETH. Hold A.' },
-  { who: 'tool', text: 'wait_for_approval: approved, 0.000008 sent', tone: 'ok' },
-  { who: 'ai', text: 'Both sent. 0.00001 ETH of the 0.00002 allowance is left.' },
+  { who: 'you', text: `Send 0.000002 ETH to ${short(CLEAN)}.` },
+  { who: 'tool', text: `send_eth: Intercepta says clean (risk 0), 0.000002 sent`, tone: 'ok' },
+  { who: 'you', text: `Send 0.000002 ETH to ${short(FLAGGED)}.` },
+  { who: 'tool', text: `send_eth: Intercepta flags a fake phishing transfer (risk 45). Not signed, held for the owner`, tone: 'wait' },
+  { who: 'stick', text: 'The phone shows “Intercepta held this payment” with the reason. Hold A on the stick to pay anyway, B to refuse.' },
+  { who: 'tool', text: 'wait_for_approval: approved, 0.000002 sent', tone: 'ok' },
+  { who: 'ai', text: 'The first payment went straight through. The second was held until you approved it on your stick.' },
 ];
 
 const WHO = { you: 'You', tool: 'Tool', stick: 'Stick', ai: 'AI' } as const;
@@ -84,7 +91,7 @@ export function ConnectAgent() {
   const [raw, setRaw] = useState(DEMO);
   const isDemo = raw.trim() === DEMO;
   const [done, setDone] = useState<{ id: string; ok: boolean } | null>(null);
-  const [promptCopied, setPromptCopied] = useState(false);
+  const [promptCopied, setPromptCopied] = useState<string | null>(null);
   const link = toLink(raw);
   const invalid = raw.trim().length > 0 && !link;
   const target = TARGETS.find((t) => t.id === done?.id);
@@ -161,22 +168,29 @@ export function ConnectAgent() {
               </p>
             ) : null}
 
-            <div className="connect-try">
-              <span>Then try</span>
-              <q>{PROMPT}</q>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  void copyText(PROMPT).then((ok) => {
-                    setPromptCopied(ok);
-                    setTimeout(() => setPromptCopied(false), 2000);
-                  });
-                }}
-              >
-                {promptCopied ? 'Copied' : 'Copy prompt'}
-              </button>
-            </div>
+            {PROMPTS.map((pr, i) => (
+              <div key={pr.id} className={`connect-try try-${pr.id}`}>
+                <span>
+                  {i === 0 ? 'Then try' : 'And then'} · <b>{pr.label}</b>
+                </span>
+                <q>{pr.text}</q>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    void copyText(pr.text).then((ok) => {
+                      setPromptCopied(ok ? pr.id : null);
+                      setTimeout(() => setPromptCopied(null), 2000);
+                    });
+                  }}
+                >
+                  {promptCopied === pr.id ? 'Copied' : 'Copy prompt'}
+                </button>
+              </div>
+            ))}
+            <p className="connect-note">
+              Every recipient is screened by <b>Intercepta</b> before the agent's key signs. Clean addresses are paid within the allowance, flagged ones wait for your stick, and sanctioned or scam addresses are refused outright.
+            </p>
             <p className="connect-note">
               Anyone with your own link can spend what is left of that key's allowance. That is all they can do. They cannot raise the limit or outlast the expiry, and you can revoke the key from the phone.
             </p>
@@ -201,7 +215,7 @@ PORT=8790 node server.mjs                 # connector links become http://localh
 # or in a container, on Render, Railway, Fly or a VPS
 docker build -t kagi-agent-mcp . && docker run -p 8790:8790 kagi-agent-mcp`}</code></pre>
           <p className="connect-src">
-            Tools: get_wallet, send_eth, wait_for_approval and request_higher_limit, plus use_my_key on the demo link. Source and details on{' '}
+            Tools: get_wallet, send_eth, wait_for_approval, request_higher_limit and get_activity (history from Curvegrid MultiBaas), plus use_my_key on the demo link. Source and details on{' '}
             <a href={MCP_SRC_URL} target="_blank" rel="noreferrer">GitHub</a>.
           </p>
         </details>
