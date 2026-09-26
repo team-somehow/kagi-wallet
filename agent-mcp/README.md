@@ -13,7 +13,7 @@ Integrated with <a href="https://intercepta.io"><picture><source media="(prefers
 | Tool | What it does |
 | --- | --- |
 | `get_wallet` | Allowance left, total, expiry, wallet balance, contacts |
-| `send_eth` | Sends ETH to a `0x` address or a contact such as `ABC`. With Intercepta on, it screens the recipient first: refused recipients never get a signature, and flagged ones are held for the owner. Over the allowance, it asks the owner for a higher limit and returns a `request_id` |
+| `send_eth` | Sends ETH to a `0x` address, or to a saved contact if `CONTACTS` is set. With Intercepta on, it screens the recipient first: refused recipients never get a signature, and flagged ones are held for the owner. Over the allowance, it asks the owner for a higher limit and returns a `request_id` |
 | `wait_for_approval` | Waits up to 45 s for the owner. Once the new limit confirms, it sends the waiting payment |
 | `get_activity` | With MultiBaas set up: the wallet's history, meaning payments, limit requests and the owner's approvals, declines and revokes, from the Curvegrid MultiBaas event index |
 | `request_higher_limit` | Asks for a higher total without a payment attached |
