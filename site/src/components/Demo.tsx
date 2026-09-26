@@ -219,7 +219,7 @@ export function Demo() {
       detail = 'µETH · HOLD';
     }
     if (join) {
-      top = second ? 'SECOND STICK' : 'WRIST';
+      top = second ? 'SECOND STICK' : 'KAGI WALLET';
       value = phase === 'joined' ? '3 OF 3' : second ? 'HELLO' : '2 OF 2';
       detail = 'Same wallet. Same address.';
     }
@@ -229,7 +229,7 @@ export function Demo() {
       detail = route!;
     }
     if (phase === 'second' && !second) {
-      top = 'WRIST';
+      top = 'KAGI WALLET';
       value = 'WAITING';
       detail = 'Second stick approval';
     }
