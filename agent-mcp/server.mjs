@@ -71,7 +71,7 @@ function parseKey(raw) {
       // not percent-encoded
     }
   }
-  const m = /^(?:kagi:)?(?:0x)?([0-9a-f]{40})[:,;|]?(?:0x)?([0-9a-f]{64})$/i.exec(v);
+  const m = /^(?:kagi:|leash:)?(?:0x)?([0-9a-f]{40})[:,;|]?(?:0x)?([0-9a-f]{64})$/i.exec(v); // leash: from builds before the rename
   if (m) return { account: getAddress(`0x${m[1]}`), key: `0x${m[2].toLowerCase()}` };
   const acct = process.env.KAGI_ACCOUNT?.trim();
   if (/^(?:0x)?[0-9a-f]{64}$/i.test(v) && acct && isAddress(acct)) return { account: getAddress(acct), key: `0x${v.replace(/^0x/i, '')}` };
@@ -81,7 +81,7 @@ function parseKey(raw) {
 /** Why a key didn't parse, for the AI and the log. Never includes the key itself. */
 function keyProblem(raw) {
   const v = String(raw ?? '').replace(/[\s"'`<>]/g, '');
-  const hex = v.replace(/^kagi:/i, '').replace(/0x/gi, '').replace(/[:,;|]/g, '');
+  const hex = v.replace(/^(kagi|leash):/i, '').replace(/0x/gi, '').replace(/[:,;|]/g, '');
   if (!v) return { shape: 'empty', message: 'No key was given. Ask the user to copy the session key from the Kagi app (Copy session key only).' };
   if (/^[0-9a-f]+$/i.test(hex) && hex.length === 64) {
     return { shape: 'bare private key', message: 'That is only the private key; the wallet address is missing. Ask the user for the whole session key from the Kagi app. It starts with kagi: and has two parts.' };
