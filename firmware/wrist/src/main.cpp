@@ -32,7 +32,7 @@
 #include "secrets.example.h"
 #endif
 
-static const char* FW = "0.3.1";
+static const char* FW = "0.3.2";
 
 // ---- look -----------------------------------------------------------------
 
@@ -311,7 +311,7 @@ static void beep(int freq, int ms) {
   // The amp needs a moment to power up, and the tone plays from a background task:
   // wait for it to finish before switching the amp back off.
   if (!M5.Speaker.isEnabled()) M5.Speaker.begin();
-  M5.Speaker.setVolume(155);
+  M5.Speaker.setVolume(200);
   delay(30);
   M5.Speaker.tone(freq, ms);
   uint32_t t0 = millis();
@@ -321,18 +321,20 @@ static void beep(int freq, int ms) {
   M5.Speaker.end();
 }
 
+// The StickS3's small speaker only carries well around 1.5-3 kHz. Below 1 kHz a buzz you
+// need to notice (an approval waiting) is close to silent, so keep these high.
 static void buzz(int times = 3) {
   for (int i = 0; i < times; i++) {
-    beep(i % 2 ? 660 : 440, 95);
+    beep(2600, 90);
     delay(60);
   }
 }
 
-static void chirp() { beep(780, 45); }
+static void chirp() { beep(1800, 40); }
 static void chime() {
-  beep(523, 70);
-  beep(659, 70);
-  beep(784, 130);
+  beep(1320, 70);
+  beep(1760, 70);
+  beep(2640, 120);
 }
 
 // ---- storage --------------------------------------------------------------
