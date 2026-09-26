@@ -8,7 +8,7 @@ import { KagiAccountAbi } from './contracts';
 import { loadSessionKey } from './session';
 import * as evm from './evm';
 
-export const DEMO_RECIPIENT = '0xD130448ff0c82Cd4f8044E41ACE6cA5289A88107' as const; // ABC in agent-mcp/contacts.json
+export const DEMO_RECIPIENT = '0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0' as const; // ABC in agent-mcp/contacts.json
 const STORAGE = 'kagi.agent-demo.v1';
 const MICRO = 1_000_000_000_000n;
 type Job = {

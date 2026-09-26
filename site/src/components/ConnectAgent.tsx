@@ -3,7 +3,8 @@ import { MCP_SRC_URL, MCP_URL, REPO_URL } from '../data';
 
 // Two recipients the live server screens with Intercepta before the key signs: one clean, one
 // flagged for phishing transfers, so the second payment waits for the owner's stick.
-const CLEAN = '0xD130448ff0c82Cd4f8044E41ACE6cA5289A88107';
+// The clean recipient is the gas sponsor wallet: demo payments flow back into gas.
+const CLEAN = '0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0';
 const FLAGGED = '0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E';
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const PROMPTS = [

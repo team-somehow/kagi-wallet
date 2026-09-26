@@ -11,7 +11,7 @@ Open **Kagi → More → In-app test agent**. No external chat client is require
 3. Add the second ESP32 to the same wallet, if it has not already joined. This strengthens future grants and increases; it does not change the account or interrupt under-limit agent payments.
 4. Run **act two** with that same session. It requests 44 µETH total before sending 12 µETH. Both devices must approve; request and signature travel by IR.
 
-ABC is `0xD130448ff0c82Cd4f8044E41ACE6cA5289A88107`, the existing MCP contact. The screen shows this destination before starting. Act one needs at least 10 µETH in the wallet, act two needs another 12 µETH. The session key separately needs test ETH for fees. The app funds this at grant, and reports if that top-up fails.
+ABC is `0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0`, the existing MCP contact. The screen shows this destination before starting. Act one needs at least 10 µETH in the wallet, act two needs another 12 µETH. The session key separately needs test ETH for fees. The app funds this at grant, and reports if that top-up fails.
 
 The connected wallet was already three-party. Disconnecting the red ESP32 does **not** turn it into a two-party wallet. A fresh one-device-to-two-device presentation requires a separately prepared wallet; do not erase the connected wallet merely to rehearse act one.
 

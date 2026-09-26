@@ -43,7 +43,7 @@ await tx(await phone.writeContract({ address: account, abi: KagiAccountAbi, func
 await tx(await phone.sendTransaction({ to: agent, value: parseEther('0.01') }));
 check(true, 'granted a 0.000005 ETH key and sent it gas');
 
-const ABC = '0xD130448ff0c82Cd4f8044E41ACE6cA5289A88107';
+const ABC = '0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0';
 const srv = spawn('node', ['server.mjs'], {
   cwd: new URL('..', import.meta.url).pathname,
   env: { ...process.env, SESSION_KEY: `kagi:${account}:0x${agentKey}`, RPC_URL: RPC, MCP_TOKEN: 't', PORT: '8795', CONTACTS: JSON.stringify({ ABC }) },
