@@ -11,6 +11,14 @@ expo-env.d.ts
 
 # Native
 .kotlin/
+.gradle/
+.cxx/
+local.properties
+*.hprof
+*.apk
+*.aab
+*.ipa
+*.dSYM.zip
 *.orig.*
 *.jks
 *.p8
@@ -30,7 +38,8 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (.env.example stays tracked)
+.env
 .env*.local
 
 # typescript
@@ -39,3 +48,13 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local native modules: Gradle and Xcode output
+modules/*/android/build/
+modules/*/android/.gradle/
+modules/*/android/.cxx/
+modules/*/ios/build/
+
+# IDE
+.idea/
+.vscode/

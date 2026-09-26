@@ -93,7 +93,6 @@ export function Device({
   const id = `lcd-${variant}`;
   return (
     <div className={`device device-${variant} ${className}`} style={style}>
-      <span className="device-port" aria-hidden="true" />
       <div className="device-face">
         <svg className="lcd" viewBox="0 0 240 135" role="img" aria-label={describe(screen)}>
           <defs>

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   cancelAnimation,
@@ -10,16 +10,43 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { colors } from '../theme';
+import { BRAND, colors } from '../theme';
 import { Txt } from './Txt';
 
 type Point = { x: number; y: number };
+// The case's extruded edge, stepped toward the bottom right like the logo.
+const DEPTH = [10, 8, 6, 4, 2];
 export type DeviceBeam = 'off' | 'out' | 'back' | 'lost';
 
-/** Decorative only: approvals always happen on the physical hardware. */
+const CASE = {
+  blue: { face: '#0061DA', depth: '#01347D', accent: colors.blue, button: ['#83CEFD', '#32A4FE'] },
+  red: { face: '#C92A43', depth: '#65101F', accent: '#AA3448', button: ['#FFC2C9', '#FF6B7D'] },
+} as const;
+
+/** The standby screen: the Kagi Wallet lockup from the app icon. */
+function Lockup() {
+  return (
+    <View style={s.lockup}>
+      <Text allowFontScaling={false} style={s.kanji}>
+        鍵
+      </Text>
+      <View style={s.rule} />
+      <View>
+        <Txt size={17} weight="bold" lineHeight={19} style={s.word}>
+          Kagi
+        </Txt>
+        <Txt size={17} weight="bold" lineHeight={19} color={BRAND.wallet} style={s.word}>
+          Wallet
+        </Txt>
+      </View>
+    </View>
+  );
+}
+
+/** Decorative only: approvals always happen on the physical hardware. Without a value it shows the standby lockup. */
 export function StickModel({
   title = 'WRIST',
-  value = 'Kagi',
+  value,
   detail = 'Your approval device',
   active = false,
   width = 210,
@@ -35,8 +62,13 @@ export function StickModel({
   variant?: 'blue' | 'red';
 }) {
   const k = width / 210;
+  const c = CASE[variant];
   return (
-    <View accessible accessibilityLabel={`${title}: ${value}. ${detail}`} style={{ width, height: 114 * k }}>
+    <View
+      accessible
+      accessibilityLabel={value === undefined ? `${title}: Kagi Wallet. ${detail}` : `${title}: ${value}. ${detail}`}
+      style={{ width, height: 114 * k }}
+    >
       <View
         style={{
           width: 210,
@@ -51,39 +83,36 @@ export function StickModel({
           ],
         }}
       >
-        <View style={s.depth} />
-        <View style={s.port} />
-        <LinearGradient
-          colors={variant === 'red' ? ['#C26469', '#7C2938', '#401922'] : ['#508BC2', '#23527E', '#142D4A']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={s.case}
-        >
+        {DEPTH.map((d) => (
+          <View key={d} style={[s.depth, { backgroundColor: c.depth, left: d, top: d * 0.9 }]} />
+        ))}
+        <View style={[s.case, { backgroundColor: c.face }]}>
           {/* The screen matches the firmware's light mode: aluminium, ink, the role's accent. */}
           <LinearGradient colors={['#F8FAFC', '#E4EBF2']} style={s.lcd}>
-            <Txt size={9} mono color={variant === 'red' ? '#AA3448' : colors.blue}>
-              {title}
-            </Txt>
-            <Txt size={value.length > 15 ? 12 : 17} mono color={colors.text} numberOfLines={2}>
-              {value}
-            </Txt>
-            <Txt size={9} color={colors.muted} numberOfLines={1}>
-              {detail}
-            </Txt>
-            <View style={[s.bar, active && { backgroundColor: colors.blue }]} />
+            {value === undefined ? (
+              <Lockup />
+            ) : (
+              <>
+                <Txt size={9} mono color={c.accent}>
+                  {title}
+                </Txt>
+                <Txt size={value.length > 15 ? 12 : 17} mono color={colors.text} numberOfLines={2}>
+                  {value}
+                </Txt>
+                <Txt size={9} color={colors.muted} numberOfLines={1}>
+                  {detail}
+                </Txt>
+                <View style={[s.bar, active && { backgroundColor: c.accent }]} />
+              </>
+            )}
           </LinearGradient>
-          <View style={[s.buttonHalo, active && s.buttonActive]}>
-            <LinearGradient
-              colors={variant === 'red' ? ['#D97B82', '#F0BCC0', '#C65F6B'] : ['#4889C1', '#A6D7F6', '#3C83BE']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={s.button}
-            />
+          <View style={[s.buttonHalo, active && [s.buttonActive, { shadowColor: c.accent }]]}>
+            <View style={s.button}>
+              <View style={[s.half, { backgroundColor: c.button[0] }]} />
+              <View style={[s.half, { backgroundColor: c.button[1] }]} />
+            </View>
           </View>
-          <Txt size={7} mono color="#85909C" style={s.brand}>
-            ESP32
-          </Txt>
-        </LinearGradient>
+        </View>
       </View>
     </View>
   );
@@ -137,7 +166,7 @@ export function SpatialDevices({
   connected = true,
   joined = false,
   setup = false,
-  value = 'Kagi',
+  value,
   detail,
 }: {
   two?: boolean;
@@ -237,53 +266,32 @@ export function SpatialDevices({
 const s = StyleSheet.create({
   sceneWrap: { alignItems: 'center', justifyContent: 'center', marginVertical: 4 },
   position: { position: 'absolute' },
-  depth: {
-    position: 'absolute',
-    top: 9,
-    left: 0,
-    width: 210,
-    height: 99,
-    borderRadius: 14,
-    backgroundColor: '#090D13',
-    borderWidth: 1,
-    borderColor: '#4D576444',
-  },
-  port: {
-    position: 'absolute',
-    right: -10,
-    top: 36,
-    width: 16,
-    height: 23,
-    borderRadius: 3,
-    backgroundColor: '#8B969F',
-  },
+  depth: { position: 'absolute', width: 210, height: 100, borderRadius: 14 },
   case: {
     width: 210,
     height: 100,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#77828E66',
     padding: 13,
-    paddingBottom: 16,
+    paddingRight: 11,
     flexDirection: 'row',
-    gap: 14,
+    alignItems: 'center',
+    gap: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
     elevation: 12,
   },
-  lcd: { width: 137, borderRadius: 5, borderWidth: 2, borderColor: '#070D14', padding: 6, gap: 1 },
+  lcd: { width: 142, alignSelf: 'stretch', borderRadius: 7, padding: 7, gap: 1, justifyContent: 'center' },
   bar: { height: 1, marginTop: 3, backgroundColor: colors.line },
-  buttonHalo: { width: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 15 },
-  buttonActive: {
-    shadowColor: colors.blue,
-    shadowRadius: 9,
-    shadowOpacity: 0.9,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  button: { width: 25, height: 25, borderRadius: 14, borderWidth: 1, borderColor: '#57BEEE55' },
-  brand: { position: 'absolute', bottom: 3, left: 17 },
+  lockup: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  kanji: { fontSize: 38, lineHeight: 46, fontWeight: '700', color: BRAND.case },
+  rule: { width: 1.5, height: 36, borderRadius: 1, backgroundColor: colors.line },
+  word: { letterSpacing: -0.4 },
+  buttonHalo: { width: 32, height: 32, borderRadius: 16 },
+  buttonActive: { shadowRadius: 10, shadowOpacity: 0.95, shadowOffset: { width: 0, height: 0 } },
+  button: { flex: 1, flexDirection: 'row', borderRadius: 16, overflow: 'hidden' },
+  half: { flex: 1 },
   orbit: {
     position: 'absolute',
     left: 15,

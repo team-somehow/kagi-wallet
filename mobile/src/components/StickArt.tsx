@@ -13,7 +13,7 @@ export function StickArt({
   return (
     <View style={{ alignItems: 'center', paddingVertical: 20 }}>
       <StickModel
-        value={screen ?? 'Kagi'}
+        value={screen}
         active={pointToA || pressing}
         detail={pointToA ? 'HOLD A TO APPROVE →' : 'Your approval device'}
       />

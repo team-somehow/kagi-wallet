@@ -16,8 +16,7 @@ export function App() {
       <nav className="nav">
         <div className="wrap nav-inner">
           <a className="brand" href="#top">
-            <svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="8.5" cy="13" r="4.6" fill="none" stroke="currentColor" strokeWidth="2.2" /><path d="M13 13h10M19 13v4M22.5 13v3" fill="none" stroke="#b35f17" strokeWidth="2.2" strokeLinecap="round" /></svg>
-            Kagi Wallet
+            <img src="./logo.png" alt="Kagi Wallet" width="81" height="34" />
           </a>
           <div className="nav-links">
             <a href="#demo">Demo</a>

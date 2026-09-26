@@ -87,7 +87,7 @@ p { margin: 0; }
 }
 .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; letter-spacing: -0.02em; text-decoration: none; }
-.brand svg { width: 26px; height: 26px; }
+.brand img { display: block; height: 34px; width: auto; }
 .nav-links { display: flex; align-items: center; gap: 26px; font-size: 15px; color: var(--muted); }
 .nav-links a:not(.btn) { text-decoration: none; }
 .nav-links a:not(.btn):hover { color: var(--text); }
@@ -147,43 +147,30 @@ p { margin: 0; }
 .stage-phone i { width: 12px; height: 20px; border-radius: 4px; border: 1.5px solid currentColor; background: var(--raised); }
 .stage-cap { position: absolute; bottom: 1%; left: 0; right: 0; text-align: center; color: var(--muted); font: 11px var(--mono); letter-spacing: 0.08em; }
 
-/* ---- the device: an ESP32 stick, blue on the wrist, red for the second one ---- */
+/* ---- the device: the Kagi stick from the logo, blue on the wrist, red for the second one ---- */
 .device { position: relative; container-type: inline-size; filter: drop-shadow(0 30px 26px rgba(17, 24, 32, 0.28)); }
 .device-face {
   position: relative; display: flex; align-items: center; gap: 6%;
-  padding: 8% 6% 9% 6.5%; border-radius: 7cqw;
-  border: 1px solid rgba(119, 130, 142, 0.4);
-  box-shadow:
-    inset 1px 2px 2px rgba(182, 196, 213, 0.2),
-    inset -2px -2px 2px #080b0f,
-    0 2px 0 #11151b, 0 4px 0 #10141a, 0 6px 0 #0c1015, 0 8px 0 #080b10, 0 9px 1px rgba(103, 117, 134, 0.4);
+  padding: 7% 5.5% 7% 6.5%; border-radius: 7cqw;
+  /* Flat case with an edge stepped toward the bottom right, like the logo. */
+  box-shadow: 1px 1px 0 var(--depth), 2px 2px 0 var(--depth), 3px 3px 0 var(--depth), 4px 4px 0 var(--depth), 5px 4px 0 var(--depth), 6px 5px 0 var(--depth), 7px 6px 0 var(--depth), 8px 7px 0 var(--depth), 9px 8px 0 var(--depth), 10px 9px 0 var(--depth);
 }
-.device-blue .device-face { background: linear-gradient(135deg, #508bc2, #23527e 40%, #142d4a); }
-.device-red .device-face { background: linear-gradient(135deg, #c26469, #7c2938 40%, #401922); }
-.device-face::after {
-  content: 'ESP32'; position: absolute; bottom: 2.5%; left: 7.5%;
-  font: 500 3.2cqw var(--mono); letter-spacing: 0.1em; color: #b3bcc7; opacity: 0.55;
-}
-.device-port {
-  position: absolute; right: -3.5%; top: 38%; width: 6%; height: 22%; border-radius: 2px 5px 5px 2px; z-index: -1;
-  background: linear-gradient(90deg, #505962, #a9b1b8, #59626b); border: 1px solid rgba(166, 177, 191, 0.4);
-}
+.device-blue .device-face { background: #0061da; --depth: #01347d; }
+.device-red .device-face { background: #c92a43; --depth: #65101f; }
 .lcd {
   flex: 1; min-width: 0; display: block; width: 100%; height: auto; aspect-ratio: 240 / 135; border-radius: 1.8cqw;
-  box-shadow: 0 0 0 3px #070b10, 0 0 0 5px rgba(107, 115, 118, 0.2), 0 0 30px rgba(28, 98, 150, 0.06);
+  box-shadow: 0 0 0 3px #071525;
 }
-.device-red .lcd { box-shadow: 0 0 0 3px #10070b, 0 0 0 5px rgba(107, 115, 118, 0.2), 0 0 30px rgba(255, 132, 146, 0.06); }
 .lcd-hold { animation: bob 0.7s ease-in-out infinite alternate; }
 @keyframes bob { to { transform: translateX(3px); } }
 .device-a {
-  flex: none; width: 13%; aspect-ratio: 1; border-radius: 50%; border: 1px solid rgba(87, 190, 238, 0.35); padding: 0;
-  background: linear-gradient(120deg, #94ceef, #307eb9);
-  box-shadow: inset 2px 0 3px rgba(121, 214, 255, 0.35), inset -2px 0 3px #003d6d, 1px 2px 2px rgba(0, 0, 0, 0.66);
+  flex: none; width: 15%; aspect-ratio: 1; border-radius: 50%; border: 0; padding: 0;
+  background: linear-gradient(90deg, #83cefd 50%, #32a4fe 50%);
   transition: transform 0.12s var(--ease), box-shadow 0.2s;
 }
-.device-red .device-a { background: linear-gradient(120deg, #f0bcc0, #c65f6b); border-color: rgba(255, 132, 146, 0.35); box-shadow: inset 2px 0 3px rgba(255, 200, 205, 0.35), inset -2px 0 3px #5c1824, 1px 2px 2px rgba(0, 0, 0, 0.66); }
-.device-a.is-pressed { transform: scale(0.88); box-shadow: inset 2px 0 8px #001a37, 0 0 24px rgba(28, 98, 150, 0.6); }
-.device-red .device-a.is-pressed { box-shadow: inset 2px 0 8px #37000a, 0 0 24px rgba(255, 132, 146, 0.6); }
+.device-red .device-a { background: linear-gradient(90deg, #ffc2c9 50%, #ff6b7d 50%); }
+.device-a.is-pressed { transform: scale(0.88); box-shadow: 0 0 24px rgba(28, 98, 150, 0.6); }
+.device-red .device-a.is-pressed { box-shadow: 0 0 24px rgba(255, 132, 146, 0.6); }
 
 /* ---- losses ---- */
 .losses { padding: 36px 36px 28px; display: grid; gap: 36px; --name-col: 200px; --gap: 24px; }
@@ -273,8 +260,8 @@ p { margin: 0; }
 .link.tone-human { background: var(--amber); box-shadow: 0 0 12px var(--amber); }
 .link.is-ir { background: repeating-linear-gradient(90deg, var(--blue) 0 6px, transparent 6px 14px); box-shadow: none; filter: drop-shadow(0 0 4px var(--blue)); }
 /* Stick nodes carry their body colour, as in the app and on the hardware. */
-.node-wrist svg { background: linear-gradient(160deg, #23527e, #142d4a); border-color: rgba(28, 98, 150, 0.3); }
-.node-vault svg { background: linear-gradient(160deg, #7c2938, #401922); border-color: rgba(255, 132, 146, 0.3); }
+.node-wrist svg { background: #0061da; border-color: #32a4fe66; }
+.node-vault svg { background: #c92a43; border-color: #ff6b7d66; }
 .ladder-note { text-align: center; color: var(--muted); font-size: 15px; }
 
 /* ---- hardware ---- */

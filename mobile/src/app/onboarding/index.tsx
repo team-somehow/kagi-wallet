@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Txt } from '../../components/Txt';
+import { Logo } from '../../components/Logo';
 import { StickModel } from '../../components/SpatialDevices';
 import { colors, space } from '../../theme';
 
@@ -37,16 +38,14 @@ export default function Welcome() {
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <Txt size={22} weight="bold" color={ink} style={styles.mark}>
-          Kagi
-        </Txt>
+        <Logo height={32} />
 
         <View style={[styles.stage, { height: 200 * k }]} accessibilityLabel="Your wrist stick and a second stick">
           <View style={[styles.at, { left: 204 * k, top: 0 }]}>
             <StickModel width={144 * k} tilt={9} variant="red" title="SECOND STICK" value="Ready" detail="Infrared" />
           </View>
           <View style={[styles.at, { left: 0, top: 84 * k }]}>
-            <StickModel width={190 * k} tilt={-6} title="WRIST" value="Kagi" detail="Hold A to approve" />
+            <StickModel width={190 * k} tilt={-6} title="WRIST" detail="Hold A to approve" />
           </View>
         </View>
 
@@ -104,7 +103,6 @@ const styles = StyleSheet.create({
     paddingTop: space.m,
     paddingBottom: space.l,
   },
-  mark: { letterSpacing: -0.6 },
   stage: { marginTop: space.l, marginBottom: space.m },
   at: { position: 'absolute' },
   hero: { marginTop: space.s },

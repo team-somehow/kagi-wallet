@@ -260,46 +260,13 @@
   position: absolute;
   inset: 0;
   border-radius: 14px;
-  background: linear-gradient(135deg, #444950, #24282e 35%, #15191e);
-  border: 1px solid #747b8555;
-  box-shadow:
-    inset 1px 2px 2px #b6c4d536,
-    inset -2px -2px 2px #080b0f,
-    0 1px 0 #11151b,
-    0 3px 0 #11151b,
-    0 5px 0 #10141a,
-    0 7px 0 #10141a,
-    0 9px 0 #0c1015,
-    0 11px 0 #0c1015,
-    0 13px 0 #080b10,
-    0 14px 1px #67758666;
+  background: #0061da;
+  box-shadow: 1px 1px 0 var(--kg-case-depth, #01347d), 2px 2px 0 var(--kg-case-depth, #01347d), 3px 3px 0 var(--kg-case-depth, #01347d), 4px 4px 0 var(--kg-case-depth, #01347d), 5px 4px 0 var(--kg-case-depth, #01347d), 6px 5px 0 var(--kg-case-depth, #01347d), 7px 6px 0 var(--kg-case-depth, #01347d), 8px 7px 0 var(--kg-case-depth, #01347d), 9px 8px 0 var(--kg-case-depth, #01347d), 10px 9px 0 var(--kg-case-depth, #01347d);
   display: grid;
   grid-template-columns: 1fr 16%;
   gap: 6%;
   padding: 9% 5% 8% 7%;
   transform: translateZ(14px);
-}
-#kagi-studio .kg-case::after {
-  content: 'ESP32';
-  position: absolute;
-  bottom: 2.7%;
-  left: 8%;
-  font:
-    500 clamp(6px, 1.5cqw, 9px) var(--mono);
-  letter-spacing: 1px;
-  color: #8b939f;
-  opacity: 0.65;
-}
-#kagi-studio .kg-port {
-  position: absolute;
-  width: 9%;
-  height: 20%;
-  right: -5%;
-  top: 40%;
-  background: linear-gradient(90deg, #505962, #a9b1b8, #59626b);
-  border-radius: 2px 5px 5px 2px;
-  transform: translateZ(1px);
-  border: 1px solid #a6b1bf66;
 }
 #kagi-studio .kg-lcd {
   min-width: 0;
@@ -1015,10 +982,12 @@
 }
 
 #kagi-studio .kg-first .kg-case {
-  background: linear-gradient(135deg, #508bc2, #23527e 40%, #142d4a);
+  background: #0061da;
+  --kg-case-depth: #01347d;
 }
 #kagi-studio .kg-second .kg-case {
-  background: linear-gradient(135deg, #c26469, #7c2938 40%, #401922);
+  background: #c92a43;
+  --kg-case-depth: #65101f;
 }
 #kagi-studio .kg-physical {
   align-self: center;
@@ -1029,8 +998,8 @@
 #kagi-studio .kg-physical::before {
   inset: 0;
   border-radius: 50%;
-  background: linear-gradient(120deg, #94ceef, #307eb9);
+  background: linear-gradient(90deg, #83cefd 50%, #32a4fe 50%);
 }
 #kagi-studio .kg-second .kg-physical::before {
-  background: linear-gradient(120deg, #f0bcc0, #c65f6b);
+  background: linear-gradient(90deg, #ffc2c9 50%, #ff6b7d 50%);
 }
