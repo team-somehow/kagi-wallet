@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Linking, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import { Screen } from '../components/Screen';
@@ -9,17 +9,36 @@ import { useChain } from '../store/chain';
 import { DEMO_RECIPIENT, restoreAgentDemo, runAgentDemo, useAgentDemo } from '../lib/agentDemo';
 import { EXPLORER } from '../lib/evm';
 import { usePresentation } from '../components/Presentation';
+import { resetEverything, type ResetStep } from '../lib/reset';
+import { useStore } from '../store/store';
 import { colors, radius, space } from '../theme';
 
-/** Presentation settings operate the real app. Simulated wallet/reset actions stay out of it. */
+/** Presentation settings operate the real app, plus a reset that the wrist has to confirm. */
 export default function PresentationSettings() {
   const p = usePresentation();
   const demo = useAgentDemo();
   const { info, live } = useChain();
   const key = live.find((s) => s.cap === 5_000_000_000_000n || s.cap === 20_000_000_000_000n) ?? live[0];
+  const { sim } = useStore();
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetStep, setResetStep] = useState<ResetStep | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
   useEffect(() => {
     void restoreAgentDemo().catch(() => {}); // Reopening retries if the chain is temporarily unavailable.
   }, []);
+
+  const startReset = async () => {
+    setResetError(null);
+    try {
+      await resetEverything(setResetStep);
+      sim.reset();
+      router.dismissAll();
+      router.replace('/onboarding');
+    } catch (e) {
+      setResetStep(null);
+      setResetError(e instanceof Error ? e.message : String(e));
+    }
+  };
   return (
     <Screen scroll>
       <TopBar title="Presentation" left={{ label: 'Close', onPress: () => router.back() }} />
@@ -93,6 +112,38 @@ export default function PresentationSettings() {
         <Txt size={12} color={colors.muted}>
           Real on-chain test ETH. Keys and approvals are enforced by your wallet contract.
         </Txt>
+
+        <View style={styles.reset}>
+          <Txt size={22}>Reset everything</Txt>
+          <Txt size={14} color={colors.muted}>
+            Erases the wallet key share on the wrist and on this phone, and forgets every agent key, so you can set up a new
+            wallet from the start. The wrist has to confirm first; until it does, nothing is erased.
+          </Txt>
+          {!resetOpen ? (
+            <Button label="Reset everything" variant="danger" onPress={() => setResetOpen(true)} />
+          ) : resetStep === 'confirm_on_wrist' ? (
+            <Txt size={15} color={colors.amber}>
+              Hold A on the wrist to erase its share. Press B to keep everything.
+            </Txt>
+          ) : resetStep ? (
+            <Txt size={15} color={colors.muted}>
+              Erasing this phone’s share…
+            </Txt>
+          ) : (
+            <>
+              <Txt size={14} color={colors.red}>
+                The current wallet can’t be used again after this. Any ETH still in it stays there.
+              </Txt>
+              <Button label="Erase wrist and phone" variant="danger" onPress={() => void startReset()} />
+              <Button label="Cancel" variant="ghost" onPress={() => { setResetOpen(false); setResetError(null); }} />
+            </>
+          )}
+          {resetError ? (
+            <Txt size={14} color={colors.red}>
+              {resetError}
+            </Txt>
+          ) : null}
+        </View>
       </View>
     </Screen>
   );
@@ -109,4 +160,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.m,
   },
   copy: { flex: 1, gap: 5 },
+  reset: { borderWidth: 1, borderColor: colors.red, borderRadius: radius.m, padding: space.m, gap: space.m, marginTop: space.l },
 });
