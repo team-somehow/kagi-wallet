@@ -17,7 +17,7 @@ import com.facebook.react.jstasks.HeadlessJsTaskConfig
 /**
  * Keeps Kagi alive in the background: a foreground service with an ongoing notification, running
  * one headless JS task that never ends on its own. While that task runs, React Native keeps its
- * timers going, so the app keeps talking to the stick over Bluetooth and watching Sepolia.
+ * timers going, so the app keeps talking to the stick over Bluetooth and watching the chain.
  */
 class KagiBackgroundService : HeadlessJsTaskService() {
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

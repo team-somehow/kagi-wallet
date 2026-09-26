@@ -1,7 +1,7 @@
 # Kagi agent MCP
 
-A bare-bones MCP server that gives an MCP client an agent wallet on Sepolia.
-It holds one Kagi session key and talks to Sepolia directly: it signs spends, sends them, and
+A bare-bones MCP server that gives an MCP client an agent wallet on-chain.
+It holds one Kagi session key and talks to the chain directly: it signs spends, sends them, and
 pays its gas from the key's own address (the phone tops it up at grant). The key can only spend
 its on-chain allowance. For more, it files a limit request on-chain; the owner's phone sees it,
 and the owner approves on their Kagi stick or declines.
@@ -13,6 +13,7 @@ and the owner approves on their Kagi stick or declines.
 | `get_wallet` | Allowance left, total, expiry, wallet balance, contacts |
 | `send_eth` | Sends ETH to a `0x` address or a contact such as `ABC`. Over the allowance, it asks the owner for a higher limit and returns a `request_id` |
 | `wait_for_approval` | Waits up to 45 s for the owner. Once the new limit confirms, it sends the waiting payment |
+| `get_activity` | With MultiBaas set up: the wallet's history, meaning payments, limit requests and the owner's approvals, declines and revokes, from the Curvegrid MultiBaas event index |
 | `request_higher_limit` | Asks for a higher total without a payment attached |
 | `use_my_key` | On the `/demo` link only: switches this connection to the user's own key, `kagi:0x…:0x…`. It lasts for the connection |
 
@@ -42,7 +43,10 @@ It's one Node file with a Dockerfile, so Render, Railway, Fly or any container h
 | --- | --- |
 | `SESSION_KEY` | Optional. A single key served at `/mcp/<MCP_TOKEN>`, as `kagi:<account>:<key>` |
 | `MCP_TOKEN` | With `SESSION_KEY`: a random string for that endpoint |
-| `RPC_URL` | Optional. Defaults to a public Sepolia RPC |
+| `RPC_URL` | Optional. Defaults to a public RPC |
+| `MULTIBAAS_URL` | Optional. `https://<deployment>.multibaas.com`, which turns on `get_activity` |
+| `MULTIBAAS_API_KEY` | With `MULTIBAAS_URL`: an API key in the deployment's Administrators group |
+| `MULTIBAAS_START` | Optional. How far back to index a newly linked wallet, default `-50000` blocks |
 | `CONTACTS` | Optional JSON of names to addresses. Defaults to `contacts.json` |
 
 Nothing else needs to run: no hub, no laptop.

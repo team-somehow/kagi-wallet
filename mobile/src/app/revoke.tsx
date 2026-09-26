@@ -40,7 +40,7 @@ export default function Revoked() {
         <Txt size={17} color={colors.muted}>
           {done
             ? `${r.confirmed} ${r.confirmed === 1 ? 'key revoked' : 'keys revoked'} in this run. No saved active session keys remain.`
-            : 'Keys can still spend until their revocation confirms on Sepolia. Keep this phone connected.'}
+            : 'Keys can still spend until their revocation confirms on-chain. Keep this phone connected.'}
         </Txt>
         {r.error ? <Txt color={colors.amber}>{r.error}</Txt> : null}
         {r.hash ? (

@@ -1,5 +1,5 @@
 /**
- * Bluetooth LE link to the sticks. The only link: the phone talks to Sepolia itself.
+ * Bluetooth LE link to the sticks. The only link: the phone talks to the chain itself.
  *
  * Each stick runs one GATT service (see firmware/wrist/src/ble.h): the phone writes lines to
  * RX, the stick notifies lines on TX. Lines are the same JSON as every other link, chunked to

@@ -9,7 +9,7 @@ import * as evm from '../lib/evm';
 import { listSessionAddresses, loadSessionKey } from '../lib/session';
 import { useStore } from './store';
 
-/** Sepolia, read by the phone itself: the account, agent keys, what they did, and what they ask. */
+/** The chain, read by the phone itself: the account, agent keys, what they did, and what they ask. */
 export interface ChainSession {
   address: string;
   name: string;

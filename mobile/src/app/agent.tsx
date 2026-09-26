@@ -18,7 +18,7 @@ import { colors, fonts, radius, space } from '../theme';
 
 type Phase = 'form' | 'sign' | 'submitting' | 'done' | 'error' | 'pending';
 
-// The agent pays its own gas, so its key gets a little Sepolia ETH with the grant: enough for
+// The agent pays its own gas, so its key gets a little test ETH with the grant: enough for
 // a handful of transfers and limit requests at about 1 gwei.
 const AGENT_GAS = 500_000_000_000_000n; // 0.0005 ETH
 // What the grant itself costs, with room to spare.
@@ -67,7 +67,7 @@ export default function NewAgentKey() {
     setError(null);
     const i = (await refresh()) ?? info;
     if (!i?.account) {
-      setError('This wallet has no Sepolia account yet. Create it from Home first.');
+      setError('This wallet has no on-chain account yet. Create it from Home first.');
       return;
     }
     if (i.gasBalance < AGENT_GAS + GRANT_GAS) {
@@ -190,7 +190,7 @@ export default function NewAgentKey() {
             steps={[
               { label: 'Approved on your stick', detail: 'Phone and stick signed it together', state: 'done' },
               {
-                label: sentHash ? 'Sent to Sepolia' : 'Sending to Sepolia',
+                label: sentHash ? 'Sent on-chain' : 'Sending on-chain',
                 detail: sentHash ? `Transaction ${shortAddr(sentHash, 8, 6)}` : 'Handing the signed grant to the network',
                 state: sentHash ? 'done' : 'active',
               },
@@ -219,7 +219,7 @@ export default function NewAgentKey() {
 
       {phase === 'pending' ? <View style={styles.gap}>
         <Txt size={24}>Grant submitted</Txt>
-        <Txt size={15} color={colors.muted}>Sepolia has not confirmed yet. Your key stays saved while we track this transaction.</Txt>
+        <Txt size={15} color={colors.muted}>The chain has not confirmed yet. Your key stays saved while we track this transaction.</Txt>
         <Button label="Check confirmation" onPress={() => void checkGrant()} />
         <Button label="View on Etherscan" variant="secondary" onPress={() => void Linking.openURL(`${evm.EXPLORER}/tx/${sentHash}`)} />
       </View> : null}
@@ -248,7 +248,7 @@ export default function NewAgentKey() {
           </View>
           {gasStep === 'failed' ? (
             <Txt size={14} color={colors.amber} lineHeight={20}>
-              The gas top-up for the agent did not go through. Send it a little Sepolia ETH at {shortAddr(key.address)} before it spends.
+              The gas top-up for the agent did not go through. Send it a little test ETH at {shortAddr(key.address)} before it spends.
             </Txt>
           ) : null}
           <Txt size={15} color={colors.muted} lineHeight={22}>

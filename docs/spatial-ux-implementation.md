@@ -4,7 +4,7 @@ The phone, interactive website and physical displays share a blue wrist / red se
 
 ## Try it on the phone
 
-Open **Kagi → More → In-app test agent**. No external chat client is required. This is a real Sepolia test agent running on the phone, explicitly distinct from the website simulation.
+Open **Kagi → More → In-app test agent**. No external chat client is required. This is a real on-chain test agent running on the phone, explicitly distinct from the website simulation.
 
 1. Create a 60-minute session with a total allowance of **0.000005 ETH** (5 µETH). Unlock the phone and approve on the required devices.
 2. Run **act one**. The agent sends 2 µETH to ABC, then pauses its 8 µETH transfer and requests 20 µETH total. Unlock the phone, verify the amount, and hold A on the device(s). Only a confirmed limit increase resumes the waiting transfer.
@@ -47,6 +47,6 @@ Read-only USB diagnostics: `hello?` includes `fw` and `uiTheme`. `ui_snapshot` r
 - Website production build and browser walkthrough: early hold release, decline, first approval, join, both IR approvals, final balances (10 / 22 µETH), no horizontal overflow at 390 px and no console errors.
 - Both physical devices flashed successfully, with blue/red display captures and existing three-party configuration preserved.
 - Connected phone confirmed foreground wake lock across multiple minutes. A real three-device grant completed over IR, leaving a live 5 µETH session.
-- The in-app agent confirmed its real 2 µETH Sepolia transfer and submitted the 5 → 20 µETH increase request. The live rehearsal paused at the phone's fingerprint prompt; physical approval and the queued 8 µETH transfer have not yet been verified.
+- The in-app agent confirmed its real 2 µETH on-chain transfer and submitted the 5 → 20 µETH increase request. The live rehearsal paused at the phone's fingerprint prompt; physical approval and the queued 8 µETH transfer have not yet been verified.
 
 A fresh live two-to-three-party reshare was not repeated on this already-joined wallet. The physical test does not simulate device button holds or bypass phone authentication.

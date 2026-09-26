@@ -1,7 +1,7 @@
 /**
- * The phone talks to Sepolia itself. No hub, no relayer.
+ * The phone talks to the chain itself. No hub, no relayer.
  *
- * Gas comes from the gas wallet: the Sepolia key compiled into the build as
+ * Gas comes from the gas wallet: the testnet key compiled into the build as
  * EXPO_PUBLIC_GAS_SPONSOR_KEY (mobile/.env.local), or, in a build without one, a key the phone
  * makes and keeps in its secure store. It pays for deploying, granting, revoking and deciding
  * limit requests. It holds no power
@@ -76,7 +76,7 @@ export function reason(e: unknown): string {
   if (e instanceof BaseError) {
     const r = e.walk((x) => x instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | null;
     if (r?.reason) return r.reason;
-    if (/insufficient funds/i.test(e.message)) return 'The phone gas wallet is out of Sepolia ETH. Top it up from Home.';
+    if (/insufficient funds/i.test(e.message)) return 'The phone gas wallet is out of test ETH. Top it up from Home.';
     return e.shortMessage;
   }
   return e instanceof Error ? e.message : String(e);
@@ -84,7 +84,7 @@ export function reason(e: unknown): string {
 
 export class PendingTransactionError extends Error {
   constructor(public readonly hash: Hex) {
-    super('Submitted to Sepolia. Confirmation is still pending; do not send it again.');
+    super('Submitted on-chain. Confirmation is still pending; do not send it again.');
   }
 }
 

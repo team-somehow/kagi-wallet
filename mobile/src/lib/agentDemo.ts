@@ -75,7 +75,7 @@ export async function restoreAgentDemo() {
 
 export async function runAgentDemo(account: Hex, agent: Hex, secondAct = false) {
   if (snapshot.running) return;
-  publish({ running: true, hash: undefined, message: 'Checking the session and Sepolia balance…' });
+  publish({ running: true, hash: undefined, message: 'Checking the session and on-chain balance…' });
   try {
     const raw = await SecureStore.getItemAsync(STORAGE);
     const previous: Job | null = raw ? JSON.parse(raw) : null;
@@ -128,7 +128,7 @@ export async function runAgentDemo(account: Hex, agent: Hex, secondAct = false) 
         message:
           kind === 'spend'
             ? 'Transfer submitted. Waiting for its receipt…'
-            : 'Limit request submitted. Waiting for Sepolia…',
+            : 'Limit request submitted. Waiting for the chain…',
       });
     };
     while (job.index < job.amounts.length) {
@@ -205,7 +205,7 @@ export async function runAgentDemo(account: Hex, agent: Hex, secondAct = false) 
     job.completed = true;
     job.outcome = 'confirmed';
     await save(job);
-    publish({ saved: false, message: 'Transfers confirmed. Open Wallet activity to see each Sepolia receipt.' });
+    publish({ saved: false, message: 'Transfers confirmed. Open Wallet activity to see each on-chain receipt.' });
   } catch (e) {
     const stored = await SecureStore.getItemAsync(STORAGE).catch(() => null);
     const unfinished = stored ? !(JSON.parse(stored) as Job).completed : false;

@@ -23,7 +23,7 @@ const wait = <T extends Msg>(pred: (m: Msg) => boolean, ms: number, what: string
 
 /**
  * Add a second stick. The wallet key is split again, three ways, and keeps the same public key,
- * so the account on Sepolia does not change. From then on every approval goes phone, wrist,
+ * so the account on-chain does not change. From then on every approval goes phone, wrist,
  * then the second stick over infrared.
  */
 export default function SecondStick() {

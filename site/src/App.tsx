@@ -61,7 +61,7 @@ export function App() {
 
       <footer className="footer">
         <div className="wrap footer-inner">
-          <span>Kagi Wallet runs on the Sepolia testnet. Development firmware, not audited.</span>
+          <span>Kagi Wallet runs on-chain, on a testnet. Development firmware, not audited.</span>
           <a href={REPO_URL} target="_blank" rel="noreferrer">github.com/team-somehow/kagi-wallet</a>
         </div>
       </footer>

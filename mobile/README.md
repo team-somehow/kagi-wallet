@@ -4,9 +4,9 @@ The phone half of Kagi: one shard of the 2-of-2 manager key, the place you issue
 capped keys to agents, and the screen that lights up when an agent goes over.
 
 Expo SDK 57, Expo Router, TypeScript. The sticks are real (see `../firmware/wrist`) and
-reached over Bluetooth LE. The phone talks to Sepolia itself (`src/lib/evm.ts`): no hub,
+reached over Bluetooth LE. The phone talks to the chain itself (`src/lib/evm.ts`): no hub,
 no relayer. It pays its own fees from a gas wallet kept in the secure store; fund the
-address shown on Home with a little Sepolia ETH.
+address shown on Home with a little test ETH.
 
 ## Run on a USB-connected Android phone
 
@@ -20,13 +20,13 @@ Set `EXPO_PUBLIC_SEPOLIA_RPC` to use another RPC.
 
 ## Gas wallet
 
-The phone pays its Sepolia fees from a gas wallet. Give the build a funded key and every
+The phone pays its gas fees from a gas wallet. Give the build a funded key and every
 phone uses it, so onboarding never stops at "Add gas money": copy `.env.example` to
 `.env.local` and set `EXPO_PUBLIC_GAS_SPONSOR_KEY`. Home shows that wallet's address and
 balance. A build without the key falls back to a wallet each phone makes for itself, which
 you fund by hand.
 
-The key is compiled into the app, so anyone with the APK can read it. Use a Sepolia-only
+The key is compiled into the app, so anyone with the APK can read it. Use a testnet-only
 wallet with a small balance.
 
 ## What is real

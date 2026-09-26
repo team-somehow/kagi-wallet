@@ -18,7 +18,7 @@ export default function PresentationSettings() {
   const { info, live } = useChain();
   const key = live.find((s) => s.cap === 5_000_000_000_000n || s.cap === 20_000_000_000_000n) ?? live[0];
   useEffect(() => {
-    void restoreAgentDemo().catch(() => {}); // Reopening retries if Sepolia is temporarily unavailable.
+    void restoreAgentDemo().catch(() => {}); // Reopening retries if the chain is temporarily unavailable.
   }, []);
   return (
     <Screen scroll>
@@ -49,7 +49,7 @@ export default function PresentationSettings() {
         <View style={styles.testAgent}>
           <Txt size={22}>In-app test agent</Txt>
           <Txt size={14} color={colors.muted}>
-            Real Sepolia transfers from the selected session key. Act one sends 2 + 8 µETH; act two sends 12 µETH after
+            Real on-chain transfers from the selected session key. Act one sends 2 + 8 µETH; act two sends 12 µETH after
             adding the second device.
           </Txt>
           <Txt size={12} mono color={colors.muted}>
@@ -91,7 +91,7 @@ export default function PresentationSettings() {
         <Button label="Agent access" onPress={() => router.push('/agent')} />
         <Button label="Second stick" variant="secondary" onPress={() => router.push('/vault')} />
         <Txt size={12} color={colors.muted}>
-          Real Sepolia test ETH. Keys and approvals are enforced by your wallet contract.
+          Real on-chain test ETH. Keys and approvals are enforced by your wallet contract.
         </Txt>
       </View>
     </Screen>

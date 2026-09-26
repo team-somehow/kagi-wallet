@@ -22,7 +22,7 @@ import { colors, space } from '../../theme';
 
 type Phase = 'search' | 'hold' | 'keygen' | 'lock' | 'fund' | 'account' | 'ready' | 'accountError' | 'error';
 
-// Starting balance for the Sepolia account, from the phone's gas wallet. Tiny: testnet ETH is scarce.
+// Starting balance for the on-chain account, from the phone's gas wallet. Tiny: testnet ETH is scarce.
 const FUND = 50_000_000_000_000n; // 0.00005 ETH
 // The gas wallet needs this much to deploy and fund the account, with room to spare.
 const NEED = 2_000_000_000_000_000n; // 0.002 ETH
@@ -32,10 +32,10 @@ const COPY: Record<Phase, { title: string; body: string }> = {
   hold: { title: 'Press and hold A', body: 'Hold the A button on your stick until its ring fills.' },
   keygen: { title: 'Creating your key', body: 'Phone and stick each make half. Neither side ever holds the whole key.' },
   lock: { title: 'Wallet created', body: 'Last step: lock your half of the key to your fingerprint.' },
-  fund: { title: 'Add gas money', body: 'The phone pays its own Sepolia fees from a gas wallet. Send it at least 0.002 Sepolia ETH, from a faucet or another wallet. This continues by itself once it arrives.' },
-  account: { title: 'Creating your account', body: 'Putting your wallet on Sepolia. This takes about 20 seconds.' },
-  ready: { title: 'Your wallet is ready', body: 'It holds 0.00005 test ETH on Sepolia. Next, give an agent its own key.' },
-  accountError: { title: 'The account is not on Sepolia yet', body: '' },
+  fund: { title: 'Add gas money', body: 'The phone pays its own gas fees from a gas wallet. Send it at least 0.002 test ETH, from a faucet or another wallet. This continues by itself once it arrives.' },
+  account: { title: 'Creating your account', body: 'Putting your wallet on-chain. This takes about 20 seconds.' },
+  ready: { title: 'Your wallet is ready', body: 'It holds 0.00005 test ETH on-chain. Next, give an agent its own key.' },
+  accountError: { title: 'The account is not on-chain yet', body: '' },
   error: { title: 'Something went wrong', body: '' },
 };
 
@@ -118,7 +118,7 @@ export default function Connect() {
     void deploy();
   };
 
-  // 3. Put the wallet on Sepolia in the same journey, paid for by the phone's gas wallet.
+  // 3. Put the wallet on-chain in the same journey, paid for by the phone's gas wallet.
   const [gas, setGas] = useState<{ address: string; balance: bigint } | null>(null);
   const [copied, setCopied] = useState(false);
   const deploy = async () => {

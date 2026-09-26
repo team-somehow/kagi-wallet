@@ -38,7 +38,7 @@ export default function SessionDetail() {
       <Screen>
         <TopBar left={{ label: 'Close', onPress: () => router.back() }} />
         <Txt size={16} color={colors.muted}>
-          {info ? 'This key is not on this wallet.' : 'Reading Sepolia'}
+          {info ? 'This key is not on this wallet.' : 'Reading the chain'}
         </Txt>
       </Screen>
     );
@@ -90,7 +90,7 @@ export default function SessionDetail() {
           <View style={styles.footer}>
             {revoke.phase === 'working' ? (
               <Txt size={14} color={colors.muted} align="center">
-                Revoking on Sepolia
+                Revoking on-chain
               </Txt>
             ) : (
               <HoldButton label="Hold to revoke this key" onComplete={() => void doRevoke()} />

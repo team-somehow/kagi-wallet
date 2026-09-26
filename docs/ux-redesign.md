@@ -9,7 +9,7 @@ not claim the new handoff, chat, or limit-update flow is implemented.
 - Start with one phone and one M5StickS3. Introduce the second stick at the end.
 - Create a wallet and a temporary session key from the phone.
 - Copy the actual session private key and paste it into a small web chat.
-- The chat connects to an MCP and performs simple ETH transfers on Sepolia.
+- The chat connects to an MCP and performs simple ETH transfers on-chain.
 - The agent runs its requested sequence automatically. A transfer above its
   remaining allowance pauses and requests a higher spending limit.
 - The stick beeps and presents the decision. After approval and on-chain
@@ -23,7 +23,7 @@ from the initial spoken hardware names.
 
 1. **Create wallet.** Find the stick, compare pairing codes, hold A on the stick,
    and protect the phone share with its existing biometric flow. Create the
-   Sepolia account as part of this journey; show pending, success, and recovery
+   on-chain account as part of this journey; show pending, success, and recovery
    states instead of requiring a separate chain screen.
 2. **Create session key.** Name the agent, set its total ETH allowance and expiry,
    then approve the grant on the stick. Show that access is pending until the
@@ -61,7 +61,7 @@ receipts and explorer links.
   retain revoke and expiry controls. Move operational demo/debug controls out
   of the main experience.
 - **Web:** session-key connection followed by one chat. Keep the connected
-  wallet, Sepolia network, allowance, and expiry easy to inspect. Each transfer
+  wallet, network, allowance, and expiry easy to inspect. Each transfer
   shows its recipient, amount, pending status, and confirmed transaction link.
   A limit request has a waiting state, not another approve button.
 - **Stick:** quiet allowance readout during ordinary spending; a readable,
@@ -136,7 +136,7 @@ line-of-sight prompt and progress feedback while the radio path is unavailable.
 ## Findings in the current build
 
 - `mobile/src/app/home.tsx`, `issue.tsx`, and `sign/[id].tsx` use the simulated
-  dollar-denominated store. Real Sepolia actions are isolated in `chain.tsx`.
+  dollar-denominated store. Real on-chain actions are isolated in `chain.tsx`.
 - `hub/agent.mjs` currently generates and retains session keys in the hub.
   Phone generation/export and web import are new work for this design.
 - `contracts/src/KagiAccount.sol::grant` resets `spent` when re-granting the same

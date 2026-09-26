@@ -49,7 +49,7 @@ async function run(groupKey: string | null) {
       publish({ phase: 'working', confirmed });
     }
     const o = await evm.overview(groupKey);
-    if (!o.account) throw new Error('No Sepolia account is deployed.');
+    if (!o.account) throw new Error('No on-chain account is deployed.');
     for (const addr of await listSessionAddresses()) {
       const s = await evm.session(o.account, addr as `0x${string}`);
       if (s.expiry <= o.now) continue;

@@ -1,6 +1,6 @@
 /**
  * The phone's link to the sticks: Bluetooth LE only (lib/ble.ts). The phone talks to
- * Sepolia itself (lib/evm.ts), so there is no hub.
+ * the chain itself (lib/evm.ts), so there is no hub.
  * Both sticks are merged into one message stream. Vault messages carry "from": "vault", and
  * a {t: "hub"} status (name kept for the listeners) reports which sticks are connected.
  */

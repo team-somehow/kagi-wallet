@@ -40,7 +40,7 @@ const labels: Record<Phase, string> = {
   'ir-out': 'Sending by infrared',
   second: 'Hold A on second stick',
   'ir-back': 'Returning signature',
-  confirming: 'Confirming on Sepolia',
+  confirming: 'Confirming on-chain',
   done: 'Add a second stick',
   declined: 'Try approving instead',
   join: 'Join second stick',

@@ -74,7 +74,7 @@ static bool dirty = true;
 
 // Exposure, as last reported by the phone.
 static double expLeft = 0, expCap = 0, expSpent = 0;
-static String expUnit = "USD";  // "ETH" for a real Sepolia session
+static String expUnit = "USD";  // "ETH" for a real on-chain session
 static int expKeys = 0;
 static bool warned80 = false;
 
@@ -1137,7 +1137,7 @@ static void onSign(JsonDocument& in) {
     memcpy(w + T + 104, valB, 32);
     if (dlen && !unhex(dataHex.c_str(), w + T + 136, dlen)) return reject(id, "bad_request");
     frost::sha256(pre.data(), pre.size(), p.msg);
-    String net = chain == "11155111" ? "Sepolia" : chain == "1" ? "MAINNET" : "chain " + chain;
+    String net = chain == "11155111" ? "TESTNET" : chain == "1" ? "MAINNET" : "chain " + chain;
     p.title = net + " tx";
     char eth[32];
     snprintf(eth, sizeof eth, "%.6f ETH", strtod(valueS.c_str(), nullptr) / 1e18);

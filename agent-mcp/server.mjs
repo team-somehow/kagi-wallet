@@ -1,6 +1,6 @@
 // Kagi agent MCP: an agent's wallet, as tools for ChatGPT, Claude or any MCP client.
 //
-// It talks to Sepolia directly. It signs spends with a Kagi session key and sends them itself,
+// It talks to the chain directly. It signs spends with a Kagi session key and sends them itself,
 // paying gas from the key's own address (the phone tops it up when it grants the key). The key
 // can only spend its on-chain allowance. For more, it files a limit request on-chain; the
 // owner's phone sees it and the owner approves on their stick.
@@ -16,6 +16,7 @@
 //   RPC_URL      default https://ethereum-sepolia-rpc.publicnode.com
 //   EXPLORER     default https://sepolia.etherscan.io
 //   CONTACTS     JSON name -> address; default contacts.json next to this file
+//   MULTIBAAS_URL, MULTIBAAS_API_KEY  optional: Curvegrid MultiBaas, for get_activity (multibaas.mjs)
 //   PORT         default 8790
 //   HOST         default 0.0.0.0; 127.0.0.1 behind a reverse proxy
 import http from 'node:http';
@@ -39,6 +40,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount, sign } from 'viem/accounts';
 import { z } from 'zod';
+import { activity as mbActivity, multibaasEnabled } from './multibaas.mjs';
 
 const here = (f) => new URL(f, import.meta.url);
 const ABI = JSON.parse(readFileSync(here('./abi.json'), 'utf8'));
@@ -165,7 +167,7 @@ function forKey(parsed) {
     revoked: 'The owner revoked this session key.',
     unknown: 'This session key has no session on that Kagi account.',
     insufficient_funds: 'The wallet itself does not hold enough ETH.',
-    no_gas: `The agent key has no Sepolia ETH left for gas. Send a little to ${'${agent}'}.`,
+    no_gas: `The agent key has no test ETH left for gas. Send a little to ${'${agent}'}.`,
   };
   const explain = (r) => (EXPLAIN[r] ?? r).replace('${agent}', AGENT?.address ?? 'the agent key');
 
@@ -268,7 +270,32 @@ function forKey(parsed) {
     }
   }
 
-  return { AGENT, ACCOUNT, walletInfo, transfer, askForMore, waitForOwner, requestsKey: (id) => `${AGENT.address}:${id}` };
+  /** The account's history from MultiBaas: every spend, request, raise, decline, grant and revoke. */
+  async function history() {
+    const { justLinked, rows } = await mbActivity(ACCOUNT, ABI);
+    const me = AGENT.address.toLowerCase();
+    const who = (a) => (!a ? null : a.toLowerCase() === me ? 'this agent' : a);
+    const describe = (r) => {
+      switch (r.event) {
+        case 'Spent': return `${who(r.agent)} sent ${eth(r.value)} to ${r.to}`;
+        case 'LimitRequested': return `${who(r.agent)} asked to raise its limit ${eth(r.oldCap)} -> ${eth(r.newCap)}: "${r.reason}"`;
+        case 'LimitRaised': return `owner approved ${who(r.agent)}: limit ${eth(r.oldCap)} -> ${eth(r.newCap)} (phone + stick signed)`;
+        case 'LimitDeclined': return `owner declined ${who(r.agent)}'s request for ${eth(r.newCap)}`;
+        case 'Granted': return `owner granted ${who(r.agent)} a key with a ${eth(r.cap)} limit (phone + stick signed)`;
+        case 'Revoked': return `owner revoked ${who(r.agent)}`;
+        default: return r.event;
+      }
+    };
+    return {
+      ok: true,
+      source: 'Curvegrid MultiBaas event index',
+      wallet: ACCOUNT,
+      ...(justLinked ? { note: 'This wallet was just added to the index. Older events can take a minute to appear; call again shortly.' } : {}),
+      events: rows.map((r) => ({ what: describe(r), event: r.event, at: r.at, tx: r.tx ? txLink(r.tx) : null })),
+    };
+  }
+
+  return { AGENT, ACCOUNT, walletInfo, transfer, askForMore, waitForOwner, history, requestsKey: (id) => `${AGENT.address}:${id}` };
 }
 
 // ---- tools --------------------------------------------------------------------------------
@@ -301,10 +328,12 @@ function buildServer(current, setKey) {
     { name: 'kagi-agent', version: '0.2.0' },
     {
       instructions:
-        'You control a Kagi agent wallet on the Sepolia testnet. It holds a session key with a total ETH allowance ' +
+        'You control a Kagi agent wallet on-chain. It holds a session key with a total ETH allowance ' +
         'and an expiry set by its owner. Call get_wallet first. Use send_eth for payments. If a payment is over the ' +
         'allowance, send_eth asks the owner for a higher limit automatically; then call wait_for_approval with the ' +
-        'request_id, which sends the payment once the owner approves. Never claim a payment was sent unless a tool ' +
+        'request_id, which sends the payment once the owner approves. ' +
+        (multibaasEnabled() ? 'get_activity shows the wallet history: past payments, requests and approvals. ' : '') +
+        'Never claim a payment was sent unless a tool ' +
         'returned status "confirmed" with a tx link.' +
         (setKey ? ' If the user gives you a Kagi session key (kagi:0x…:0x…), call use_my_key with it to spend from their own wallet.' : ''),
     },
@@ -350,12 +379,28 @@ function buildServer(current, setKey) {
     guarded(async (a) => reply(await a.walletInfo())),
   );
 
+  if (multibaasEnabled()) {
+    server.registerTool(
+      'get_activity',
+      {
+        title: 'Get activity',
+        description:
+          "The wallet's history, newest first, from the Curvegrid MultiBaas event index: every payment an agent sent, " +
+          'every limit it asked for, and whether the owner approved (phone + stick), declined or revoked. Use it to answer ' +
+          '"what did my agent spend?" or "who approved that?".',
+        inputSchema: {},
+        annotations: { readOnlyHint: true, openWorldHint: true },
+      },
+      guarded(async (a) => reply(await a.history())),
+    );
+  }
+
   server.registerTool(
     'send_eth',
     {
       title: 'Send ETH',
       description:
-        'Send Sepolia ETH from the agent wallet, within its allowance. "to" is a 0x address or a contact name from get_wallet. ' +
+        'Send test ETH from the agent wallet, within its allowance. "to" is a 0x address or a contact name from get_wallet. ' +
         'Returns status "confirmed" with a tx link, or "waiting_for_owner" with a request_id when the owner must approve a higher limit.',
       inputSchema: {
         to: z.string().describe('0x address or contact name, e.g. ABC'),

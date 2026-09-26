@@ -11,11 +11,13 @@ Everything above the cap climbs a ladder of physical devices: your wrist, then a
 ![Foundry](https://img.shields.io/badge/tested_with-Foundry-f26b1d)
 ![Expo](https://img.shields.io/badge/Expo-SDK_57-000020?logo=expo)
 ![ESP32](https://img.shields.io/badge/ESP32--S3-PlatformIO-e7352c?logo=espressif)
-![Network](https://img.shields.io/badge/network-Sepolia-627eea?logo=ethereum)
+![Network](https://img.shields.io/badge/network-on--chain-627eea?logo=ethereum)
 
 </div>
 
 ---
+
+> **In one sentence:** Kagi gives an AI agent a capped, expiring on-chain spending key, and anything above the cap needs you to approve on your phone and press a button on a device on your wrist.
 
 ## The problem
 
@@ -73,7 +75,7 @@ contracts/   Solidity + Foundry. KagiAccount, RootTreasury, BIP340 verifier, for
 firmware/    ESP32-S3 firmware (PlatformIO). One build runs as wrist or vault
   wrist/       the shard firmware: FROST, display, buttons, BLE, WiFi, IR
   irprobe/     bench tool for the IR link
-mobile/      Expo / React Native app. The phone shard, the control surface, and its own Sepolia client
+mobile/      Expo / React Native app. The phone shard, the control surface, and its own on-chain client
 agent-mcp/   Node. A bare-bones MCP server that gives ChatGPT or Claude an agent wallet
 site/        the landing page
 IDEA.md      the full design, threat model and demo script
@@ -101,7 +103,7 @@ IDEA.md      the full design, threat model and demo script
 - **ERC-165:** advertises all of the above.
 - **Not ERC-4337 (yet):** there is no relayer. The phone pays for its own transactions from a gas wallet, and an agent pays for its own from its session key, which the phone tops up when it grants it.
 
-**Gas** (Sepolia `eth_call` estimates)
+**Gas** (on-chain `eth_call` estimates)
 
 | Call | Gas |
 |---|---|
@@ -141,6 +143,8 @@ npm test                # anvil end to end: spend, ask for more, approve, declin
 
 See [`agent-mcp/README.md`](agent-mcp/README.md) to connect ChatGPT or Claude.
 
+To turn on `get_activity`, the history tool backed by Curvegrid MultiBaas, set `MULTIBAAS_URL` and `MULTIBAAS_API_KEY` before `npm start` (see [Curvegrid MultiBaas](#curvegrid-multibaas)).
+
 ### 3. Firmware
 
 ```bash
@@ -161,7 +165,7 @@ npm install
 npx expo run:android
 ```
 
-The phone talks to the ESP32 devices over **Bluetooth LE** and to Sepolia directly. It keeps a gas wallet in its secure store: fund its address, shown on Home, with a little Sepolia ETH.
+The phone talks to the ESP32 devices over **Bluetooth LE** and to the chain directly. It keeps a gas wallet in its secure store: fund its address, shown on Home, with a little test ETH.
 
 ## Tests
 
@@ -173,6 +177,34 @@ The phone talks to the ESP32 devices over **Bluetooth LE** and to Sepolia direct
 | `cd agent-mcp && npm test` | on anvil: the phone's message builders, the contract and the MCP server, through a spend, a limit raise and a decline |
 
 The phone's `src/lib/frost.ts` and the firmware's `src/frost.cpp` must match byte for byte. The fixture test is what catches it when they drift.
+
+## Curvegrid MultiBaas
+
+Kagi is a policy-aware transaction agent: the contract enforces the spending limit, and a person has to approve anything above it. The chain can tell you the current state, like how much allowance is left, but not the story behind it. **MultiBaas gives the agent a memory of what happened.**
+
+The agent MCP's `get_activity` tool reads the wallet's history from the MultiBaas event index: every payment an agent sent, every higher limit it asked for and why, and whether the owner approved it (phone + wrist), declined it or revoked the key. You can ask your AI *"what did my agent spend today, and who approved the raise?"* and get an answer drawn from indexed events, not guesses.
+
+| What | Where |
+|---|---|
+| MultiBaas client: registers the `KagiAccount` ABI, links each wallet with event indexing, reads its events | [`agent-mcp/multibaas.mjs`](agent-mcp/multibaas.mjs) |
+| The `get_activity` MCP tool and how it turns events into sentences | [`agent-mcp/server.mjs`](agent-mcp/server.mjs), `history()` and `get_activity` |
+
+Every user's phone deploys their own wallet, so wallets can't be linked in the MultiBaas console ahead of time. The first time a wallet asks for its history, the server registers the ABI (once per deployment), gives the address an alias and links it with `startingBlock`. After that, calls are just `GET /events?contract_address=…`.
+
+**Try it:** create a MultiBaas deployment on the same testnet, make an API key in the Administrators group, then:
+
+```bash
+cd agent-mcp
+MULTIBAAS_URL=https://<deployment>.multibaas.com MULTIBAAS_API_KEY=<key> npm start
+```
+
+Connect your AI with a connector link from the Kagi app, make a couple of payments and one limit request, then ask it for your wallet's activity.
+
+**Our experience with MultiBaas:** _TODO after the live run: what went well, what was confusing, what was missing._
+
+## Team
+
+_TODO: names, roles and social handles._
 
 ## Threat model, in short
 

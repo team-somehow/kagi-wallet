@@ -122,7 +122,7 @@ export default function Home() {
       {waiting.map((l) => (
         <Pressable key={l.id} onPress={() => router.push(`/limit/${l.id}`)} style={({ pressed }) => [styles.request, pressed && styles.pressed]}>
           <Txt size={17} weight="medium">
-            {l.status === 'waiting' ? `${l.name} is waiting for approval` : 'New limit confirming on Sepolia'}
+            {l.status === 'waiting' ? `${l.name} is waiting for approval` : 'New limit confirming on-chain'}
           </Txt>
           <Txt size={14} color={colors.muted}>
             Raise its total from {fmtAmount(l.oldCap)} to {fmtAmount(l.newCap)}
@@ -134,7 +134,7 @@ export default function Home() {
         value={live.length ? fmtAmount(totals.left) : 'KAGI'} detail={live.length ? 'Agent allowance left' : 'Your physical boundary'} />
       <View style={styles.account}>
         <Txt size={15} color={colors.muted}>
-          Wallet on Sepolia
+          Wallet on-chain
         </Txt>
         {info?.account ? (
           <>
@@ -150,18 +150,18 @@ export default function Home() {
         ) : info ? (
           <View style={styles.gap}>
             <Txt size={16} color={colors.faint}>
-              This wallet is not on Sepolia yet.
+              This wallet is not on-chain yet.
             </Txt>
             {deployError ? (
               <Txt size={14} color={colors.red}>
                 {deployError}
               </Txt>
             ) : null}
-            <Button label={deploying ? 'Creating account' : 'Create Sepolia account'} loading={deploying} onPress={() => void deploy()} />
+            <Button label={deploying ? 'Creating account' : 'Create on-chain account'} loading={deploying} onPress={() => void deploy()} />
           </View>
         ) : (
           <Txt size={16} color={colors.faint}>
-            Reading Sepolia
+            Reading the chain
           </Txt>
         )}
       </View>
@@ -229,7 +229,7 @@ export default function Home() {
             {info.gasBalance === 0n ? 'Out of gas' : 'Gas running low'}
           </Txt>
           <Txt size={14} color={colors.muted} lineHeight={20}>
-            The phone pays its Sepolia fees from a gas wallet with {fmtEth(info.gasBalance)} left. Send it a little Sepolia ETH, or the phone cannot grant, revoke or decide limits.
+            The phone pays its gas fees from a gas wallet with {fmtEth(info.gasBalance)} left. Send it a little test ETH, or the phone cannot grant, revoke or decide limits.
           </Txt>
           <Button
             label={gasCopied ? 'Copied' : `Copy ${shortAddr(info.gasAddress)}`}

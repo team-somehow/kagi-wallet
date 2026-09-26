@@ -76,7 +76,7 @@ export default function LimitRequestScreen() {
       const shard = await loadShard();
       if (!shard) throw new Error('This phone has no shard.');
       const i = (await refresh()) ?? info;
-      if (!i) throw new Error('Could not read Sepolia.');
+      if (!i) throw new Error('Could not read the chain.');
       const sig = phoneOnlySign(shard, evmDeclineMessage(i.chainId, r.account, i.nonce, r.agent, r.newCap), rand);
       const d = await evm.declineLimit(r.account as `0x${string}`, r.agent as `0x${string}`, r.newCap, sig, (hash) => setLimitLocal(r.id, { hash }));
       setLimitLocal(r.id, { status: d.status === 'success' ? 'rejected' : 'failed', hash: d.hash, error: d.status === 'success' ? null : 'The decline reverted.' });
@@ -160,7 +160,7 @@ export default function LimitRequestScreen() {
         {r.status === 'waiting' && !sent ? (
           nonce === null ? (
             <Txt size={14} color={colors.muted}>
-              Reading the account from Sepolia
+              Reading the account on-chain
             </Txt>
           ) : (
             <>
@@ -195,7 +195,7 @@ export default function LimitRequestScreen() {
           </Txt>
         ) : null}
         {r.status === 'submitting' ? <>
-          <Status title="Confirming on Sepolia" body="Your answer is submitted. The agent stays paused until the chain confirms it." />
+          <Status title="Confirming on-chain" body="Your answer is submitted. The agent stays paused until the chain confirms it." />
           {r.hash ? <Button label="Track transaction" variant="secondary" onPress={() => void Linking.openURL(`${explorer}/tx/${r.hash}`)} /> : null}
           <Button label="Check confirmation" variant="ghost" onPress={() => void refresh()} />
         </> : null}
