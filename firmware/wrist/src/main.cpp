@@ -761,6 +761,7 @@ static bool animating() {
   if (mode == Mode::Unpaired || mode == Mode::Pairing || mode == Mode::Prompt) return true;
   if (mode == Mode::ConfirmWipe || mode == Mode::ConfirmWifi) return true;
   if (mode == Mode::Result) return millis() - modeSince < 1000;
+  if (mode == Mode::Home && isVault) return windowOpen() || (!vJoined && M5.BtnA.isPressed()) || millis() - modeSince < 800;
   if (mode == Mode::Home) return millis() - modeSince < 800;
   return false;
 }
@@ -1647,27 +1648,108 @@ static bool isVaultRole() { return isVault; }
 
 static void drawVault() {
   bool win = windowOpen();
-  canvas.setFont(&fonts::FreeSans9pt7b);
-  canvas.setTextDatum(top_left);
-  canvas.setTextColor(win ? C_AMBER : C_TEXT);
-  canvas.drawString(win ? "Vault: window open" : "Vault", 8, 6);
-  canvas.setFont(&fonts::Font0);
-  canvas.setTextDatum(top_right);
-  canvas.setTextColor(C_MUTED);
-  canvas.drawString(String(win ? (ble::connected() ? "ble" : tcpUp() ? "hub" : "wifi...") : "radio off") + "  " + String(M5.Power.getBatteryLevel()) + "%", W - 8, 10);
-  canvas.setTextDatum(top_left);
-  canvas.setFont(&fonts::FreeSansBold12pt7b);
-  canvas.setTextColor(vJoined ? C_TEXT : C_MUTED);
-  canvas.drawString(vJoined ? "Root 3 of 3" : "Not joined", 8, 34);
-  canvas.setFont(&fonts::FreeSans9pt7b);
-  canvas.setTextColor(C_MUTED);
-  if (win) {
-    canvas.drawString("Code " + fingerprint(vdevPub), 8, 72);
-    canvas.drawString(String((windowUntil - millis()) / 1000) + " s left", 8, 96);
-  } else {
-    canvas.drawString(vJoined ? "Signs only by IR." : "Hold A to join.", 8, 72);
-    canvas.drawString("Code " + fingerprint(vdevPub), 8, 96);
+  int lvl = M5.Power.getBatteryLevel();
+  // battery, top right, the same as the wrist
+  {
+    int x = W - 10;
+    canvas.drawRect(x - 18, 6, 18, 9, C_MUTED);
+    canvas.fillRect(x, 8, 2, 5, C_MUTED);
+    if (lvl > 0) canvas.fillRect(x - 16, 8, std::max(1, 14 * std::min(lvl, 100) / 100), 5, lvl < 20 ? C_RED : C_TEXT);
   }
+
+  if (win) {
+    // Pairing: radio pulses on the left, the code to compare, and the time left.
+    title("PAIRING", C_AMBER);
+    canvas.fillCircle(W - 38, 10, 3, ble::connected() ? C_TEXT : C_AMBER);
+    int cx = 34, cy = 70;
+    for (int i = 0; i < 3; i++) {
+      float ph = fmodf(t01(1800) + i / 3.0f, 1.0f);
+      int r = 5 + (int)(ph * 24);
+      uint8_t a = (uint8_t)(230 * (1 - ph));
+      canvas.drawCircle(cx, cy, r, M5.Display.color565(a, (uint8_t)(a * 177 / 255), (uint8_t)(a * 59 / 255)));
+    }
+    canvas.fillCircle(cx, cy, 4, C_AMBER);
+    canvas.setFont(&fonts::FreeSans9pt7b);
+    canvas.setTextDatum(top_left);
+    canvas.setTextColor(C_MUTED);
+    canvas.drawString(ble::connected() ? "Phone connected. Code:" : "Same code on the phone?", 70, 34);
+    String code = fingerprint(vdevPub);
+    canvas.setFont(&fonts::FreeSansBold12pt7b);
+    canvas.setTextColor(C_TEXT);
+    canvas.drawString(code.substring(0, 4), 70, 56);
+    canvas.drawString(code.length() > 5 ? code.substring(5) : String(""), 150, 56);
+    // countdown
+    uint32_t left = windowUntil > millis() ? windowUntil - millis() : 0;
+    float frac = std::min(1.0f, left / 120000.0f);
+    int bx = 12, bw = W - 24, by = 104;
+    canvas.drawRoundRect(bx, by, bw, 8, 4, C_FAINT);
+    canvas.fillRoundRect(bx + 2, by + 2, std::max(4, (int)((bw - 4) * frac)), 4, 2, frac < 0.2f ? C_RED : C_AMBER);
+    canvas.setFont(&fonts::Font0);
+    canvas.setTextDatum(bottom_left);
+    canvas.setTextColor(C_FAINT);
+    canvas.drawString("In the app: + Device", 12, H - 4);
+    canvas.setTextDatum(bottom_right);
+    canvas.drawString(String(left / 1000) + " s", W - 12, H - 4);
+    return;
+  }
+
+  if (!vJoined) {
+    // Waiting to be added: hold A for 2 s, with the ring filling as you hold.
+    title("2ND STICK", C_MUTED);
+    static uint32_t pressAt = 0;
+    if (M5.BtnA.isPressed()) {
+      if (!pressAt) pressAt = millis();
+    } else {
+      pressAt = 0;
+    }
+    float hp = pressAt ? std::min(1.0f, (millis() - pressAt) / 2000.0f) : 0.0f;
+    int rx = A_ON_RIGHT ? 44 : W - 44, ry = 72, rr = 28;
+    canvas.drawCircle(rx, ry, rr, C_CELL);
+    canvas.drawCircle(rx, ry, rr - 1, C_CELL);
+    if (hp > 0) arcRing(rx, ry, rr, 6, 0, 360 * hp, C_AMBER);
+    canvas.setFont(&fonts::FreeSansBold12pt7b);
+    canvas.setTextDatum(middle_center);
+    canvas.setTextColor(hp > 0 ? C_AMBER : C_TEXT);
+    canvas.drawString("A", rx, ry + 1);
+    arrowsToA(56, "Hold A");
+    canvas.setFont(&fonts::FreeSans9pt7b);
+    canvas.setTextDatum(top_left);
+    canvas.setTextColor(C_MUTED);
+    canvas.drawString("to join a wallet", 90, 80);
+    canvas.setTextColor(C_FAINT);
+    canvas.drawString("then + Device in the app", 90, 100);
+    return;
+  }
+
+  // Joined: a closed ring, and what it is for. Held still: it is listening for the wrist.
+  title("2ND STICK", C_MUTED);
+  int cx = 50, cy = 72, r = 38;
+  float sweep = easeOut(since(700));
+  canvas.drawCircle(cx, cy, r, C_CELL);
+  canvas.drawCircle(cx, cy, r - 7, C_CELL);
+  arcRing(cx, cy, r, 7, 0, 360 * sweep, C_AMBER);
+  canvas.setFont(&fonts::FreeSansBold12pt7b);
+  canvas.setTextDatum(middle_center);
+  canvas.setTextColor(C_TEXT);
+  canvas.drawString("3", cx, cy - 8);
+  canvas.setFont(&fonts::Font0);
+  canvas.setTextColor(C_MUTED);
+  canvas.drawString("of 3", cx, cy + 12);
+  int x = 102;
+  canvas.setFont(&fonts::FreeSansBold9pt7b);
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(C_TEXT);
+  canvas.drawString("Guarding your", x, 34);
+  canvas.drawString("wallet", x, 54);
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextColor(C_MUTED);
+  canvas.drawString("Signs only by IR", x, 80);
+  // IR ready: a small beam mark pointing out toward the wrist
+  int iy = 108;
+  canvas.fillCircle(x + 4, iy, 3, C_AMBER);
+  for (int i = 1; i <= 3; i++) canvas.drawArc(x + 4, iy, 4 + i * 5, 3 + i * 5, 300, 60, i == 1 ? C_AMBER : C_FAINT);
+  canvas.setTextColor(C_FAINT);
+  canvas.drawString("Face the wrist", x + 30, iy - 8);
 }
 
 static void approveRoot() {
