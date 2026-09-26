@@ -146,8 +146,7 @@ body { background: var(--ground); }
 .key-principle-link { display: flex; justify-content: space-between; margin-top: auto; padding-top: 24px; font-size: 12px; text-decoration: none; }
 .key-principle-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .sources { padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
-.sources summary { display: flex; width: 100%; padding: 20px 24px; color: var(--text); }
-.sources summary::before { border: none; border-radius: 0; }
+.sources-label { padding: 20px 24px; color: var(--muted); font: 11px var(--mono); }
 .sources ul { columns: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; padding: 0 24px 24px; margin: 0; counter-reset: reference; }
 .sources li { counter-increment: reference; position: relative; padding: 16px 0 16px 30px; border-top: 1px solid var(--line); margin: 0; gap: 4px; font-size: 13px; }
 .sources li::before { content: counter(reference, decimal-leading-zero); position: absolute; left: 0; top: 18px; font: 9px var(--mono); color: var(--muted); }

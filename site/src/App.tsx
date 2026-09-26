@@ -49,8 +49,8 @@ export function App() {
               <h2>Follow the evidence.</h2>
               <p>The research, incident reports, and technical references behind Kagi.</p>
             </div>
-            <details className="sources" open>
-              <summary>Browse all {sources.length} sources</summary>
+            <div className="sources">
+              <p className="sources-label">{sources.length} references</p>
               <ul>
                 {sources.map((s) => (
                   <li key={s.url + s.title}>
@@ -59,7 +59,7 @@ export function App() {
                   </li>
                 ))}
               </ul>
-            </details>
+            </div>
           </div>
         </section>
       </main>

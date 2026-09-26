@@ -391,10 +391,6 @@ p { margin: 0; }
 
 /* ---- sources + footer ---- */
 .sources { border-top: 1px solid var(--line); padding-top: 24px; }
-.sources summary { cursor: pointer; color: var(--muted); font-size: 15px; list-style: none; display: inline-flex; gap: 10px; align-items: center; }
-.sources summary::before { content: '+'; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line-2); font-size: 14px; }
-.sources[open] summary::before { content: '−'; }
-.sources summary::-webkit-details-marker { display: none; }
 .sources ul { columns: 2; column-gap: 48px; list-style: none; padding: 0; margin: 20px 0 0; font-size: 14px; }
 .sources li { break-inside: avoid; margin-bottom: 10px; display: grid; }
 .sources li a { color: var(--text); text-decoration-color: var(--line-2); text-underline-offset: 3px; }
