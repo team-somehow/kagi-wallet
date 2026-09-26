@@ -240,6 +240,22 @@ export default function Home() {
         </View>
       ) : null}
 
+      {info?.account ? (
+        <Pressable accessibilityRole="button" onPress={() => router.push('/spending')} style={({ pressed }) => [styles.card, styles.sticks, pressed && styles.pressed]}>
+          <View style={styles.row}>
+            <Txt size={16} weight="medium">
+              Spending
+            </Txt>
+            <Txt size={16} color={colors.muted}>
+              ›
+            </Txt>
+          </View>
+          <Txt size={13} color={colors.muted}>
+            What each agent spent, who got paid, and every approval.
+          </Txt>
+        </Pressable>
+      ) : null}
+
       {info?.account && twoSticks !== null ? (
         <Pressable onPress={() => router.push('/vault')} style={({ pressed }) => [styles.card, styles.sticks, pressed && styles.pressed]}>
           <Txt size={16} weight="medium">

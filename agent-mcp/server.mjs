@@ -41,7 +41,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount, sign } from 'viem/accounts';
 import { z } from 'zod';
-import { activity as mbActivity, multibaasEnabled, track } from './multibaas.mjs';
+import { activity as mbActivity, multibaasEnabled, saveDashboard, spendingSummary, track } from './multibaas.mjs';
 import { interceptaEnabled, screen } from './intercepta.mjs';
 
 const here = (f) => new URL(f, import.meta.url);
@@ -354,7 +354,35 @@ function forKey(parsed) {
     };
   }
 
-  return { AGENT, ACCOUNT, walletInfo, transfer, askForMore, waitForOwner, history, requestsKey: (id) => `${AGENT.address}:${id}` };
+  /** Totals and approvals for this wallet, aggregated by MultiBaas Event Queries. */
+  async function summary() {
+    const r = await spendingSummary(ACCOUNT, ABI);
+    const me = AGENT.address.toLowerCase();
+    const label = (a) => (a === me ? 'this agent' : a);
+    return {
+      ok: true,
+      source: 'Curvegrid MultiBaas Event Queries (aggregated server side)',
+      wallet: ACCOUNT,
+      agents: r.agents.map((a) => ({
+        agent: label(a.agent),
+        spent: eth(a.spent),
+        payments: a.payments,
+        limit_granted: a.grantedCap ? eth(a.grantedCap) : null,
+        limit_raised_to: a.raisedTo ? eth(a.raisedTo) : null,
+        revoked: a.revoked,
+      })),
+      top_recipients: r.recipients.slice(0, 5).map((x) => ({ to: x.to, received: eth(x.total) })),
+      approvals: {
+        limit_requests: r.approvals.requested,
+        approved_on_phone_and_kagi_wallet: r.approvals.approved,
+        declined: r.approvals.declined,
+        held_by_intercepta: r.approvals.held,
+        refused_by_intercepta: r.approvals.blocked,
+      },
+    };
+  }
+
+  return { AGENT, ACCOUNT, walletInfo, transfer, askForMore, waitForOwner, history, summary, requestsKey: (id) => `${AGENT.address}:${id}` };
 }
 
 // ---- tools --------------------------------------------------------------------------------
@@ -398,7 +426,7 @@ function buildServer(current, setKey) {
             '(tell the user why, and do not retry or route around it; the owner was alerted and can bypass it on all their ' +
             'devices); "waiting_for_owner" with held_by "intercepta" means the owner must approve that payment. '
           : '') +
-        (multibaasEnabled() ? 'get_activity shows the wallet history: past payments, requests and approvals. ' : '') +
+        (multibaasEnabled() ? 'get_activity shows the wallet history: past payments, requests and approvals; get_spending_summary gives the totals. ' : '') +
         'Never claim a payment was sent unless a tool ' +
         'returned status "confirmed" with a tx link.' +
         (setKey ? ' If the user gives you a Kagi session key (kagi:0x…:0x…), call use_my_key with it to spend from their own wallet.' : ''),
@@ -465,6 +493,20 @@ function buildServer(current, setKey) {
         annotations: { readOnlyHint: true, openWorldHint: true },
       },
       guarded(async (a) => reply(await a.history())),
+    );
+    server.registerTool(
+      'get_spending_summary',
+      {
+        title: 'Get spending summary',
+        description:
+          "Totals for this wallet from Curvegrid MultiBaas Event Queries: how much each agent spent and in how many " +
+          'payments, the limit it was granted and raised to, the top recipients, and how many limit requests were ' +
+          'approved, declined, or held or refused by Intercepta. Use it for "how much has my agent spent?" or ' +
+          '"who did we pay the most?".',
+        inputSchema: {},
+        annotations: { readOnlyHint: true, openWorldHint: true },
+      },
+      guarded(async (a) => reply(await a.summary())),
     );
   }
 
@@ -585,6 +627,14 @@ function buildServer(current, setKey) {
   return server;
 }
 
+// ---- the wallet summary the phone app shows (MultiBaas Event Queries) ----------------------
+
+/** A wallet's spending summary as JSON, for the app's Spending screen. On-chain data only. */
+async function summaryJson(account) {
+  const r = await spendingSummary(account, ABI);
+  return JSON.stringify(r, (_, v) => (typeof v === 'bigint' ? v.toString() : v));
+}
+
 // ---- HTTP ---------------------------------------------------------------------------------
 
 async function readBody(req) {
@@ -646,6 +696,11 @@ http
   .createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://x');
     try {
+      const sm = /^\/api\/summary\/(0x[0-9a-fA-F]{40})$/.exec(url.pathname);
+      if (sm && multibaasEnabled()) {
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(await summaryJson(getAddress(sm[1])));
+        return;
+      }
       if (url.pathname === '/' || url.pathname === '/health') {
         res.writeHead(200, { 'content-type': 'text/plain' }).end('kagi agent mcp: connect at /demo, or /k/<your connector token>\n');
         return;
@@ -663,6 +718,7 @@ http
     }
   })
   .listen(PORT, HOST, () => {
+    if (multibaasEnabled()) saveDashboard().then((l) => log(`multibaas saved queries: ${l.join(', ')}`)).catch((e) => log('multibaas saved queries failed:', e.message));
     log(`kagi agent mcp on ${HOST}:${PORT}, rpc ${RPC}`);
     log('shared endpoint: /k/<connector token>');
     log(OWN ? `public demo at /demo spends from ${privateKeyToAccount(OWN.key).address}` : 'public demo at /demo: no demo key set, use_my_key only');

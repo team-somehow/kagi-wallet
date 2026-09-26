@@ -95,3 +95,87 @@ export async function activity(account, abi, limit = 25) {
   rows.sort((x, y) => (y.block ?? 0) - (x.block ?? 0));
   return { justLinked, rows };
 }
+
+// ---- Event Queries: spending summaries -----------------------------------------------------
+// MultiBaas aggregates indexed events server side (group by a field, add up another), so a
+// summary is a handful of small queries instead of scanning logs. Events are named by their
+// signature; inputs by index, in the order the contract declares them.
+
+const EV = {
+  granted: { sig: 'Granted(address,uint256,uint256)', agent: 0, cap: 1, expiry: 2 },
+  spent: { sig: 'Spent(address,address,uint256)', agent: 0, to: 1, value: 2 },
+  requested: { sig: 'LimitRequested(address,uint256,uint256,string)', agent: 0, oldCap: 1, newCap: 2, reason: 3 },
+  raised: { sig: 'LimitRaised(address,uint256,uint256)', agent: 0, oldCap: 1, newCap: 2 },
+  declined: { sig: 'LimitDeclined(address,uint256)', agent: 0, newCap: 1 },
+  revoked: { sig: 'Revoked(address)', agent: 0 },
+};
+
+const sel = (i, alias, aggregator) => ({ type: 'input', inputIndex: i, alias, ...(aggregator ? { aggregator } : {}) });
+const onAccount = (account) => ({ rule: 'and', children: [{ fieldType: 'contract_address', operator: 'equal', value: account.toLowerCase() }] });
+const onKagi = () => ({ rule: 'and', children: [{ fieldType: 'contract_label', operator: 'equal', value: LABEL }] });
+
+async function run(query) {
+  return (await mb('POST', '/queries', query))?.rows ?? [];
+}
+
+/**
+ * One wallet's spending and approvals, from MultiBaas Event Queries: totals per agent and per
+ * recipient (aggregated by MultiBaas), and the requests, raises, declines and Intercepta holds.
+ */
+export async function spendingSummary(account, abi) {
+  await ensureLinked(account, abi);
+  const where = onAccount(account);
+  const [byAgent, byRecipient, payments, grants, raises, raiseEvents, requests, declines, revokes] = await Promise.all([
+    run({ events: [{ eventName: EV.spent.sig, select: [sel(EV.spent.agent, 'agent'), sel(EV.spent.value, 'total', 'add')], filter: where }], groupBy: 'agent', orderBy: 'total', order: 'DESC' }),
+    run({ events: [{ eventName: EV.spent.sig, select: [sel(EV.spent.to, 'to'), sel(EV.spent.value, 'total', 'add')], filter: where }], groupBy: 'to', orderBy: 'total', order: 'DESC' }),
+    run({ events: [{ eventName: EV.spent.sig, select: [sel(EV.spent.agent, 'agent')], filter: where }] }),
+    run({ events: [{ eventName: EV.granted.sig, select: [sel(EV.granted.agent, 'agent'), sel(EV.granted.cap, 'cap', 'last')], filter: where }], groupBy: 'agent' }),
+    run({ events: [{ eventName: EV.raised.sig, select: [sel(EV.raised.agent, 'agent'), sel(EV.raised.newCap, 'cap', 'max')], filter: where }], groupBy: 'agent' }),
+    run({ events: [{ eventName: EV.raised.sig, select: [sel(EV.raised.agent, 'agent')], filter: where }] }),
+    run({ events: [{ eventName: EV.requested.sig, select: [sel(EV.requested.agent, 'agent'), sel(EV.requested.newCap, 'newCap'), sel(EV.requested.reason, 'reason')], filter: where }] }),
+    run({ events: [{ eventName: EV.declined.sig, select: [sel(EV.declined.agent, 'agent')], filter: where }] }),
+    run({ events: [{ eventName: EV.revoked.sig, select: [sel(EV.revoked.agent, 'agent')], filter: where }] }),
+  ]);
+  const low = (a) => String(a ?? '').toLowerCase();
+  const count = (rows, agent) => rows.filter((r) => low(r.agent) === agent).length;
+  const agents = [...new Set([...grants, ...byAgent].map((r) => low(r.agent)))];
+  return {
+    agents: agents.map((a) => ({
+      agent: a,
+      spent: BigInt(byAgent.find((r) => low(r.agent) === a)?.total ?? 0),
+      payments: count(payments, a),
+      grantedCap: grants.find((r) => low(r.agent) === a)?.cap ?? null,
+      raisedTo: raises.find((r) => low(r.agent) === a)?.cap ?? null,
+      revoked: count(revokes, a) > 0,
+    })),
+    recipients: byRecipient.map((r) => ({ to: r.to, total: BigInt(r.total ?? 0) })),
+    approvals: {
+      requested: requests.length,
+      approved: raiseEvents.length,
+      declined: declines.length,
+      held: requests.filter((r) => String(r.reason ?? '').startsWith('Intercepta held')).length,
+      blocked: requests.filter((r) => String(r.reason ?? '').startsWith('Intercepta blocked')).length,
+    },
+  };
+}
+
+// ---- Saved queries: the protocol dashboard ------------------------------------------------
+// The same questions across every Kagi wallet, saved in the MultiBaas console under Event
+// Queries, so an operator can watch the protocol without writing any code.
+export const DASHBOARD = {
+  'kagi-spent-by-agent': { events: [{ eventName: EV.spent.sig, select: [sel(EV.spent.agent, 'agent'), sel(EV.spent.value, 'total_wei', 'add')], filter: onKagi() }], groupBy: 'agent', orderBy: 'total_wei', order: 'DESC' },
+  'kagi-spent-by-recipient': { events: [{ eventName: EV.spent.sig, select: [sel(EV.spent.to, 'recipient'), sel(EV.spent.value, 'total_wei', 'add')], filter: onKagi() }], groupBy: 'recipient', orderBy: 'total_wei', order: 'DESC' },
+  'kagi-limit-raises': { events: [{ eventName: EV.raised.sig, select: [sel(EV.raised.agent, 'agent'), sel(EV.raised.newCap, 'highest_cap_wei', 'max')], filter: onKagi() }], groupBy: 'agent' },
+  'kagi-limit-requests': { events: [{ eventName: EV.requested.sig, select: [sel(EV.requested.agent, 'agent'), sel(EV.requested.newCap, 'requested_cap_wei'), sel(EV.requested.reason, 'reason')], filter: onKagi() }] },
+};
+
+/** Create or update the dashboard's saved queries. Returns their labels. */
+export async function saveDashboard() {
+  for (const [label, query] of Object.entries(DASHBOARD)) await mb('PUT', `/queries/${label}`, query);
+  return Object.keys(DASHBOARD);
+}
+
+/** A saved query's current results. */
+export async function dashboardResults(label) {
+  return (await mb('GET', `/queries/${label}/results`))?.rows ?? [];
+}

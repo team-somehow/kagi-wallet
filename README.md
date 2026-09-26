@@ -235,9 +235,12 @@ Kagi is a policy-aware transaction agent: the contract enforces the spending lim
 
 The agent MCP's `get_activity` tool reads the wallet's history from the MultiBaas event index: every payment an agent sent, every higher limit it asked for and why, and whether the owner approved it (phone + Kagi Wallet), declined it or revoked the key. You can ask your AI *"what did my agent spend today, and who approved the raise?"* and get an answer drawn from indexed events, not guesses.
 
+On top of the raw history, **MultiBaas Event Queries** aggregate it: `get_spending_summary` (and the app's **Spending** screen, Home → Spending) show what each agent spent and in how many payments, the limit it was granted and raised to, the top recipients, and how many requests were approved, declined, or held or refused by Intercepta, all grouped and added up by MultiBaas. Four **saved queries** (`kagi-spent-by-agent`, `kagi-spent-by-recipient`, `kagi-limit-raises`, `kagi-limit-requests`) give operators a protocol-wide view in the MultiBaas console. The MultiBaas key stays on the agent server; the app asks the server for its own wallet's summary. Details and a diagram: [docs/curvegrid-multibaas.md](docs/curvegrid-multibaas.md).
+
 | What | Where |
 |---|---|
-| MultiBaas client: registers the `KagiAccount` ABI, links each wallet with event indexing, reads its events | [`agent-mcp/multibaas.mjs`](agent-mcp/multibaas.mjs) |
+| MultiBaas client: registers the `KagiAccount` ABI, links each wallet with event indexing, reads its events, runs the aggregated Event Queries and keeps the saved queries | [`agent-mcp/multibaas.mjs`](agent-mcp/multibaas.mjs) |
+| The Spending screen in the app | [`mobile/src/app/spending.tsx`](mobile/src/app/spending.tsx) |
 | The `get_activity` MCP tool and how it turns events into sentences | [`agent-mcp/server.mjs`](agent-mcp/server.mjs), `history()` and `get_activity` |
 
 Every user's phone deploys their own wallet, so wallets can't be linked in the MultiBaas console ahead of time. The first time a wallet asks for its history, the server registers the ABI (once per deployment), gives the address an alias and links it with `startingBlock`. After that, calls are just `GET /events?contract_address=…`.
