@@ -170,6 +170,10 @@ On-chain `eth_call` estimates:
 
 A BIP340 check through `ecrecover` plus one `modexp` call costs a few thousand gas, so a threshold-signed action costs about the same as an ordinary one.
 
-## 11. Summary
+## 11. See it on-chain
+
+A full run, from granting a key to a held payment released on the owner's Kagi Wallet, is linked transaction by transaction in the README's [On-chain](../README.md#on-chain) section: wallet [`0x397C…4492`](https://sepolia.etherscan.io/address/0x397C50b12730a4f75658DFEd8b8c61A49D174492) on Sepolia, [decoded on Blockscout](https://eth-sepolia.blockscout.com/address/0x397C50b12730a4f75658DFEd8b8c61A49D174492).
+
+## 12. Summary
 
 Kagi turns "trust the agent" into a number the chain enforces. The agent spends freely under that number; raising it takes the owner's hand on a physical device; and the key that can raise it never exists in one place.

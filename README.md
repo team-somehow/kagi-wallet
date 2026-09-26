@@ -119,6 +119,32 @@ IDEA.md      the full design, threat model and demo script
 | `execute` (ETH transfer) | ~54k |
 | `revoke` | ~46k |
 
+## On-chain
+
+Every Kagi wallet is its own `KagiAccount` contract. Open one on Etherscan and its **Transactions** tab shows who called what (the owner's phone for `grant` and `raiseLimit`, the agent's key for `spend` and `requestLimit`), **Internal Txns** shows the ETH it paid out, and **Events** shows the audit trail, including Intercepta's reason on a held payment. The contracts are verified on Sourcify, so [Blockscout](https://eth-sepolia.blockscout.com) shows every call and event by name.
+
+**The end-to-end run, step by step** (testnet wallet [`0x397C…4492`](https://sepolia.etherscan.io/address/0x397C50b12730a4f75658DFEd8b8c61A49D174492), [decoded on Blockscout](https://eth-sepolia.blockscout.com/address/0x397C50b12730a4f75658DFEd8b8c61A49D174492)):
+
+| Step | Who signed | Transaction |
+|---|---|---|
+| 1. The owner gives an agent a key (cap 0.000005 ETH) | phone + Kagi Wallet | [`grant`](https://sepolia.etherscan.io/tx/0x518582dc5475658a526655da95b51c92ead8878321ce2f33f623b90e2eec096c) |
+| 2. A clean recipient, paid within the cap | the agent | [`spend`](https://sepolia.etherscan.io/tx/0xe9bfeda3be364c75408d981e0265573d464c76373e7e8e78d334d74bf973b3b7) |
+| 3. Intercepta flags the next recipient: held, with the reason on-chain | the agent | [`requestLimit`](https://sepolia.etherscan.io/tx/0x20398a042365a500ec55ee10443751a6c58a417342dc004fce8a4d14cfa10904) |
+| 4. The owner approves on the phone and the Kagi Wallet | phone + Kagi Wallet | [`raiseLimit`](https://sepolia.etherscan.io/tx/0xcddf3b82e535c054e759a6ed67cb9521b2a3d0088c5810468fc98e858a65c9b9) |
+| 5. The held payment goes out | the agent | [`spend`](https://sepolia.etherscan.io/tx/0x3755a1a00dd86a67c99db04875dffc898ee3e067274879813b18ef834cce4d80) |
+
+The refused payment (Tornado Cash) never reaches the chain: nothing is signed.
+
+**Addresses**
+
+| | Testnet (Sepolia) | Ethereum mainnet |
+|---|---|---|
+| Demo wallet from the run above | [`0x397C50b12730a4f75658DFEd8b8c61A49D174492`](https://sepolia.etherscan.io/address/0x397C50b12730a4f75658DFEd8b8c61A49D174492) | not deployed yet |
+| The current phone's wallet | [`0xB34296ef5846D74d59df70e7f3CEbf0b650478d9`](https://sepolia.etherscan.io/address/0xB34296ef5846D74d59df70e7f3CEbf0b650478d9) | not deployed yet |
+| Gas sponsor (deploys testnet wallets, receives demo payments) | [`0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0`](https://sepolia.etherscan.io/address/0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0) | none: on mainnet the phone uses its own gas wallet |
+
+Each phone deploys its own wallet, so every user's address is different; the app's **Etherscan** button on Home opens yours.
+
 ## Getting started
 
 ### Prerequisites
