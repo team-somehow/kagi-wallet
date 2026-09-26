@@ -17,21 +17,23 @@ export function Hardware() {
     <section className="section" id="hardware">
       <div className="wrap">
         <div className="section-head">
-          <h2>Two signers for $43</h2>
-          <p>An off-the-shelf ESP32 device at $21.50. One on your wrist, one at home.</p>
+          <h2>Two sticks for $43</h2>
+          <p>An off-the-shelf ESP32 stick at $21.50. Start with one on your wrist. Add a second to the same wallet whenever you want a stronger boundary.</p>
         </div>
 
         <div className="hw">
           <div className="hw-visual panel">
             <div className="hw-pair">
               <div className="hw-unit">
-                <Device screen={{ kind: 'status', top: 'WRIST', big: 'Quiet', sub: 'agents under budget', meter: 0.42 }} />
+                <Device screen={{ kind: 'ring', top: 'ESP32 / WRIST', center: '58%', fill: 0.58, label: 'Remaining', big: '11 µETH', sub: '1 live key' }} />
                 <span className="hw-tag">$21.50</span>
+                <small className="hw-role">Wrist · BLE to your phone</small>
               </div>
               <span className="hw-plus" aria-hidden="true">+</span>
               <div className="hw-unit">
-                <Device variant="red" screen={{ kind: 'status', top: 'SECOND STICK', big: 'Ready', sub: 'approvals by infrared' }} />
+                <Device variant="red" screen={{ kind: 'ring', top: 'ESP32 / SECOND', center: '3', centerSub: 'of 3', fill: 1, label: 'Guarding', big: 'your wallet', sub: 'Signs only by IR' }} />
                 <span className="hw-tag">$21.50</span>
+                <small className="hw-role is-second">Second stick · infrared only</small>
               </div>
             </div>
             <ul className="hw-specs">
@@ -66,7 +68,7 @@ export function Hardware() {
               <div>{[0, 50, 100, 150, 200, 250].map((v) => <span key={v} style={{ left: `${(v / MAX) * 100}%` }}>${v}</span>)}</div>
             </div>
             <p className="fine">
-              Kagi buys both signers for less than one hardware wallet. Prices: <a href={DEVICE_URL} target="_blank" rel="noreferrer">device store</a>, <a href={PRICES_URL} target="_blank" rel="noreferrer">Coin Bureau, Jun 2026</a>. No secure element, so no device is ever trusted alone.
+              Kagi buys both sticks for less than one hardware wallet. Prices: <a href={DEVICE_URL} target="_blank" rel="noreferrer">device store</a>, <a href={PRICES_URL} target="_blank" rel="noreferrer">Coin Bureau, Jun 2026</a>. No secure element, so no device is ever trusted alone.
             </p>
           </figure>
         </div>

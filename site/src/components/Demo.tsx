@@ -14,8 +14,6 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import '@fontsource/manrope/400.css';
-import '@fontsource/ibm-plex-mono/400.css';
 import '../spatial-demo.css';
 
 type Phase =

@@ -10,8 +10,6 @@
     "deploy": "firebase deploy --only hosting:kagiwallet"
   },
   "dependencies": {
-    "@fontsource/ibm-plex-mono": "^5.3.0",
-    "@fontsource/manrope": "^5.3.0",
     "@fontsource/martian-mono": "^5.3.0",
     "@fontsource/schibsted-grotesk": "^5.3.0",
     "esp-web-tools": "^10.4.0",

@@ -75,7 +75,7 @@ export function GetKagi() {
               <svg viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="10" rx="2.5" /><rect x="6.5" y="9" width="8" height="6" rx="1" /><circle cx="17.5" cy="12" r="1.2" /></svg>
             </div>
             <h3>Firmware</h3>
-            <p>One build for the wrist and the vault. C++ on PlatformIO, open on GitHub.</p>
+            <p>One build for both sticks. Its saved role picks the blue wrist or red second-stick screens. C++ on PlatformIO, open on GitHub.</p>
             <div className="get-actions">
               <a className="btn btn-ghost" href={FIRMWARE_SRC_URL} target="_blank" rel="noreferrer">View source</a>
               <a className="btn btn-ghost" href={FIRMWARE.bin} download>Download .bin</a>
@@ -86,7 +86,7 @@ export function GetKagi() {
 
         <div className="flash panel" id="flash">
           <div className="flash-head">
-            <h3>Flash an ESP32 device</h3>
+            <h3>Flash an ESP32 stick</h3>
             {webSerial ? (
               <esp-web-install-button manifest={FIRMWARE.manifest}>
                 <button slot="activate" type="button" className="btn btn-primary">Flash from this browser</button>
@@ -101,11 +101,11 @@ export function GetKagi() {
           <ol className="steps">
             <li>
               <b>Plug it in</b>
-              <span>Connect the ESP32 device to your computer with a USB-C data cable.</span>
+              <span>Connect the ESP32 stick to your computer with a USB-C data cable.</span>
             </li>
             <li>
               <b>First time only: download mode</b>
-              <span>Hold the side button until the green LED flashes. After Kagi Wallet is on it, updates reset the device by themselves.</span>
+              <span>Hold the side button until the green LED flashes. After Kagi Wallet is on it, updates reset the stick by themselves.</span>
             </li>
             <li>
               <b>Flash</b>
@@ -113,14 +113,14 @@ export function GetKagi() {
             </li>
             <li>
               <b>Boot</b>
-              <span>Click the side button once. The screen shows Kagi and a pairing code.</span>
+              <span>Click the side button once. The screen shows Kagi and asks you to open the app.</span>
             </li>
             <li>
-              <b>Make the second one the vault</b>
-              <span>Flash a second device the same way, keep it plugged in, then set its role over the cable.</span>
+              <b>Optional: a second stick</b>
+              <span>Optional. Flash another stick the same way, keep it plugged in, then set its role over the cable. It turns red, then joins your wallet from the app.</span>
               <div className="step-action">
                 <button type="button" className="btn btn-ghost btn-sm" onClick={onVault} disabled={!webSerial || role === 'busy'}>
-                  {role === 'busy' ? 'Setting…' : role === 'done' ? 'Vault set' : 'Set as vault'}
+                  {role === 'busy' ? 'Setting…' : role === 'done' ? 'Second stick set' : 'Set as second stick'}
                 </button>
                 {role === 'error' && <em className="flash-warn">Couldn't write to the device. Check the cable and try again.</em>}
               </div>

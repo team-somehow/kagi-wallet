@@ -22,13 +22,13 @@ function Icon({ id }: { id: Who }) {
     case 'phone':
       return <svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></svg>;
     case 'wrist':
-      return <svg viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="10" rx="2.5" /><rect x="6.5" y="9" width="8" height="6" rx="1" /><circle cx="17.5" cy="12" r="1.2" /></svg>;
     case 'vault':
-      return <svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7" /><rect x="5.5" y="10" width="13" height="10" rx="1.5" /><path d="M9 15c1.5-2 4.5-2 6 0" /></svg>;
+      // Both sticks are the same ESP32: screen on the left, round A button on the right.
+      return <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2.5" /><rect x="5.5" y="9.2" width="9" height="5.6" rx="1" /><circle cx="17.8" cy="12" r="1.6" /></svg>;
   }
 }
 
-// The line that joins the devices that sign together. Wrist to vault is infrared, drawn dashed.
+// The line that joins the devices that sign together. Wrist to second stick is infrared, drawn dashed in blue.
 function Links({ signs, tone }: { signs: Who[]; tone: string }) {
   const idx = signs.map((s) => DEVICES.findIndex((d) => d.id === s)).sort();
   if (idx.length < 2) return null;

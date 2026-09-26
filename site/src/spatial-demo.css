@@ -10,8 +10,7 @@
   --kg-shadow: light-dark(#25293222, #00000077);
   --kg-depth: 18deg;
   font:
-    400 14px/1.5 'Manrope',
-    sans-serif;
+    400 14px/1.5 var(--sans);
   color: var(--kg-ink);
   width: 100%;
   isolation: isolate;
@@ -43,7 +42,7 @@
   font-weight: 400;
 }
 #kagi-studio .kg-mono {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
 #kagi-studio .kg-shell {
@@ -86,8 +85,7 @@
 }
 #kagi-studio .kg-network {
   font:
-    11px 'IBM Plex Mono',
-    monospace;
+    11px var(--mono);
   color: var(--kg-muted);
   display: flex;
   align-items: center;
@@ -137,8 +135,7 @@
 }
 #kagi-studio .kg-tabs b {
   font:
-    11px 'IBM Plex Mono',
-    monospace;
+    11px var(--mono);
   font-weight: 400;
   color: var(--kg-muted);
 }
@@ -155,8 +152,7 @@
 }
 #kagi-studio .kg-eyebrow {
   font:
-    11px 'IBM Plex Mono',
-    monospace;
+    11px var(--mono);
   letter-spacing: 1.4px;
   text-transform: uppercase;
   color: var(--kg-accent);
@@ -289,8 +285,7 @@
   bottom: 2.7%;
   left: 8%;
   font:
-    500 clamp(6px, 1.5cqw, 9px) 'IBM Plex Mono',
-    monospace;
+    500 clamp(6px, 1.5cqw, 9px) var(--mono);
   letter-spacing: 1px;
   color: #8b939f;
   opacity: 0.65;
@@ -318,7 +313,7 @@
   color: #bbe8ff;
   padding: 7% 8%;
   overflow: hidden;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--mono);
 }
 #kagi-studio .kg-lcd::after {
   content: '';
@@ -428,8 +423,7 @@
   right: 0;
   text-align: center;
   font:
-    10px 'IBM Plex Mono',
-    monospace;
+    10px var(--mono);
   color: var(--kg-muted);
   transform: rotateZ(12deg);
   white-space: nowrap;
@@ -462,8 +456,7 @@
 }
 #kagi-studio .kg-route-label {
   font:
-    10px 'IBM Plex Mono',
-    monospace;
+    10px var(--mono);
   fill: var(--kg-blue);
 }
 #kagi-studio .kg-ir-dot {
@@ -475,8 +468,7 @@
   left: 40%;
   top: 18%;
   font:
-    10px 'IBM Plex Mono',
-    monospace;
+    10px var(--mono);
   letter-spacing: 1px;
   color: var(--kg-blue);
   background: var(--kg-bg);
@@ -507,8 +499,7 @@
 }
 #kagi-studio .kg-decline {
   font:
-    12px 'IBM Plex Mono',
-    monospace;
+    12px var(--mono);
   border: 0;
   background: transparent;
   padding: 10px 14px;
@@ -552,8 +543,7 @@
   align-items: center;
   justify-content: space-between;
   font:
-    11px 'IBM Plex Mono',
-    monospace;
+    11px var(--mono);
   height: 19px;
   margin-bottom: 28px;
 }
@@ -634,8 +624,7 @@
 }
 #kagi-studio .kg-unit {
   font:
-    11px 'IBM Plex Mono',
-    monospace;
+    11px var(--mono);
   color: var(--kg-muted);
   margin-bottom: 18px;
 }
@@ -692,8 +681,7 @@
   border: 1px solid var(--kg-line);
   border-radius: 50%;
   font:
-    9px 'IBM Plex Mono',
-    monospace;
+    9px var(--mono);
   display: grid;
   place-items: center;
   font-style: normal;
@@ -799,8 +787,7 @@
 #kagi-studio .kg-bottom {
   padding: 10px 28px;
   font:
-    10px 'IBM Plex Mono',
-    monospace;
+    10px var(--mono);
   color: var(--kg-muted);
   display: flex;
   justify-content: space-between;

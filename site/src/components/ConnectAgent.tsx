@@ -64,7 +64,7 @@ const RUN: { who: 'you' | 'tool' | 'stick' | 'ai'; text: string; tone?: 'ok' | '
   { who: 'you', text: `Send 0.000002 ETH to ${SHORT}, then send 0.000008 ETH to the same address.` },
   { who: 'tool', text: `send_eth 0.000002 to ${SHORT}`, tone: 'ok' },
   { who: 'tool', text: `send_eth 0.000008 to ${SHORT}: over the allowance, asks for 0.00002 in total`, tone: 'wait' },
-  { who: 'stick', text: 'Beeps. Raise trader’s total to 0.00002 ETH? Hold A.' },
+  { who: 'stick', text: 'Unlock the phone. Wrist shows Raise Agent’s total, 5 → 20 µETH. Hold A.' },
   { who: 'tool', text: 'wait_for_approval: approved, 0.000008 sent', tone: 'ok' },
   { who: 'ai', text: 'Both sent. 0.00001 ETH of the 0.00002 allowance is left.' },
 ];
@@ -110,26 +110,26 @@ export function ConnectAgent() {
             <span>In the Kagi app, tap New agent key. Pick a total allowance and an expiry, then hold A on the stick.</span>
           </li>
           <li>
-            <b>Copy its connector link</b>
-            <span>Tap Copy connector link. It points at the shared Kagi server and carries this key, so keep it private.</span>
+            <b>Copy the session key</b>
+            <span>Tap Copy session key. It can spend only the approved allowance until it expires, so keep it private. Copy connector link does the same as a URL.</span>
           </li>
           <li>
             <b>Add it to your AI</b>
-            <span>Paste the link below and pick your app. Or skip the first two steps and try the demo wallet that is already there.</span>
+            <span>Paste it below and pick your app. To just try Kagi, keep the demo link that is already there.</span>
           </li>
         </ol>
 
         <div className="connect">
           <div className="connect-setup panel">
             <label className="connect-field">
-              <span>Connector link</span>
+              <span>Session key or connector link</span>
               <input
                 type="text"
                 inputMode="url"
                 autoComplete="off"
                 autoCapitalize="off"
                 spellCheck={false}
-                placeholder={`${MCP_URL}/k/…`}
+                placeholder={`kagi:0x…:0x…  or  ${MCP_URL}/k/…`}
                 value={raw}
                 onChange={(e) => {
                   setRaw(e.target.value);
@@ -140,7 +140,7 @@ export function ConnectAgent() {
               />
               <small className={invalid ? 'is-bad' : ''}>
                 {invalid
-                  ? 'That is not a connector link. Copy it again from the Kagi app.'
+                  ? 'That is not a Kagi session key or connector link. Copy it again from the Kagi app.'
                   : isDemo
                     ? 'This is the public demo link. To use your own wallet, paste your link from the Kagi app here, or give your AI your session key in the chat and it switches over.'
                     : 'Your own wallet. The link stays on this page. Nothing here is sent anywhere.'}
