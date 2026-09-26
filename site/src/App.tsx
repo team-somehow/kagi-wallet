@@ -20,11 +20,11 @@ export function App() {
             <img src="./logo.png" alt="Kagi Wallet" width="81" height="34" />
           </a>
           <div className="nav-links">
-            <a href="#video">Video</a>
             <a href="#demo">Demo</a>
             <a href="#how">How it works</a>
             <a href="#hardware">Hardware</a>
             <a href="#connect">Connect AI</a>
+            <a href="#video">Video</a>
             <a href="#sources">Sources</a>
             <a href={REPO_URL} target="_blank" rel="noreferrer">GitHub</a>
             <a className="btn btn-primary btn-sm" href="#get">Download</a>
@@ -34,7 +34,6 @@ export function App() {
 
       <main>
         <div className="wrap"><Hero /></div>
-        <VideoDemo />
         <Demo />
         <Losses />
         <KeyStats />
@@ -44,6 +43,7 @@ export function App() {
         <GetKagi />
         <ConnectAgent />
         <Partners />
+        <VideoDemo />
 
         <section className="section" id="sources">
           <div className="wrap">
