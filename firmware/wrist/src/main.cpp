@@ -4,7 +4,8 @@
 // Over WiFi the wrist dials out to the hub (it never listens). USB serial still works as
 // a fallback. The wrist never initiates anything except a revoke and status reports.
 //
-// Buttons: A (front) approves, B (side) rejects. Hold B for 2 seconds to revoke every key.
+// One button, on G10: hold to approve, tap to say no. On the wrist's home screen, hold for 3 seconds
+// to revoke every key. (The built-in A and B keys still work where a stick has them.)
 
 #include <Arduino.h>
 #include <algorithm>
@@ -32,7 +33,7 @@
 #include "secrets.example.h"
 #endif
 
-static const char* FW = "0.4.2";
+static const char* FW = "0.5.0";
 
 // ---- look -----------------------------------------------------------------
 
@@ -85,7 +86,12 @@ static void pollButtons() {
     was = btnA.isPressed();
     Serial.printf("{\"t\":\"btn\",\"a\":%d,\"g10\":%d,\"builtin\":%d}\n", was, g10, M5.BtnA.isPressed());
   }
+  if (btnA.wasClicked()) Serial.printf("{\"t\":\"btn_tap\"}\n");
 }
+// "No": a tap of the one button (released within half a second, so it can never be the end of
+// a hold to approve), or the built-in B key on a stick that has one.
+static bool revokeHeld = false;  // one revoke per hold of the button, however long it lasts
+static bool tapped() { return btnA.wasClicked() || M5.BtnB.wasPressed(); }
 
 static uint32_t resultUntil = 0;
 static uint32_t lastPhone = 0;
@@ -530,11 +536,11 @@ static void drawIdle() {
 static void drawPairHold() {
   title("Pair with this phone?", C_TEXT);
   holdRing(A_ON_RIGHT ? 48 : W - 48, 74, 30);
-  arrowsToA(74, "Hold A");
+  arrowsToA(74, "Hold");
   canvas.setFont(&fonts::FreeSans9pt7b);
   canvas.setTextDatum(bottom_left);
   canvas.setTextColor(C_FAINT);
-  canvas.drawString(paired ? "Replaces this stick's wallet" : "B to cancel", 10, H - 6);
+  canvas.drawString(paired ? "Replaces this stick's wallet" : "Tap to cancel", 10, H - 6);
 }
 
 // Phone on the left, stick on the right, a chain of dots running between them.
@@ -636,7 +642,7 @@ static void drawPrompt() {
     canvas.setFont(&fonts::Font0);
     canvas.setTextDatum(middle_left);
     canvas.setTextColor(C_FAINT);
-    if (A_ON_RIGHT) canvas.drawString("B: no", 14, 109);
+    if (A_ON_RIGHT) canvas.drawString("Tap: no", 14, 109);
   }
 }
 
@@ -756,8 +762,8 @@ static void draw() {
     case Mode::Prompt: drawPrompt(); break;
     case Mode::Result: drawResult(); break;
     case Mode::Revoked: drawRevoked(); break;
-    case Mode::ConfirmWipe: drawConfirm("Erase this stick?", "The wallet here can't sign again.", "Hold A"); break;
-    case Mode::ConfirmWifi: drawConfirm("Join network?", pendingNet.ssid.substring(0, 24), "Hold A"); break;
+    case Mode::ConfirmWipe: drawConfirm("Erase this stick?", "The wallet here can't sign again.", "Hold"); break;
+    case Mode::ConfirmWifi: drawConfirm("Join network?", pendingNet.ssid.substring(0, 24), "Hold"); break;
     case Mode::Beam: drawBeam(); break;
   }
   canvas.pushSprite(0, 0);
@@ -1397,26 +1403,26 @@ static void describeRoot(char type, const uint8_t* c, Prompt& p) {
     p.title = isVault ? "VAULT: send" : "ROOT send";
     p.amount = eth;
     p.line1 = "to " + shortHex(hex(c + 28, 20), 4, 4);
-    p.line2 = isVault ? "A: sign as vault  B: no" : "from the root treasury";
+    p.line2 = isVault ? "Hold: sign  Tap: no" : "from the root treasury";
     return;
   }
   if (type == 'A') {
     p.title = isVault ? "2nd stick: new key" : "New agent key";
     p.amount = ethStr(u128(c + 48) / 1e18);
     p.line1 = "total allowance, key " + shortHex(hex(c + 28, 20), 4, 4);
-    p.line2 = isVault ? "A: sign  B: no" : "then the second stick";
+    p.line2 = isVault ? "Hold: sign  Tap: no" : "then the second stick";
     return;
   }
   if (type == 'L') {
     p.title = isVault ? "2nd stick: raise" : "Raise the total";
     p.amount = ethStr(u128(c + 64) / 1e18);
     p.line1 = "was " + ethStr(u128(c + 48) / 1e18) + ", key " + shortHex(hex(c + 28, 20), 4, 4);
-    p.line2 = isVault ? "A: sign  B: no" : "then the second stick";
+    p.line2 = isVault ? "Hold: sign  Tap: no" : "then the second stick";
     return;
   }
   p.amount = ethStr(u128(c + 48) / 1e18);
   p.line1 = "raise cap, agent " + shortHex(hex(c + 28, 20), 4, 4);
-  p.line2 = isVault ? "A: sign as vault  B: no" : "needs the vault next";
+  p.line2 = isVault ? "Hold: sign  Tap: no" : "needs the vault next";
 }
 
 static void showPrompt(Prompt& p) {
@@ -1819,7 +1825,7 @@ static void drawVault() {
     canvas.setTextDatum(middle_center);
     canvas.setTextColor(hp > 0 ? C_ACCENT : C_TEXT);
     canvas.drawString("A", rx, ry + 1);
-    arrowsToA(56, "Hold A");
+    arrowsToA(56, "Hold");
     canvas.setFont(&fonts::FreeSans9pt7b);
     canvas.setTextDatum(top_left);
     canvas.setTextColor(C_MUTED);
@@ -2666,6 +2672,7 @@ void loop() {
   }
 
   // Buttons.
+  if (!btnA.isPressed() && !M5.BtnB.isPressed()) revokeHeld = false;
   if (mode == Mode::ConfirmWifi) {
     if (heldA()) {
       // Replace a network with the same name, otherwise add it, dropping the oldest if full.
@@ -2687,7 +2694,7 @@ void loop() {
       send(d);
       showResult("Saved " + pendingNet.ssid.substring(0, 14), C_TEXT);
       if (!tcpUp()) wifiRestart();
-    } else if (M5.BtnB.wasPressed()) {
+    } else if (tapped()) {
       JsonDocument d;
       d["t"] = "wifi_add_reject";
       d["reason"] = "user";
@@ -2701,7 +2708,7 @@ void loop() {
       mode = Mode::Unpaired;
       showResult("Shard erased", C_MUTED);
       sendHello();
-    } else if (M5.BtnB.wasPressed()) {
+    } else if (tapped()) {
       mode = restingMode();
       dirty = true;
     }
@@ -2713,7 +2720,7 @@ void loop() {
       d["t"] = "pair_ok";
       send(d);
       dirty = true;
-    } else if (M5.BtnB.wasPressed()) {
+    } else if (tapped()) {
       JsonDocument d;
       d["t"] = "pair_reject";
       send(d);
@@ -2723,7 +2730,7 @@ void loop() {
   } else if (mode == Mode::Prompt) {
     if (heldA()) {
       approvePrompt();
-    } else if (M5.BtnB.wasPressed()) {
+    } else if (tapped()) {
       if (prompt.kind == "vault_sign") vaultReject();
       else {
         reject(prompt.id, "user");
@@ -2733,9 +2740,11 @@ void loop() {
       reject(prompt.id, "timeout");
       showResult("Timed out", C_MUTED);
     }
-  } else if ((mode == Mode::Home || mode == Mode::Revoked) && paired && M5.BtnB.pressedFor(2000)) {
+  } else if ((mode == Mode::Home || mode == Mode::Revoked) && paired &&
+             (M5.BtnB.pressedFor(2000) || (!isVault && btnA.pressedFor(3000)))) {
     static uint32_t lastRevoke = 0;
-    if (millis() - lastRevoke > 3000) {
+    if (!revokeHeld && millis() - lastRevoke > 3000) {
+      revokeHeld = true;
       lastRevoke = millis();
       JsonDocument d;
       d["t"] = "revoke_all";
