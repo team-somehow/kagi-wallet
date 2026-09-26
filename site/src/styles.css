@@ -417,7 +417,7 @@ p { margin: 0; }
 .connect-try span { color: var(--faint); font-size: 13px; }
 .connect-try q { font-size: 17px; quotes: none; color: var(--text); }
 .connect-note { color: var(--faint); font-size: 14px; line-height: 1.5; max-width: 60ch; }
-.connect-run { padding: 24px; display: grid; align-content: start; gap: 2px; font-size: 14px; }
+.connect-run { padding: 24px; display: grid; align-content: start; align-self: start; gap: 2px; font-size: 14px; }
 .run-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .run-row:last-child { border-bottom: 0; }
 .run-who { color: var(--faint); font-size: 12px; padding-top: 2px; }
