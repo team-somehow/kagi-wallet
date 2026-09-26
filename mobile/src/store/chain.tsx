@@ -1,5 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { router, useRootNavigationState } from 'expo-router';
+import * as bg from '../../modules/kagi-background';
 import { link } from '../lib/link';
 import { buzz } from '../lib/haptics';
 import * as evm from '../lib/evm';
@@ -82,6 +84,9 @@ export const fmtEth = (wei: bigint) => {
   const s = (Number(wei) / 1e18).toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
   return `${s} ETH`;
 };
+
+// A stable notification id per request, from its transaction hash.
+const alertId = (hash: string) => parseInt(hash.slice(2, 9), 16);
 
 // A request nobody answered lapses after about ten minutes of blocks; the old limit stands.
 const REQUEST_BLOCKS = 50n;
@@ -212,13 +217,23 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
     setLocal((m) => ({ ...m, [id]: { ...m[id], ...patch } }));
   }, []);
 
-  // A new request the owner hasn't seen: buzz and bring the approval screen up, like a push.
+  // A new request the owner hasn't seen: in the app, bring the approval screen up; in another
+  // app, a heads-up notification that opens it. The fingerprint needs the app in front.
   useEffect(() => {
     for (const r of Object.values(limits)) {
-      if (r.status !== 'waiting' || opened.current.has(r.id)) continue;
+      const nid = alertId(r.id);
+      if (r.status !== 'waiting') {
+        bg.clearAlert(nid);
+        continue;
+      }
+      if (opened.current.has(r.id)) continue;
       opened.current.add(r.id);
       void buzz();
-      if (navRef.current) router.push(`/limit/${r.id}`);
+      if (AppState.currentState === 'active' && navRef.current) {
+        router.push(`/limit/${r.id}`);
+      } else {
+        bg.alert(nid, `${r.name} asks for a higher limit`, `Raise its total from ${fmtEth(r.oldCap)} to ${fmtEth(r.newCap)}. Tap to approve with your fingerprint and your stick.`, `kagi://limit/${r.id}`);
+      }
     }
   }, [limits]);
 

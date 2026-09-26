@@ -14,6 +14,7 @@ import { ChainProvider } from '../store/chain';
 import { colors } from '../theme';
 import { buzz } from '../lib/haptics';
 import { WristBridge } from '../components/WristBridge';
+import { BackgroundKeeper } from '../components/BackgroundKeeper';
 import { AUTOTEST } from '../lib/biometrics';
 import { View } from 'react-native';
 import { Txt } from '../components/Txt';
@@ -90,6 +91,7 @@ export default function RootLayout() {
         {AUTOTEST ? <AutotestBanner /> : null}
         <IncomingWatcher />
         <WristBridge />
+        <BackgroundKeeper />
       </ThemeProvider>
       </ChainProvider>
     </StoreProvider>

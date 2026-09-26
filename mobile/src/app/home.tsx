@@ -185,36 +185,25 @@ export default function Home() {
         </View>
       ) : null}
 
-      {info ? (
-        <View style={styles.section}>
-          <Txt size={15} weight="medium" color={colors.muted}>
-            Gas wallet
+      {/* The gas wallet stays out of sight until it can no longer pay for what you do next. */}
+      {info && info.gasBalance < LOW_GAS ? (
+        <View style={[styles.card, styles.gasLow]}>
+          <Txt size={17} weight="medium">
+            {info.gasBalance === 0n ? 'Out of gas' : 'Gas running low'}
           </Txt>
-          <View style={styles.card}>
-            <View style={styles.row}>
-              <Txt mono size={15} color={info.gasBalance < LOW_GAS ? colors.amber : colors.text}>
-                {fmtEth(info.gasBalance)}
-              </Txt>
-              <Pressable
-                hitSlop={8}
-                onPress={() => {
-                  void Clipboard.setStringAsync(info.gasAddress).then(() => {
-                    setGasCopied(true);
-                    setTimeout(() => setGasCopied(false), 2500);
-                  });
-                }}
-              >
-                <Txt mono size={13} color={colors.muted}>
-                  {gasCopied ? 'Copied' : shortAddr(info.gasAddress)}
-                </Txt>
-              </Pressable>
-            </View>
-            <Txt size={13} color={info.gasBalance < LOW_GAS ? colors.amber : colors.faint}>
-              {info.gasBalance < LOW_GAS
-                ? 'Running low. Send Sepolia ETH to this address, or the phone cannot grant, revoke or decide limits.'
-                : 'Pays the phone’s Sepolia fees. It has no power over your wallet.'}
-            </Txt>
-          </View>
+          <Txt size={14} color={colors.muted} lineHeight={20}>
+            The phone pays its Sepolia fees from a gas wallet with {fmtEth(info.gasBalance)} left. Send it a little Sepolia ETH, or the phone cannot grant, revoke or decide limits.
+          </Txt>
+          <Button
+            label={gasCopied ? 'Copied' : `Copy ${shortAddr(info.gasAddress)}`}
+            variant="secondary"
+            onPress={() => {
+              void Clipboard.setStringAsync(info.gasAddress).then(() => {
+                setGasCopied(true);
+                setTimeout(() => setGasCopied(false), 2500);
+              });
+            }}
+          />
         </View>
       ) : null}
 
@@ -302,6 +291,7 @@ const styles = StyleSheet.create({
   request: { marginTop: space.l, padding: space.m, gap: 4, borderRadius: radius.m, backgroundColor: colors.panel, borderLeftWidth: 3, borderLeftColor: colors.amber },
   section: { marginTop: space.xl, gap: space.s },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  gasLow: { marginTop: space.l, borderLeftWidth: 3, borderLeftColor: colors.amber },
   card: { backgroundColor: colors.panel, borderRadius: radius.m, padding: space.m, gap: space.s },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   act: { paddingVertical: space.s, borderBottomWidth: 1, borderBottomColor: colors.line, gap: 2 },
