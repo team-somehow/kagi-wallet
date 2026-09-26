@@ -137,11 +137,14 @@ The refused payment (Tornado Cash) never reaches the chain: nothing is signed.
 
 **Addresses**
 
+The mainnet wallet is live on Ethereum mainnet and verified on Sourcify.
+
 | | Testnet (Sepolia) | Ethereum mainnet |
 |---|---|---|
-| Demo wallet from the run above | [`0x397C50b12730a4f75658DFEd8b8c61A49D174492`](https://sepolia.etherscan.io/address/0x397C50b12730a4f75658DFEd8b8c61A49D174492) | not deployed yet |
-| The current phone's wallet | [`0xB34296ef5846D74d59df70e7f3CEbf0b650478d9`](https://sepolia.etherscan.io/address/0xB34296ef5846D74d59df70e7f3CEbf0b650478d9) | not deployed yet |
-| Gas sponsor (deploys testnet wallets, receives demo payments) | [`0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0`](https://sepolia.etherscan.io/address/0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0) | none: on mainnet the phone uses its own gas wallet |
+| Demo wallet from the run above | [`0x397C50b12730a4f75658DFEd8b8c61A49D174492`](https://sepolia.etherscan.io/address/0x397C50b12730a4f75658DFEd8b8c61A49D174492) | none |
+| **The owner's wallet** (same key shares on both networks) | [`0xcC07e8B413ab4b2fe63f8a9CC7576EaCD2414b7b`](https://sepolia.etherscan.io/address/0xcC07e8B413ab4b2fe63f8a9CC7576EaCD2414b7b) | [`0xc20bE65912f5E45d6B5Fc7c32C0a55e122Ee16D5`](https://etherscan.io/address/0xc20bE65912f5E45d6B5Fc7c32C0a55e122Ee16D5) ([decoded](https://eth.blockscout.com/address/0xc20bE65912f5E45d6B5Fc7c32C0a55e122Ee16D5)) |
+| Deploy transaction | none | [`0xb271bc94…b499`](https://etherscan.io/tx/0xb271bc94e41e1a5d2ef55a10d249a43c39adf884577113590a63af905e95b499) |
+| Gas wallet (pays fees, deploys wallets) | [`0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0`](https://sepolia.etherscan.io/address/0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0), the shared testnet sponsor | [`0xA0Ae08CEA829283Ea1c4f9AdA4092936626Ee7c1`](https://etherscan.io/address/0xA0Ae08CEA829283Ea1c4f9AdA4092936626Ee7c1), the phone's own |
 
 Each phone deploys its own wallet, so every user's address is different; the app's **Etherscan** button on Home opens yours.
 

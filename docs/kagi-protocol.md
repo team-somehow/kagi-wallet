@@ -174,6 +174,8 @@ A BIP340 check through `ecrecover` plus one `modexp` call costs a few thousand g
 
 A full run, from granting a key to a held payment released on the owner's Kagi Wallet, is linked transaction by transaction in the README's [On-chain](../README.md#on-chain) section: wallet [`0x397C…4492`](https://sepolia.etherscan.io/address/0x397C50b12730a4f75658DFEd8b8c61A49D174492) on Sepolia, [decoded on Blockscout](https://eth-sepolia.blockscout.com/address/0x397C50b12730a4f75658DFEd8b8c61A49D174492).
 
+On Ethereum mainnet, the owner's wallet is [`0xc20b…16D5`](https://etherscan.io/address/0xc20bE65912f5E45d6B5Fc7c32C0a55e122Ee16D5) ([decoded on Blockscout](https://eth.blockscout.com/address/0xc20bE65912f5E45d6B5Fc7c32C0a55e122Ee16D5)), deployed by the phone's own gas wallet in [`0xb271bc94…`](https://etherscan.io/tx/0xb271bc94e41e1a5d2ef55a10d249a43c39adf884577113590a63af905e95b499).
+
 ## 12. Summary
 
 Kagi turns "trust the agent" into a number the chain enforces. The agent spends freely under that number; raising it takes the owner's hand on a physical device; and the key that can raise it never exists in one place.
