@@ -25,13 +25,13 @@ export function Hardware() {
           <div className="hw-visual panel">
             <div className="hw-pair">
               <div className="hw-unit">
-                <Device screen={{ kind: 'ring', top: 'ESP32 / WRIST', center: '58%', fill: 0.58, label: 'Remaining', big: '11 µETH', sub: '1 live key' }} />
+                <Device screen={{ kind: 'home', line: '11 µETH left, 1 key' }} />
                 <span className="hw-tag">$21.50</span>
                 <small className="hw-role">Wrist · BLE to your phone</small>
               </div>
               <span className="hw-plus" aria-hidden="true">+</span>
               <div className="hw-unit">
-                <Device variant="red" screen={{ kind: 'ring', top: 'ESP32 / SECOND', center: '3', centerSub: 'of 3', fill: 1, label: 'Guarding', big: 'your wallet', sub: 'Signs only by IR' }} />
+                <Device variant="red" screen={{ kind: 'home', line: 'Signs by infrared' }} />
                 <span className="hw-tag">$21.50</span>
                 <small className="hw-role is-second">Second stick · infrared only</small>
               </div>

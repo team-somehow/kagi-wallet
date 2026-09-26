@@ -59,7 +59,7 @@ export function Hero() {
         <motion.div className="stage-3d" style={{ rotateX: reduce ? 20 : rx, rotateY: reduce ? -16 : ry }}>
           <Device
             className="hero-second" variant="red"
-            screen={{ kind: 'ring', top: 'ESP32 / SECOND', center: '3', centerSub: 'of 3', fill: 1, label: 'Guarding', big: 'your wallet', sub: 'Signs only by IR' }}
+            screen={{ kind: 'home', line: 'Signs by infrared' }}
           />
           <svg className="ir-beam" viewBox="0 0 100 120" preserveAspectRatio="none" aria-hidden="true">
             <path d="M70 116 C 40 80, 30 40, 60 4" />

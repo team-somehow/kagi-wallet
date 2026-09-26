@@ -7,8 +7,8 @@ export type Variant = 'blue' | 'red';
 export type Screen =
   | { kind: 'prompt'; title: string; amount: string; line1: string; line2?: string; hold: number }
   | { kind: 'status'; top: string; big: string; sub: string; tone?: 'ok' | 'stop' }
-  // The home screens: a ring on the left, three lines on the right.
-  | { kind: 'ring'; top: string; center: string; centerSub?: string; fill: number; label: string; big: string; sub: string };
+  // The home screen (firmware 0.6.0): the 鍵 | Kagi Wallet lockup and one line of state.
+  | { kind: 'home'; line: string; tone?: 'hot' | 'quiet' };
 
 const THEME: Record<Variant, { top: string; bottom: string; edge: string; accent: string; panel: string; cell: string }> = {
   blue: { top: '#e2eaf2', bottom: '#ecf0f4', edge: '#b6cadc', accent: '#1c6296', panel: '#e4eef7', cell: '#ccdeee' },
@@ -19,24 +19,13 @@ const F = 'Helvetica Neue, Helvetica, Arial, sans-serif';
 
 function Lcd({ screen, v }: { screen: Screen; v: Variant }) {
   const t = THEME[v];
-  if (screen.kind === 'ring') {
-    const r = 36;
-    const circ = 2 * Math.PI * r;
+  if (screen.kind === 'home') {
+    // The lockup image is the firmware's lockup.h at 3x, placed where drawLockupHome puts it.
+    const tone = screen.tone === 'hot' ? t.accent : screen.tone === 'quiet' ? C.faint : C.muted;
     return (
       <>
-        <text x="10" y="21" fill={t.accent} fontSize="13" fontWeight="700" fontFamily={F}>{screen.top}</text>
-        <circle cx="54" cy="76" r="40" fill={t.panel} />
-        <circle cx="52" cy="72" r="40" fill={t.panel} stroke={t.cell} strokeWidth="1.5" />
-        <circle cx="52" cy="72" r="33" fill="none" stroke={t.cell} strokeWidth="1" />
-        <circle
-          cx="52" cy="72" r={r} fill="none" stroke={screen.fill >= 1 ? t.accent : C.text} strokeWidth="8"
-          strokeDasharray={circ} strokeDashoffset={circ * (1 - screen.fill)} transform="rotate(-90 52 72)"
-        />
-        <text x="52" y={screen.centerSub ? 74 : 77} fill={C.text} fontSize={screen.centerSub ? 22 : 14} fontWeight="700" textAnchor="middle" fontFamily={F}>{screen.center}</text>
-        {screen.centerSub && <text x="52" y="89" fill={C.muted} fontSize="9" textAnchor="middle" fontFamily={F}>{screen.centerSub}</text>}
-        <text x="106" y="52" fill={C.muted} fontSize="13" fontFamily={F}>{screen.label}</text>
-        <text x="106" y="76" fill={C.text} fontSize="18" fontWeight="700" fontFamily={F}>{screen.big}</text>
-        <text x="106" y="104" fill={C.faint} fontSize="13" fontFamily={F}>{screen.sub}</text>
+        <image href="/lockup.png" x="18" y="30" width="204" height="64.7" />
+        <text x="120" y="118" fill={tone} fontSize="13" textAnchor="middle" fontFamily={F}>{screen.line}</text>
       </>
     );
   }
@@ -113,6 +102,6 @@ export function Device({
 
 function describe(s: Screen) {
   if (s.kind === 'prompt') return `${s.title}: ${s.amount}, ${s.line1}. Hold the button to approve, tap it to decline.`;
-  if (s.kind === 'ring') return `${s.top}: ${s.center}${s.centerSub ? ` ${s.centerSub}` : ''}. ${s.label} ${s.big}. ${s.sub}`;
+  if (s.kind === 'home') return `Kagi Wallet. ${s.line}`;
   return `${s.top}: ${s.big}. ${s.sub}`;
 }
