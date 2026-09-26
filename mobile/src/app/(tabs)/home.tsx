@@ -264,8 +264,11 @@ export default function Home() {
           <Txt size={14} color={colors.muted} lineHeight={20}>
             The phone pays its gas fees from a gas wallet with {fmtEth(info.gasBalance)} left. Send it a little {evm.network === 'mainnet' ? 'ETH' : 'test ETH'}, or the phone cannot grant, revoke or decide limits.
           </Txt>
+          <Txt mono size={13} lineHeight={20} selectable>
+            {info.gasAddress}
+          </Txt>
           <Button
-            label={gasCopied ? 'Copied' : `Copy ${shortAddr(info.gasAddress)}`}
+            label={gasCopied ? 'Copied' : 'Copy gas wallet address'}
             variant="secondary"
             onPress={() => {
               void Clipboard.setStringAsync(info.gasAddress).then(() => {
