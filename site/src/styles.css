@@ -502,3 +502,13 @@ p { margin: 0; }
   .tx { animation: none; }
   .lcd-hold, .ir-beam path, .device-a.is-ready, .is-buzzing, .chain-log.tone-human .chain-dot { animation: none; }
 }
+
+/* StickS3 has a blue pill-shaped approval button. */
+.device-a {width: 8%; height: 58%; aspect-ratio: auto; border-radius: 999px; background: linear-gradient(90deg,#0264a4,#19a5ed,#0878bc); color: transparent; }
+.device-a.is-pressed {background: #19a5ed; box-shadow: 0 0 26px #19a5ed55;}
+
+/* Generic ESP32 visual identity: two bodies, one consistent round control. */
+.device-blue .device-face {background:linear-gradient(135deg,#508bc2,#23527e 40%,#142d4a)}
+.device-red .device-face {background:linear-gradient(135deg,#c26469,#7c2938 40%,#401922)}
+.device-a {width:12%; height:auto; aspect-ratio:1; border-radius:50%; background:linear-gradient(120deg,#94ceef,#307eb9)}
+.device-red .device-a {background:linear-gradient(120deg,#f0bcc0,#c65f6b)}

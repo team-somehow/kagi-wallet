@@ -1,273 +1,575 @@
-import { motion, useInView, useReducedMotion } from 'motion/react';
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Device, type Screen } from './Device';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  BatteryFull,
+  Check,
+  Fingerprint,
+  KeyRound,
+  Pause,
+  Plus,
+  Radio,
+  ShieldCheck,
+  Sparkles,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import '@fontsource/manrope/400.css';
+import '@fontsource/ibm-plex-mono/400.css';
+import '../spatial-demo.css';
 
-type Phase = 'idle' | 'running' | 'blocked' | 'asking' | 'approved' | 'declined' | 'revoked';
-type Tx = { what: string; amt: number; state: 'sent' | 'blocked' | 'approved' };
-
-const PLAN = [
-  { what: 'Search API credits', amt: 40 },
-  { what: 'Scrape a dataset', amt: 120 },
-  { what: 'One GPU hour', amt: 85 },
-  { what: 'Translation API', amt: 60 },
-  { what: 'Dataset license', amt: 280 },
-];
-const CAP = 500;
-const RAISED = 750;
-const SCALE = 800; // gauge full scale, in dollars
-const HOLD_MS = 1200;
-
-// ---- gauge geometry: a 240 degree arc, 0 at lower left, 1 at lower right ----
-const CX = 150, CY = 150, R = 112;
-const pt = (t: number, r = R) => {
-  const a = ((150 + 240 * t) * Math.PI) / 180;
-  return [CX + r * Math.cos(a), CY + r * Math.sin(a)] as const;
+type Phase =
+  | 'request'
+  | 'unlocked'
+  | 'ir-out'
+  | 'second'
+  | 'ir-back'
+  | 'confirming'
+  | 'done'
+  | 'declined'
+  | 'join'
+  | 'joining'
+  | 'joined';
+const after: Partial<Record<Phase, Phase>> = {
+  'ir-out': 'second',
+  'ir-back': 'confirming',
+  confirming: 'done',
+  joining: 'joined',
 };
-const arc = (t0: number, t1: number, r = R) => {
-  const [x0, y0] = pt(t0, r);
-  const [x1, y1] = pt(t1, r);
-  return `M ${x0} ${y0} A ${r} ${r} 0 ${(t1 - t0) * 240 > 180 ? 1 : 0} 1 ${x1} ${y1}`;
+const labels: Record<Phase, string> = {
+  request: 'Unlock phone',
+  unlocked: 'Hold A on your wrist',
+  'ir-out': 'Sending by infrared',
+  second: 'Hold A on second stick',
+  'ir-back': 'Returning signature',
+  confirming: 'Confirming on Sepolia',
+  done: 'Add a second stick',
+  declined: 'Try approving instead',
+  join: 'Join second stick',
+  joining: 'Joining devices',
+  joined: 'Try the IR approval',
 };
-
-function Gauge({ spent, cap, ghost, phase }: { spent: number; cap: number; ghost: number; phase: Phase }) {
-  const reduce = useReducedMotion();
-  const t = (v: number) => Math.min(1, v / SCALE);
-  const [mx0, my0] = pt(t(cap), R - 22);
-  const [mx1, my1] = pt(t(cap), R + 16);
-  const [lx, ly] = pt(t(cap), R + 34);
-  const stop = phase === 'revoked';
-  return (
-    <svg className="gauge" viewBox="0 0 300 250" role="img" aria-label={`Spent $${spent} of a $${cap} cap`}>
-      <defs>
-        <linearGradient id="g-fill" x1="0" x2="1">
-          <stop offset="0" stopColor="#8e939b" />
-          <stop offset="1" stopColor="#ece9e1" />
-        </linearGradient>
-        <filter id="g-glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="6" />
-        </filter>
-      </defs>
-      <path d={arc(0, 1)} className="g-track" />
-      {[0, 0.25, 0.5, 0.75, 1].map((k) => {
-        const [a, b] = pt(k, R - 16);
-        const [c, d] = pt(k, R - 10);
-        return <line key={k} x1={a} y1={b} x2={c} y2={d} className="g-tick" />;
-      })}
-      {ghost > spent && (
-        <path d={arc(t(spent), t(ghost))} className="g-ghost" />
-      )}
-      <path
-        d={arc(0, Math.max(0.001, t(spent)))}
-        className={`g-fill ${stop ? 'is-stop' : ''}`}
-        stroke="url(#g-fill)"
-        style={reduce ? undefined : { transition: 'd 0.6s cubic-bezier(0.2, 0.7, 0.2, 1)' }}
-      />
-      <motion.g initial={false} animate={{ opacity: 1 }}>
-        <motion.line
-          className="g-cap"
-          initial={false}
-          animate={{ x1: mx0, y1: my0, x2: mx1, y2: my1 }}
-          transition={{ type: 'spring', stiffness: 90, damping: 14 }}
-        />
-        <motion.line
-          className="g-cap-glow"
-          filter="url(#g-glow)"
-          initial={false}
-          animate={{ x1: mx0, y1: my0, x2: mx1, y2: my1 }}
-          transition={{ type: 'spring', stiffness: 90, damping: 14 }}
-        />
-        <motion.text
-          className="g-cap-label"
-          textAnchor="middle"
-          initial={false}
-          animate={{ x: lx, y: ly + 4 }}
-          transition={{ type: 'spring', stiffness: 90, damping: 14 }}
-        >
-          cap ${cap}
-        </motion.text>
-      </motion.g>
-      <text x={CX} y={CY - 6} textAnchor="middle" className={`g-big ${stop ? 'is-stop' : ''}`}>${spent}</text>
-      <text x={CX} y={CY + 20} textAnchor="middle" className="g-small">spent by the agent</text>
-    </svg>
-  );
-}
-
-const LOG: Record<Phase, { text: string; tone: 'quiet' | 'stop' | 'human' | 'ok' }> = {
-  idle: { text: 'waiting for the agent', tone: 'quiet' },
-  running: { text: 'spend() ok, under the cap', tone: 'quiet' },
-  blocked: { text: 'spend() reverted: over the cap', tone: 'stop' },
-  asking: { text: 'agent asked for $750, waiting on your wrist', tone: 'human' },
-  approved: { text: 'raiseLimit() confirmed, spend() ok', tone: 'ok' },
-  declined: { text: 'declined, agent stays inside $500', tone: 'quiet' },
-  revoked: { text: 'revoke() confirmed, key is dead', tone: 'stop' },
+const notes: Record<Phase, string> = {
+  request: 'Approvals happen on your stick.',
+  unlocked: 'Release early to cancel the hold.',
+  'ir-out': 'Speaker quiet while IR is receiving.',
+  second: 'The second stick makes the final decision.',
+  'ir-back': 'Your allowance has not changed yet.',
+  confirming: 'Waiting for the transaction receipt.',
+  done: 'Same account. Your agent continues.',
+  declined: 'The waiting payment was not sent.',
+  join: 'Simulated setup · your account stays the same.',
+  joining: 'Sealed shares over BLE.',
+  joined: 'Next transfer: 12 µETH to ABC.',
 };
 
 export function Demo() {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, amount: 0.4 });
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [txs, setTxs] = useState<Tx[]>([]);
-  const [cap, setCap] = useState(CAP);
-  const [hold, setHold] = useState(0);
-  const holdRaf = useRef(0);
-  const holdStart = useRef(0);
-
-  const spent = txs.filter((t) => t.state !== 'blocked').reduce((s, t) => s + t.amt, 0);
-  const ghost = phase === 'blocked' || phase === 'asking' || phase === 'declined' ? spent + PLAN[4].amt : spent;
-
-  const start = useCallback(() => {
-    setTxs([]);
-    setCap(CAP);
+  const [act, setAct] = useState(1),
+    [phase, setPhase] = useState<Phase>('request'),
+    [sound, setSound] = useState(false),
+    [hold, setHold] = useState(0);
+  const frame = useRef(0),
+    holding = useRef(false),
+    audio = useRef<AudioContext | null>(null);
+  const dual = act === 2,
+    join = ['join', 'joining', 'joined'].includes(phase),
+    done = phase === 'done',
+    declined = phase === 'declined';
+  const old = dual ? 20 : 5,
+    cap = dual ? 44 : 20,
+    spent = dual ? 10 : 2,
+    payment = dual ? 12 : 8;
+  const cancelHold = () => {
+    cancelAnimationFrame(frame.current);
+    holding.current = false;
     setHold(0);
-    setPhase('running');
-  }, []);
-
+  };
+  const enter = (next: Phase) => {
+    cancelHold();
+    setPhase(next);
+  };
   useEffect(() => {
-    if (inView && phase === 'idle') start();
-  }, [inView, phase, start]);
-
-  // The agent works through its plan on its own.
-  useEffect(() => {
-    if (phase !== 'running') return;
-    const id = setTimeout(() => {
-      const next = PLAN[txs.length];
-      if (!next) return;
-      if (spent + next.amt > cap) {
-        setTxs((t) => [...t, { ...next, state: 'blocked' }]);
-        setPhase('blocked');
-      } else {
-        setTxs((t) => [...t, { ...next, state: 'sent' }]);
-      }
-    }, txs.length === 0 ? 500 : 1000);
-    return () => clearTimeout(id);
-  }, [phase, txs.length, spent, cap]);
-
-  useEffect(() => {
-    if (phase !== 'blocked') return;
-    const id = setTimeout(() => setPhase('asking'), 1100);
-    return () => clearTimeout(id);
+    const next = after[phase];
+    if (!next) return;
+    const timer = window.setTimeout(() => setPhase(next), phase === 'confirming' ? 1700 : 1300);
+    return () => clearTimeout(timer);
   }, [phase]);
-
-  const approve = useCallback(() => {
-    setCap(RAISED);
-    setTxs((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, state: 'approved' } : x)));
-    setPhase('approved');
-  }, []);
-
-  const beginHold = () => {
-    if (phase !== 'asking') return;
-    cancelAnimationFrame(holdRaf.current);
-    holdStart.current = performance.now();
-    const tick = (now: number) => {
-      const p = Math.min(1, (now - holdStart.current) / HOLD_MS);
-      setHold(p);
-      if (p >= 1) approve();
-      else holdRaf.current = requestAnimationFrame(tick);
+  useEffect(() => {
+    if (!sound) return;
+    const notes =
+      phase === 'done' || phase === 'joined'
+        ? [523, 659, 784]
+        : phase === 'unlocked' || phase === 'second'
+          ? [440, 660]
+          : [];
+    if (!notes.length) return;
+    try {
+      const ctx = (audio.current ??= new AudioContext());
+      void ctx.resume();
+      notes.forEach((hz, i) => {
+        const osc = ctx.createOscillator(),
+          gain = ctx.createGain(),
+          t = ctx.currentTime + i * 0.11;
+        osc.type = 'sine';
+        osc.frequency.value = hz;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.07, t + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.12);
+      });
+    } catch {
+      /* Sound is optional. */
+    }
+  }, [phase, sound]);
+  useEffect(() => {
+    const stop = () => {
+      cancelAnimationFrame(frame.current);
+      holding.current = false;
+      setHold(0);
     };
-    holdRaf.current = requestAnimationFrame(tick);
+    window.addEventListener('blur', stop);
+    document.addEventListener('visibilitychange', stop);
+    return () => {
+      stop();
+      window.removeEventListener('blur', stop);
+      document.removeEventListener('visibilitychange', stop);
+      void audio.current?.close();
+      audio.current = null;
+    };
+  }, []);
+  const beginHold = () => {
+    if (holding.current || !['unlocked', 'second'].includes(phase)) return;
+    holding.current = true;
+    const start = performance.now();
+    const tick = (now: number) => {
+      if (!holding.current) return;
+      const progress = Math.min(1, (now - start) / 900);
+      setHold(progress);
+      if (progress === 1) enter(phase === 'second' ? 'ir-back' : dual ? 'ir-out' : 'confirming');
+      else frame.current = requestAnimationFrame(tick);
+    };
+    frame.current = requestAnimationFrame(tick);
   };
-  const endHold = () => {
-    cancelAnimationFrame(holdRaf.current);
-    setHold((h) => (h >= 1 ? h : 0));
+  const next = () => {
+    if (phase === 'request') enter('unlocked');
+    else if (declined) enter('request');
+    else if (done) {
+      setAct(2);
+      enter('join');
+    } else if (phase === 'join') enter('joining');
+    else if (phase === 'joined') enter('request');
   };
-  const onKey = (e: KeyboardEvent<HTMLButtonElement>, down: boolean) => {
-    if (e.key !== ' ' && e.key !== 'Enter') return;
-    e.preventDefault();
-    if (down && !e.repeat) beginHold();
-    if (!down) endHold();
-  };
-  useEffect(() => () => cancelAnimationFrame(holdRaf.current), []);
-
-  const screen: Screen =
-    phase === 'asking'
-      ? { kind: 'prompt', title: "Raise research-bot's total", amount: `$${RAISED}`, line1: `was $${CAP}`, line2: 'same expiry, 42 min left', hold }
-      : phase === 'blocked'
-        ? { kind: 'status', top: 'research-bot', big: `$${spent + PLAN[4].amt} > $${cap}`, sub: 'blocked by the contract', tone: 'stop' }
-        : phase === 'approved'
-          ? { kind: 'status', top: 'Approved', big: `$${spent} / $${cap}`, sub: 'landed on-chain', tone: 'ok', meter: spent / cap }
-          : phase === 'declined'
-            ? { kind: 'status', top: 'Declined', big: `$${spent} / $${cap}`, sub: 'agent stays in budget', meter: spent / cap }
-            : phase === 'revoked'
-              ? { kind: 'status', top: 'Revoked', big: 'All keys', sub: "the agent can't spend", tone: 'stop' }
-              : { kind: 'status', top: 'research-bot', big: `$${spent} / $${cap}`, sub: 'spending on its own', meter: spent / cap };
-
-  const log = LOG[phase];
-  const finished = phase === 'approved' || phase === 'declined' || phase === 'revoked';
-
+  const title = done ? (
+    <>
+      Your agent moves.
+      <br />
+      <em>You stay in control.</em>
+    </>
+  ) : declined ? (
+    <>
+      The boundary
+      <br />
+      <em>holds.</em>
+    </>
+  ) : join ? (
+    <>
+      One more stick.
+      <br />
+      <em>The same wallet.</em>
+    </>
+  ) : dual ? (
+    <>
+      A little light.
+      <br />
+      <em>A stronger boundary.</em>
+    </>
+  ) : (
+    <>
+      An agent asks.
+      <br />
+      <em>You decide.</em>
+    </>
+  );
+  const wristOK = ['ir-out', 'second', 'ir-back', 'confirming', 'done', 'joined'].includes(phase),
+    secondOK = ['ir-back', 'confirming', 'done', 'joined'].includes(phase),
+    phoneOK = !['request', 'join', 'joining', 'declined'].includes(phase);
+  const proof: [string, boolean][] = [
+    ['Phone', phoneOK],
+    ['Wrist', wristOK],
+    ...(dual ? [['2nd stick', secondOK] as [string, boolean]] : []),
+  ];
+  const currentSpent = done ? spent + payment : spent;
+  const route =
+    phase === 'joining'
+      ? 'BLE · SEALED SHARES'
+      : phase === 'ir-out'
+        ? 'IR → APPROVAL'
+        : phase === 'ir-back'
+          ? 'IR ← SIGNATURE'
+          : null;
+  function device(second: boolean) {
+    const active = phase === (second ? 'second' : 'unlocked'),
+      approved = second ? secondOK : wristOK;
+    let top = second ? 'SECOND STICK' : 'LIMIT REQUEST',
+      value = second ? 'IR IDLE' : `${old} → ${cap}`,
+      detail = second ? 'Ready when you are' : 'µETH · unlock phone';
+    if (active) {
+      top = 'RAISE LIMIT?';
+      value = `${old} → ${cap}`;
+      detail = 'µETH · HOLD A';
+    }
+    if (join) {
+      top = second ? 'SECOND STICK' : 'WRIST';
+      value = phase === 'joined' ? '3 OF 3' : second ? 'HELLO' : '2 OF 2';
+      detail = 'Same wallet. Same address.';
+    }
+    if (phase === 'ir-out' || phase === 'ir-back') {
+      top = 'INFRARED';
+      value = phase === 'ir-out' ? (second ? 'READING' : 'SENDING') : second ? 'SIGNED' : 'READING';
+      detail = route!;
+    }
+    if (phase === 'second' && !second) {
+      top = 'WRIST';
+      value = 'WAITING';
+      detail = 'Second stick approval';
+    }
+    if (phase === 'confirming') {
+      top = 'SIGNED';
+      value = 'PENDING';
+      detail = 'Awaiting chain receipt';
+    }
+    if (done) {
+      top = second ? 'SECOND STICK' : 'ALLOWANCE';
+      value = second ? 'APPROVED' : `${cap - spent - payment} µETH`;
+      detail = second ? 'Back to IR idle' : 'Left for your agent';
+    }
+    if (declined) {
+      top = 'BOUNDARY';
+      value = 'HELD';
+      detail = 'Payment not sent';
+    }
+    return (
+      <div
+        className={`kg-device ${second ? 'kg-second' : 'kg-first'}`}
+        style={{ '--kg-hold': `${active ? hold * 100 : 0}%` } as CSSProperties}
+        aria-hidden={second && !dual}
+      >
+        <div className="kg-port" />
+        <div className="kg-case">
+          <div className="kg-lcd">
+            <div className="kg-lcd-top">
+              <span>{top}</span>
+              <span>{approved ? '✓' : '●'}</span>
+            </div>
+            <div className="kg-lcd-value">{value}</div>
+            <div className="kg-lcd-line">{detail}</div>
+          </div>
+          <button
+            className="kg-physical"
+            aria-label={`Hold A on ${second ? 'second' : 'wrist'} stick to approve`}
+            disabled={!active}
+            data-held={active && hold > 0}
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              e.preventDefault();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              beginHold();
+            }}
+            onPointerUp={cancelHold}
+            onPointerCancel={cancelHold}
+            onLostPointerCapture={cancelHold}
+            onBlur={cancelHold}
+            onKeyDown={(e) => {
+              if ([' ', 'Enter'].includes(e.key)) {
+                e.preventDefault();
+                if (!e.repeat) beginHold();
+              }
+            }}
+            onKeyUp={(e) => {
+              if ([' ', 'Enter'].includes(e.key)) {
+                e.preventDefault();
+                cancelHold();
+              }
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <span className="kg-target" />
+          </button>
+        </div>
+        <div className="kg-device-caption">{second ? '02 / SECOND STICK' : '01 / YOUR WRIST'}</div>
+      </div>
+    );
+  }
   return (
     <section className="section" id="demo">
       <div className="wrap">
-        <div className="section-head">
-          <h2>Watch the limit</h2>
-          <p>The agent spends alone until it hits the cap. Then it's your call.</p>
-        </div>
-
-        <div className="demo panel" ref={ref}>
-          <div className="demo-feed" aria-live="polite">
-            <div className="feed-head">
-              <span className="agent-dot" data-phase={phase} />
-              research-bot
-              <span className="feed-key">session key, expires in 24 h</span>
-            </div>
-            <ul>
-              {txs.map((t) => (
-                <li key={t.what} className={`tx is-${t.state}`}>
-                  <span className="tx-what">{t.what}</span>
-                  <span className="tx-amt">${t.amt}</span>
-                  <span className="tx-state">{t.state}</span>
-                </li>
-              ))}
-              {txs.length === 0 && <li className="tx is-empty">The agent is starting its task</li>}
-            </ul>
-          </div>
-
-          <div className="demo-gauge">
-            <Gauge spent={spent} cap={cap} ghost={ghost} phase={phase} />
-            <p className={`chain-log tone-${log.tone}`}>
-              <span className="chain-dot" />
-              {log.text}
-            </p>
-          </div>
-
-          <div className="demo-device">
-            <Device
-              className={`demo-wrist ${phase === 'asking' ? 'is-buzzing' : ''}`}
-              screen={screen}
-              button={
+        <div id="kagi-studio" data-dual={dual} data-phase={phase}>
+          <div className="kg-shell">
+            <header className="kg-top">
+              <div className="kg-brand">
+                <KeyRound />
+                kagi
+              </div>
+              <span className="kg-proto">
+                A little trust.
+                <br />A physical boundary.
+              </span>
+              <div className="kg-top-right">
+                <span className="kg-network">
+                  <span className="kg-dot" />
+                  INTERACTIVE DEMO
+                </span>
                 <button
-                  type="button"
-                  className={`device-a is-live ${hold > 0 && hold < 1 ? 'is-pressed' : ''} ${phase === 'asking' ? 'is-ready' : ''}`}
-                  aria-label="Hold A to approve the higher limit"
-                  disabled={phase !== 'asking'}
-                  onPointerDown={beginHold}
-                  onPointerUp={endHold}
-                  onPointerLeave={endHold}
-                  onPointerCancel={endHold}
-                  onKeyDown={(e) => onKey(e, true)}
-                  onKeyUp={(e) => onKey(e, false)}
-                  onContextMenu={(e) => e.preventDefault()}
+                  className="kg-sound"
+                  aria-label={sound ? 'Mute sounds' : 'Enable sounds'}
+                  aria-pressed={sound}
+                  onClick={() => {
+                    setSound(!sound);
+                    if (sound) void audio.current?.suspend();
+                  }}
                 >
-                  A
+                  {sound ? <Volume2 /> : <VolumeX />}
                 </button>
-              }
-            />
-            <div className="demo-actions">
-              {phase === 'asking' && (
-                <>
-                  <p className="hint">Press and hold A</p>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPhase('declined')}>Decline with B</button>
-                </>
-              )}
-              {!finished && phase !== 'asking' && (
-                <button type="button" className="btn btn-stop btn-sm" onClick={() => setPhase('revoked')}>Revoke every key</button>
-              )}
-              {finished && (
-                <button type="button" className="btn btn-ghost btn-sm" onClick={start}>Run it again</button>
-              )}
+              </div>
+            </header>
+            <nav className="kg-tabs" aria-label="Demo act">
+              {[1, 2].map((n) => (
+                <button
+                  key={n}
+                  aria-pressed={act === n}
+                  onClick={() => {
+                    setAct(n);
+                    enter(n === 1 ? 'request' : 'join');
+                  }}
+                >
+                  <b>0{n}</b>
+                  {n === 1 ? 'Phone + one stick' : 'Add a second stick'}
+                </button>
+              ))}
+            </nav>
+            <div className="kg-main">
+              <section className="kg-left" aria-label="Approval devices">
+                <div className="kg-eyebrow">
+                  <span className="kg-dot" />
+                  {join ? 'THREE DEVICES · ONE ACCOUNT' : 'YOU SET THE BOUNDARY'}
+                </div>
+                <h2 className="kg-title">{title}</h2>
+                <p className="kg-lead">
+                  {join
+                    ? 'Extend the same wallet with a second physical approval. Future approvals travel by infrared.'
+                    : 'A temporary key lets your agent transfer test ETH. More access needs your physical approval.'}
+                </p>
+                <div className="kg-stage">
+                  <div className="kg-floor" />
+                  <div className="kg-orbit" />
+                  {route && (
+                    <div id="kg-routes">
+                      <svg
+                        viewBox="0 0 560 337"
+                        className="kg-beam"
+                        style={{ width: '100%', height: '100%', position: 'absolute' }}
+                      >
+                        <path
+                          d="M 235 210 Q 270 130 345 130"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeDasharray="6 8"
+                          style={{
+                            animation: 'kg-dash 4s linear infinite',
+                            animationDirection: phase === 'ir-back' ? 'reverse' : 'normal',
+                            color: '#83d6eb',
+                          }}
+                        />
+                      </svg>
+                      <span className="kg-beam-label">{route}</span>
+                    </div>
+                  )}
+                  {device(false)}
+                  {device(true)}
+                </div>
+                <div className="kg-action-hint">
+                  <ArrowUpRight />
+                  <span>
+                    {phase === 'unlocked' || phase === 'second'
+                      ? 'Press and hold the round button · 0.9 s'
+                      : notes[phase]}
+                  </span>
+                </div>
+                <div className="kg-hold-cue">
+                  {['unlocked', 'second'].includes(phase) && (
+                    <>
+                      <button className="kg-decline" onClick={() => enter('declined')}>
+                        B · Decline request
+                      </button>
+                      <button className="kg-decline" onClick={beginHold}>
+                        Preview the hold
+                      </button>
+                    </>
+                  )}
+                </div>
+              </section>
+              <section className="kg-phone-wrap" aria-label="Kagi phone interface">
+                <div className="kg-phone">
+                  <div className="kg-phone-inner">
+                    <div className="kg-island" />
+                    <div className="kg-phone-top">
+                      <span>9:41</span>
+                      <BatteryFull />
+                    </div>
+                    <div className="kg-phone-heading">
+                      <span>
+                        {join
+                          ? 'Protection'
+                          : done
+                            ? 'Transfer confirmed'
+                            : declined
+                              ? 'Request declined'
+                              : 'Limit request'}
+                      </span>
+                      <ShieldCheck />
+                    </div>
+                    <div className="kg-agent-mark">
+                      <div className="kg-agent-avatar">
+                        <Sparkles />
+                      </div>
+                      <div className="kg-agent-meta">
+                        <span>Agent</span>
+                        <small>Temporary spending key</small>
+                      </div>
+                    </div>
+                    <div className="kg-amount-label">
+                      {join
+                        ? 'Approval devices'
+                        : done
+                          ? 'Allowance remaining'
+                          : declined
+                            ? 'Total allowance unchanged'
+                            : 'Increase total allowance'}
+                    </div>
+                    <div className="kg-amount">
+                      {join ? (
+                        <>
+                          <span className="kg-old">2</span>
+                          <ArrowRight />
+                          <span>3</span>
+                        </>
+                      ) : done ? (
+                        <span>{cap - currentSpent}</span>
+                      ) : declined ? (
+                        <span>{old}</span>
+                      ) : (
+                        <>
+                          <span className="kg-old">{old}</span>
+                          <ArrowRight />
+                          <span>{cap}</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="kg-unit">
+                      {join
+                        ? 'SAME WALLET · SAME ADDRESS'
+                        : `µETH · ${(done ? cap - currentSpent : declined ? old : cap) / 1e6} ETH`}
+                    </div>
+                    {!join && (
+                      <div className="kg-meter" aria-label={`${currentSpent} microETH spent`}>
+                        {Array.from({ length: 20 }, (_, i) => (
+                          <span
+                            key={i}
+                            className={i < Math.round((currentSpent / (done ? cap : old)) * 20) ? 'kg-used' : ''}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {join ? (
+                      <>
+                        <Row label="Phone" value="Connected" />
+                        <Row label="Wrist stick" value="Connected" />
+                        <Row
+                          label="Second stick"
+                          value={phase === 'joined' ? 'Joined' : phase === 'joining' ? 'Joining…' : 'Ready to join'}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Row
+                          label={done ? 'Sent to ABC' : declined ? 'Cancelled transfer' : 'Waiting transfer'}
+                          value={`${payment} µETH`}
+                        />
+                        <Row label="Already spent" value={`${currentSpent} µETH`} />
+                        <Row label="Expires in" value="58 min · unchanged" />
+                      </>
+                    )}
+                    <div className="kg-proof">
+                      {proof.map(([name, ok]) => (
+                        <span key={name} className={ok ? 'kg-complete' : ''}>
+                          <i>{ok ? '✓' : '·'}</i>
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="kg-phone-foot">
+                      <button
+                        className="kg-cta"
+                        onClick={next}
+                        disabled={!['request', 'declined', 'join', 'joined', ...(dual ? [] : ['done'])].includes(phase)}
+                      >
+                        {phase === 'request' ? <Fingerprint /> : join ? <Plus /> : done ? <Check /> : <Radio />}
+                        {done && dual ? 'Both sticks approved' : labels[phase]}
+                      </button>
+                      <div className="kg-phone-note">{notes[phase]}</div>
+                    </div>
+                    <div className="kg-homebar" />
+                  </div>
+                </div>
+              </section>
             </div>
+            <section className="kg-agent-feed" aria-label="Agent MCP activity">
+              <div className="kg-agent-feed-label">
+                <Sparkles />
+                <span>Agent + MCP</span>
+              </div>
+              <div className="kg-chat">
+                <div className="kg-chat-request">
+                  {join
+                    ? 'Your wallet stays connected to your agent.'
+                    : dual
+                      ? 'You: “Send 0.000012 ETH to ABC.”'
+                      : 'You: “Send 0.000002 ETH, then 0.000008 ETH to ABC.”'}
+                </div>
+                <div className="kg-chat-answer" aria-live="polite">
+                  {done ? <Check /> : <Pause />}
+                  <span>
+                    {join
+                      ? 'Same account and session key. Under-limit transfers remain automatic.'
+                      : done
+                        ? `${payment} µETH sent to ABC. ${cap - currentSpent} µETH remains in my allowance.`
+                        : declined
+                          ? 'You declined. I did not send the payment or change the allowance.'
+                          : phase === 'confirming'
+                            ? 'Waiting for confirmation before retrying the transfer.'
+                            : `Only ${old - spent} µETH remains; I need ${payment}. I requested ${cap} µETH total and paused the payment.`}
+                  </span>
+                </div>
+              </div>
+            </section>
+            <footer className="kg-bottom">
+              <span>SIMULATION · NO REAL TRANSACTIONS</span>
+              <span>{dual ? 'PHONE + TWO STICKS / 3 OF 3' : 'PHONE + WRIST / 2 OF 2'}</span>
+            </footer>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="kg-info-row">
+      <span>{label}</span>
+      <span className="kg-mono">{value}</span>
+    </div>
   );
 }

@@ -6,8 +6,8 @@ const MAX = 260;
 const SPECS = [
   ['ESP32-S3', 'dual core, 240 MHz'],
   ['1.14" screen', 'shows every request decoded'],
-  ['Infrared', 'the only link to the vault'],
-  ['Motion sensor', 'stops signing when you take it off'],
+  ['Infrared', 'stick-to-stick approvals'],
+  ['Motion sensor', 'wear detection'],
   ['20 g', '48 × 24 × 15 mm'],
 ] as const;
 
@@ -30,7 +30,7 @@ export function Hardware() {
               </div>
               <span className="hw-plus" aria-hidden="true">+</span>
               <div className="hw-unit">
-                <Device screen={{ kind: 'status', top: 'VAULT', big: 'Asleep', sub: 'infrared only' }} />
+                <Device variant="red" screen={{ kind: 'status', top: 'SECOND STICK', big: 'Ready', sub: 'approvals by infrared' }} />
                 <span className="hw-tag">$21.50</span>
               </div>
             </div>

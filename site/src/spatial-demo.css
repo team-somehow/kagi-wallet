@@ -1,0 +1,1049 @@
+#kagi-studio {
+  --kg-bg: light-dark(#eeede7, #0b0d11);
+  --kg-paper: light-dark(#faf9f5, #15181e);
+  --kg-ink: light-dark(#26282a, #f0eee7);
+  --kg-muted: light-dark(#656966, #a0a6b0);
+  --kg-line: light-dark(#d9d9d1, #292d34);
+  --kg-accent: light-dark(#ae501c, #ffac70);
+  --kg-soft: light-dark(#efded0, #36271f);
+  --kg-blue: light-dark(#007b9b, #83d6eb);
+  --kg-shadow: light-dark(#25293222, #00000077);
+  --kg-depth: 18deg;
+  font:
+    400 14px/1.5 'Manrope',
+    sans-serif;
+  color: var(--kg-ink);
+  width: 100%;
+  isolation: isolate;
+}
+#kagi-studio * {
+  box-sizing: border-box;
+}
+#kagi-studio button {
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+}
+#kagi-studio button:disabled {
+  cursor: default;
+}
+#kagi-studio button:focus-visible {
+  outline: 2px solid var(--kg-blue);
+  outline-offset: 5px;
+}
+#kagi-studio svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+#kagi-studio h2,
+#kagi-studio h3,
+#kagi-studio p {
+  margin: 0;
+  font-weight: 400;
+}
+#kagi-studio .kg-mono {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+#kagi-studio .kg-shell {
+  background: var(--kg-bg);
+  border: 1px solid var(--kg-line);
+  border-radius: 24px;
+  overflow: hidden;
+  position: relative;
+}
+#kagi-studio .kg-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--kg-line);
+}
+#kagi-studio .kg-brand {
+  font-size: 26px;
+  letter-spacing: -1.5px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+#kagi-studio .kg-brand svg {
+  width: 23px;
+  height: 23px;
+  color: var(--kg-accent);
+}
+#kagi-studio .kg-proto {
+  font-size: 11px;
+  color: var(--kg-muted);
+  border-left: 1px solid var(--kg-line);
+  padding-left: 16px;
+}
+#kagi-studio .kg-top-right {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+#kagi-studio .kg-network {
+  font:
+    11px 'IBM Plex Mono',
+    monospace;
+  color: var(--kg-muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+#kagi-studio .kg-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--kg-accent);
+  border-radius: 50%;
+  display: inline-block;
+}
+#kagi-studio .kg-sound {
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 12px;
+}
+#kagi-studio .kg-sound:hover {
+  background: var(--kg-paper);
+}
+#kagi-studio .kg-tabs {
+  display: flex;
+  gap: 24px;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--kg-line);
+}
+#kagi-studio .kg-tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 15px 0;
+  color: var(--kg-muted);
+  font-size: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 48px;
+}
+#kagi-studio .kg-tabs button[aria-selected='true'] {
+  border-color: var(--kg-accent);
+  color: var(--kg-ink);
+}
+#kagi-studio .kg-tabs b {
+  font:
+    11px 'IBM Plex Mono',
+    monospace;
+  font-weight: 400;
+  color: var(--kg-muted);
+}
+#kagi-studio .kg-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 322px;
+  gap: 4px;
+  padding: 30px 28px 24px;
+}
+#kagi-studio .kg-left {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+#kagi-studio .kg-eyebrow {
+  font:
+    11px 'IBM Plex Mono',
+    monospace;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--kg-accent);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 14px;
+}
+#kagi-studio .kg-title {
+  font-size: clamp(30px, 4.8vw, 48px);
+  letter-spacing: -2px;
+  line-height: 1.08;
+  max-width: 440px;
+  min-height: 104px;
+}
+#kagi-studio .kg-title em {
+  font-style: normal;
+  color: var(--kg-muted);
+}
+#kagi-studio .kg-lead {
+  font-size: 13px;
+  color: var(--kg-muted);
+  margin-top: 14px;
+  min-height: 39px;
+  max-width: 350px;
+  padding-right: 10px;
+}
+#kagi-studio .kg-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 560/337;
+  container-type: inline-size;
+  perspective: 1100px;
+  margin-top: 6px;
+  isolation: isolate;
+}
+#kagi-studio .kg-floor {
+  position: absolute;
+  left: 7%;
+  top: 22%;
+  width: 84%;
+  height: 65%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--kg-accent) 13%, transparent), transparent 67%);
+  transform: rotate(-12deg);
+  transition: background 1s;
+}
+#kagi-studio .kg-orbit {
+  position: absolute;
+  left: 10%;
+  top: 25%;
+  width: 78%;
+  height: 60%;
+  border: 1px solid var(--kg-line);
+  border-radius: 50%;
+  transform: rotate(-18deg);
+  opacity: 0.7;
+}
+#kagi-studio .kg-orbit::after {
+  content: '';
+  position: absolute;
+  inset: 14%;
+  border: 1px solid var(--kg-line);
+  border-radius: 50%;
+  opacity: 0.45;
+}
+#kagi-studio .kg-device {
+  position: absolute;
+  width: 65%;
+  left: 14%;
+  top: 25%;
+  aspect-ratio: 2.15;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--kg-depth)) rotateY(-17deg) rotateZ(-12deg);
+  transition:
+    transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    left 900ms,
+    top 900ms,
+    width 900ms,
+    opacity 700ms;
+  filter: drop-shadow(0 26px 12px #00000033);
+}
+#kagi-studio .kg-device.kg-second {
+  width: 43%;
+  left: 51%;
+  top: 12%;
+  transform: translateY(50px) rotateX(var(--kg-depth)) rotateY(14deg) rotateZ(14deg);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+#kagi-studio[data-dual='true'] .kg-device.kg-first {
+  width: 48%;
+  left: 4%;
+  top: 43%;
+  transform: rotateX(var(--kg-depth)) rotateY(-13deg) rotateZ(-13deg);
+}
+#kagi-studio[data-dual='true'] .kg-device.kg-second {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) rotateX(var(--kg-depth)) rotateY(14deg) rotateZ(14deg);
+  pointer-events: auto;
+}
+#kagi-studio .kg-case {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #444950, #24282e 35%, #15191e);
+  border: 1px solid #747b8555;
+  box-shadow:
+    inset 1px 2px 2px #b6c4d536,
+    inset -2px -2px 2px #080b0f,
+    0 1px 0 #11151b,
+    0 3px 0 #11151b,
+    0 5px 0 #10141a,
+    0 7px 0 #10141a,
+    0 9px 0 #0c1015,
+    0 11px 0 #0c1015,
+    0 13px 0 #080b10,
+    0 14px 1px #67758666;
+  display: grid;
+  grid-template-columns: 1fr 16%;
+  gap: 6%;
+  padding: 9% 5% 8% 7%;
+  transform: translateZ(14px);
+}
+#kagi-studio .kg-case::after {
+  content: 'ESP32';
+  position: absolute;
+  bottom: 2.7%;
+  left: 8%;
+  font:
+    500 clamp(6px, 1.5cqw, 9px) 'IBM Plex Mono',
+    monospace;
+  letter-spacing: 1px;
+  color: #8b939f;
+  opacity: 0.65;
+}
+#kagi-studio .kg-port {
+  position: absolute;
+  width: 9%;
+  height: 20%;
+  right: -5%;
+  top: 40%;
+  background: linear-gradient(90deg, #505962, #a9b1b8, #59626b);
+  border-radius: 2px 5px 5px 2px;
+  transform: translateZ(1px);
+  border: 1px solid #a6b1bf66;
+}
+#kagi-studio .kg-lcd {
+  min-width: 0;
+  border-radius: 5px;
+  background: linear-gradient(125deg, #121a23, #06101c 60%, #0b1420);
+  box-shadow:
+    0 0 0 3px #070b10,
+    0 0 0 5px #6b737633,
+    inset 0 0 16px #08111f;
+  position: relative;
+  color: #bbe8ff;
+  padding: 7% 8%;
+  overflow: hidden;
+  font-family: 'IBM Plex Mono', monospace;
+}
+#kagi-studio .kg-lcd::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(140deg, #ffffff13, transparent 45%);
+  pointer-events: none;
+}
+#kagi-studio .kg-lcd-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: clamp(7px, 1.85cqw, 11px);
+  line-height: 1.1;
+  color: #81b9d4;
+}
+#kagi-studio .kg-lcd-value {
+  font-size: clamp(16px, 5.3cqw, 31px);
+  line-height: 1.3;
+  letter-spacing: -1px;
+  white-space: nowrap;
+  margin-top: 5%;
+}
+#kagi-studio[data-dual='true'] .kg-lcd-value {
+  font-size: clamp(14px, 4cqw, 25px);
+}
+#kagi-studio .kg-lcd-line {
+  font-size: clamp(7px, 1.65cqw, 10px);
+  color: #80a5b8;
+  white-space: nowrap;
+}
+#kagi-studio .kg-lcd-bar {
+  position: absolute;
+  bottom: 7%;
+  height: 2px;
+  background: #233645;
+  left: 8%;
+  right: 8%;
+}
+#kagi-studio .kg-lcd-bar span {
+  display: block;
+  height: 100%;
+  background: #98e2ff;
+  width: var(--kg-hold, 0%);
+  box-shadow: 0 0 10px #69d0ff;
+}
+#kagi-studio .kg-physical {
+  min-width: 28px;
+  min-height: 44px;
+  align-self: stretch;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  position: relative;
+  transform: translateZ(4px);
+}
+#kagi-studio .kg-physical::before {
+  content: '';
+  width: 48%;
+  height: 82%;
+  border-radius: 20px;
+  background: linear-gradient(90deg, #0264a4, #17a0ea 48%, #0878bc);
+  box-shadow:
+    inset 2px 0 3px #79d6ff55,
+    inset -2px 0 3px #003d6d,
+    1px 2px 2px #000000aa;
+  transition:
+    transform 0.15s,
+    box-shadow 0.2s;
+}
+#kagi-studio .kg-physical:disabled::before {
+  filter: saturate(0.7);
+}
+#kagi-studio .kg-physical:not(:disabled)::before {
+  box-shadow:
+    inset 2px 0 3px #79d6ff55,
+    inset -2px 0 3px #003d6d,
+    0 0 18px #138fe855;
+}
+#kagi-studio .kg-physical[data-held='true']::before {
+  transform: scale(0.85, 0.96);
+  box-shadow:
+    inset 2px 0 8px #001a37,
+    0 0 24px #00b7ff88;
+}
+#kagi-studio .kg-target {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 18px;
+  outline: 1px solid #7cdfff;
+  outline-offset: 7px;
+  opacity: 0;
+}
+#kagi-studio .kg-physical:not(:disabled) .kg-target {
+  opacity: 0.6;
+}
+#kagi-studio .kg-device-caption {
+  position: absolute;
+  top: calc(100% + 29px);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font:
+    10px 'IBM Plex Mono',
+    monospace;
+  color: var(--kg-muted);
+  transform: rotateZ(12deg);
+  white-space: nowrap;
+}
+#kagi-studio .kg-second .kg-device-caption {
+  transform: rotateZ(-14deg);
+}
+#kagi-studio .kg-links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+#kagi-studio .kg-links path {
+  fill: none;
+  stroke: var(--kg-blue);
+  stroke-width: 1.2;
+}
+#kagi-studio .kg-wire {
+  stroke-dasharray: 4 5;
+  opacity: 0.25;
+}
+#kagi-studio .kg-travel {
+  stroke-dasharray: 8 180;
+  stroke-width: 2.5 !important;
+  filter: drop-shadow(0 0 5px var(--kg-blue));
+  animation: kg-dash 1s linear 3;
+}
+#kagi-studio .kg-route-label {
+  font:
+    10px 'IBM Plex Mono',
+    monospace;
+  fill: var(--kg-blue);
+}
+#kagi-studio .kg-ir-dot {
+  fill: var(--kg-blue);
+  filter: drop-shadow(0 0 6px var(--kg-blue));
+}
+#kagi-studio .kg-beam-label {
+  position: absolute;
+  left: 40%;
+  top: 18%;
+  font:
+    10px 'IBM Plex Mono',
+    monospace;
+  letter-spacing: 1px;
+  color: var(--kg-blue);
+  background: var(--kg-bg);
+  padding: 4px 7px;
+  transform: rotate(-29deg);
+}
+#kagi-studio .kg-action-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-size: 12px;
+  min-height: 38px;
+  color: var(--kg-muted);
+  margin-top: 3px;
+}
+#kagi-studio .kg-action-hint svg {
+  width: 15px;
+  color: var(--kg-accent);
+}
+#kagi-studio .kg-hold-cue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 42px;
+}
+#kagi-studio .kg-decline {
+  font:
+    12px 'IBM Plex Mono',
+    monospace;
+  border: 0;
+  background: transparent;
+  padding: 10px 14px;
+  min-height: 44px;
+  color: var(--kg-muted);
+}
+#kagi-studio .kg-decline:hover {
+  color: var(--kg-ink);
+}
+#kagi-studio .kg-phone-wrap {
+  padding: 0 3px 0 10px;
+  perspective: 1100px;
+  align-self: start;
+}
+#kagi-studio .kg-phone {
+  position: relative;
+  padding: 7px;
+  border-radius: 36px;
+  background: linear-gradient(140deg, #7c858b, #252a2f 20%, #596065 60%, #171b20);
+  box-shadow:
+    0 24px 40px var(--kg-shadow),
+    3px 3px 0 #171b20,
+    4px 4px 0 #555b6155;
+  transform: rotateY(-4deg);
+  transition: transform 0.6s;
+}
+#kagi-studio .kg-phone:hover {
+  transform: rotateY(0);
+}
+#kagi-studio .kg-phone-inner {
+  border-radius: 29px;
+  background: var(--kg-paper);
+  min-height: 502px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 15px 20px 20px;
+}
+#kagi-studio .kg-phone-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font:
+    11px 'IBM Plex Mono',
+    monospace;
+  height: 19px;
+  margin-bottom: 28px;
+}
+#kagi-studio .kg-island {
+  width: 73px;
+  height: 19px;
+  border-radius: 20px;
+  background: #101216;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 18px;
+}
+#kagi-studio .kg-phone-top svg {
+  width: 15px;
+  height: 15px;
+}
+#kagi-studio .kg-phone-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--kg-muted);
+  margin-bottom: 20px;
+}
+#kagi-studio .kg-phone-heading svg {
+  width: 17px;
+  color: var(--kg-accent);
+}
+#kagi-studio .kg-agent-mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  margin-bottom: 19px;
+}
+#kagi-studio .kg-agent-avatar {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--kg-soft);
+  color: var(--kg-accent);
+}
+#kagi-studio .kg-agent-meta {
+  display: flex;
+  flex-direction: column;
+}
+#kagi-studio .kg-agent-meta small {
+  font-size: 11px;
+  color: var(--kg-muted);
+}
+#kagi-studio .kg-amount-label {
+  font-size: 12px;
+  color: var(--kg-muted);
+}
+#kagi-studio .kg-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 5px 0 2px;
+  font-size: 54px;
+  line-height: 1.2;
+  letter-spacing: -3px;
+  font-variant-numeric: tabular-nums;
+}
+#kagi-studio .kg-amount .kg-old {
+  color: var(--kg-muted);
+  font-size: 34px;
+  letter-spacing: -2px;
+}
+#kagi-studio .kg-amount svg {
+  width: 25px;
+  height: 25px;
+  align-self: center;
+  color: var(--kg-accent);
+}
+#kagi-studio .kg-unit {
+  font:
+    11px 'IBM Plex Mono',
+    monospace;
+  color: var(--kg-muted);
+  margin-bottom: 18px;
+}
+#kagi-studio .kg-meter {
+  display: flex;
+  gap: 4px;
+  margin: 6px 0 19px;
+  height: 14px;
+}
+#kagi-studio .kg-meter span {
+  flex: 1;
+  border-radius: 2px;
+  background: var(--kg-line);
+  transition:
+    background 0.4s,
+    transform 0.4s;
+}
+#kagi-studio .kg-meter span.kg-used {
+  background: var(--kg-accent);
+}
+#kagi-studio .kg-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--kg-line);
+  gap: 7px;
+}
+#kagi-studio .kg-info-row span:first-child {
+  color: var(--kg-muted);
+}
+#kagi-studio .kg-info-row b {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+#kagi-studio .kg-proof {
+  display: flex;
+  gap: 6px;
+  margin: 19px 0;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#kagi-studio .kg-proof span {
+  font-size: 10px;
+  color: var(--kg-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+#kagi-studio .kg-proof i {
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--kg-line);
+  border-radius: 50%;
+  font:
+    9px 'IBM Plex Mono',
+    monospace;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+}
+#kagi-studio .kg-proof .kg-complete {
+  color: var(--kg-accent);
+}
+#kagi-studio .kg-proof .kg-complete i {
+  border-color: var(--kg-accent);
+  background: var(--kg-soft);
+}
+#kagi-studio .kg-proof .kg-divider {
+  width: 11px;
+  height: 1px;
+  background: var(--kg-line);
+}
+#kagi-studio .kg-phone-foot {
+  margin-top: auto;
+  padding-top: 5px;
+}
+#kagi-studio .kg-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 47px;
+  padding: 12px 10px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--kg-ink);
+  color: var(--kg-paper);
+  font-size: 13px;
+  transition:
+    transform 0.15s,
+    background 0.2s;
+}
+#kagi-studio .kg-cta:hover {
+  transform: translateY(-1px);
+}
+#kagi-studio .kg-cta:active {
+  transform: scale(0.98);
+}
+#kagi-studio .kg-cta:disabled {
+  background: var(--kg-soft);
+  color: var(--kg-accent);
+  transform: none;
+}
+#kagi-studio .kg-phone-note {
+  font-size: 10px;
+  color: var(--kg-muted);
+  text-align: center;
+  min-height: 16px;
+  margin-top: 10px;
+}
+#kagi-studio .kg-homebar {
+  height: 3px;
+  width: 80px;
+  border-radius: 6px;
+  margin: 17px auto 0;
+  background: var(--kg-ink);
+  opacity: 0.4;
+}
+#kagi-studio .kg-agent-feed {
+  border-top: 1px solid var(--kg-line);
+  padding: 18px 28px;
+  display: grid;
+  grid-template-columns: 115px 1fr;
+  gap: 20px;
+  background: var(--kg-paper);
+}
+#kagi-studio .kg-agent-feed-label {
+  display: flex;
+  gap: 9px;
+  font-size: 12px;
+  align-items: flex-start;
+  padding-top: 3px;
+}
+#kagi-studio .kg-agent-feed-label svg {
+  color: var(--kg-accent);
+}
+#kagi-studio .kg-chat {
+  min-width: 0;
+}
+#kagi-studio .kg-chat-request {
+  font-size: 11px;
+  color: var(--kg-muted);
+  margin-bottom: 6px;
+}
+#kagi-studio .kg-chat-answer {
+  font-size: 13px;
+  line-height: 1.6;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-height: 42px;
+}
+#kagi-studio .kg-chat-answer svg {
+  width: 16px;
+  margin-top: 3px;
+  color: var(--kg-accent);
+}
+#kagi-studio .kg-bottom {
+  padding: 10px 28px;
+  font:
+    10px 'IBM Plex Mono',
+    monospace;
+  color: var(--kg-muted);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+#kagi-studio .kg-lcd {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4% 6% 8%;
+  gap: 4%;
+}
+#kagi-studio .kg-lcd-value {
+  margin-top: 0;
+  line-height: 1.07;
+}
+#kagi-studio .kg-lcd-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+#kagi-studio[data-dual='true'] .kg-device.kg-first {
+  top: 49%;
+}
+#kagi-studio #kg-routes {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+#kagi-studio .kg-beam-label {
+  left: 48%;
+  top: 46%;
+  transform: rotate(-52deg);
+}
+#kagi-studio .kg-beam-glow {
+  stroke-width: 12px !important;
+  opacity: 0.09;
+  filter: blur(4px);
+}
+#kagi-studio .kg-physical::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+@keyframes kg-dash {
+  to {
+    stroke-dashoffset: -188;
+  }
+}
+@keyframes kg-settle {
+  0% {
+    transform: translateY(6px);
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+#kagi-studio[data-phase='done'] .kg-amount {
+  animation: kg-settle 0.55s ease-out;
+}
+#kagi-studio[data-motion='quiet'] *,
+#kagi-studio[data-motion='quiet'] *::before {
+  animation: none !important;
+  transition: none !important;
+}
+#kagi-studio[data-motion='quiet'] .kg-physical[data-held='true']::before {
+  filter: brightness(1.2);
+}
+@media (max-width: 760px) {
+  #kagi-studio .kg-main {
+    grid-template-columns: minmax(0, 1fr) 285px;
+    padding: 24px 20px;
+    gap: 0;
+  }
+  #kagi-studio .kg-top {
+    padding: 14px 20px;
+  }
+  #kagi-studio .kg-tabs {
+    padding: 0 20px;
+  }
+  #kagi-studio .kg-title {
+    font-size: 35px;
+    min-height: 80px;
+    letter-spacing: -1.5px;
+  }
+  #kagi-studio .kg-phone-inner {
+    padding: 14px 16px 17px;
+    min-height: 481px;
+  }
+  #kagi-studio .kg-lead {
+    font-size: 12px;
+  }
+  #kagi-studio .kg-device-caption {
+    font-size: 8px;
+  }
+  #kagi-studio .kg-stage {
+    margin-top: 32px;
+    aspect-ratio: 560/400;
+  }
+  #kagi-studio .kg-lcd-value {
+    font-size: 5cqw;
+  }
+  #kagi-studio[data-dual='true'] .kg-lcd-value {
+    font-size: 4cqw;
+  }
+  #kagi-studio .kg-action-hint {
+    font-size: 11px;
+  }
+  #kagi-studio .kg-beam-label {
+    font-size: 8px;
+  }
+}
+@media (max-width: 580px) {
+  #kagi-studio .kg-shell {
+    border-radius: 19px;
+  }
+  #kagi-studio .kg-main {
+    display: flex;
+    flex-direction: column;
+    padding: 23px 18px;
+    gap: 22px;
+  }
+  #kagi-studio .kg-title {
+    font-size: 38px;
+    min-height: 82px;
+  }
+  #kagi-studio .kg-stage {
+    margin: 0 auto;
+    max-width: 450px;
+    aspect-ratio: 560/337;
+  }
+  #kagi-studio .kg-lead {
+    min-height: 0;
+    max-width: 330px;
+    margin-top: 10px;
+  }
+  #kagi-studio .kg-phone-wrap {
+    width: min(100%, 326px);
+    padding: 0;
+    margin: auto;
+  }
+  #kagi-studio .kg-phone-inner {
+    min-height: 484px;
+    padding: 17px 21px;
+  }
+  #kagi-studio .kg-phone {
+    transform: none;
+  }
+  #kagi-studio .kg-proto {
+    display: none;
+  }
+  #kagi-studio .kg-tabs {
+    gap: 20px;
+  }
+  #kagi-studio .kg-network {
+    font-size: 10px;
+  }
+  #kagi-studio .kg-top-right {
+    gap: 5px;
+  }
+  #kagi-studio .kg-top {
+    padding: 10px 18px;
+  }
+  #kagi-studio .kg-tabs {
+    padding: 0 18px;
+  }
+  #kagi-studio .kg-agent-feed {
+    grid-template-columns: 1fr;
+    gap: 9px;
+    padding: 17px 20px;
+  }
+  #kagi-studio .kg-chat-answer {
+    min-height: 0;
+  }
+  #kagi-studio .kg-bottom {
+    padding: 10px 18px;
+    font-size: 9px;
+    flex-wrap: wrap;
+  }
+  #kagi-studio .kg-device-caption {
+    font-size: 10px;
+  }
+  #kagi-studio .kg-action-hint {
+    font-size: 12px;
+  }
+  #kagi-studio .kg-lcd-value {
+    font-size: 6cqw;
+  }
+  #kagi-studio[data-dual='true'] .kg-lcd-value {
+    font-size: 4.4cqw;
+  }
+  #kagi-studio .kg-lcd-top {
+    font-size: 2cqw;
+  }
+  #kagi-studio .kg-lcd-line {
+    font-size: 1.8cqw;
+  }
+  #kagi-studio .kg-beam-label {
+    font-size: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #kagi-studio *,
+  #kagi-studio *::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+#kagi-studio {
+  color-scheme: dark;
+}
+#kagi-studio .kg-tabs button[aria-pressed='true'] {
+  border-color: var(--kg-accent);
+  color: var(--kg-ink);
+}
+
+#kagi-studio .kg-hold-cue {
+  gap: 18px;
+  display: flex;
+  justify-content: center;
+}
+
+#kagi-studio .kg-first .kg-case {
+  background: linear-gradient(135deg, #508bc2, #23527e 40%, #142d4a);
+}
+#kagi-studio .kg-second .kg-case {
+  background: linear-gradient(135deg, #c26469, #7c2938 40%, #401922);
+}
+#kagi-studio .kg-physical {
+  align-self: center;
+  aspect-ratio: 1;
+  height: auto;
+  border-radius: 50%;
+}
+#kagi-studio .kg-physical::before {
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(120deg, #94ceef, #307eb9);
+}
+#kagi-studio .kg-second .kg-physical::before {
+  background: linear-gradient(120deg, #f0bcc0, #c65f6b);
+}

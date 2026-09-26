@@ -38,15 +38,15 @@ export function Hero() {
           Give your agent a spending key.
           <span>Keep the wallet.</span>
         </h1>
-        <p className="hero-sub">Capped, expiring keys for AI agents. Raising a limit takes your phone and a press on your wrist.</p>
+        <p className="hero-sub">Capped, expiring keys for AI agents. Raising a limit takes your phone and a hold on your stick.</p>
         <div className="hero-cta">
           <a className="btn btn-primary" href="#demo">Try the demo</a>
           <a className="btn btn-ghost" href="#get">Get the app and firmware</a>
         </div>
         <dl className="hero-facts">
           <div><dt>$43</dt><dd>hardware for both signers</dd></div>
-          <div><dt>0</dt><dd>devices that can sign alone</dd></div>
-          <div><dt>1 tap</dt><dd>stops every agent</dd></div>
+          <div><dt>2</dt><dd>devices to grant access</dd></div>
+          <div><dt>1 phone</dt><dd>can revoke agent access</dd></div>
         </dl>
       </div>
 
@@ -55,8 +55,8 @@ export function Hero() {
         <div className="stage-floor" aria-hidden="true" />
         <motion.div className="stage-3d" style={{ rotateX: reduce ? 20 : rx, rotateY: reduce ? -16 : ry }}>
           <Device
-            className="hero-vault"
-            screen={{ kind: 'status', top: 'VAULT', big: 'Asleep', sub: 'no radio, infrared only' }}
+            className="hero-vault" variant="red"
+            screen={{ kind: 'status', top: 'SECOND STICK', big: 'Ready', sub: 'approvals by infrared' }}
           />
           <svg className="ir-beam" viewBox="0 0 100 120" preserveAspectRatio="none" aria-hidden="true">
             <path d="M40 118 C 55 80, 45 40, 62 2" />
@@ -66,9 +66,9 @@ export function Hero() {
             pressed={hold > 0 && hold < 1}
             screen={{
               kind: 'prompt',
-              title: "Raise research-bot's total",
-              amount: '$750',
-              line1: 'was $500',
+              title: "Raise Agent’s total",
+              amount: '20 µETH',
+              line1: 'was 5 µETH',
               line2: 'same expiry, 42 min left',
               hold,
             }}

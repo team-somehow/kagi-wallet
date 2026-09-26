@@ -44,3 +44,14 @@ export async function loadRoot(): Promise<import('./root').RootShare | null> {
 export async function saveRoot(r: import('./root').RootShare): Promise<void> {
   await SecureStore.setItemAsync(ROOT_KEY, JSON.stringify(r));
 }
+
+export interface PendingJoin { id: string; root: import('./root').RootShare }
+const JOIN_KEY = 'kagi.pending-join.v1';
+export async function loadPendingJoin(): Promise<PendingJoin | null> {
+  const raw = await SecureStore.getItemAsync(JOIN_KEY);
+  return raw ? JSON.parse(raw) as PendingJoin : null;
+}
+export async function savePendingJoin(join: PendingJoin): Promise<void> {
+  await SecureStore.setItemAsync(JOIN_KEY, JSON.stringify(join));
+}
+export async function clearPendingJoin(): Promise<void> { await SecureStore.deleteItemAsync(JOIN_KEY); }

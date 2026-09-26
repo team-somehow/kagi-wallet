@@ -8,8 +8,8 @@ import { colors, space } from '../../theme';
 
 const LADDER: { who: string; what: string }[] = [
   { who: 'agent', what: 'Spends on its own under a cap you set. Nobody in the loop.' },
-  { who: 'phone + wrist', what: 'Anything over the cap needs your face and a press on your wrist.' },
-  { who: 'vault', what: 'Anything bigger needs a device at home that only light can reach.' },
+  { who: 'phone + wrist', what: 'Anything over the cap needs your phone unlock and a hold on your wrist.' },
+  { who: 'second stick', what: 'Add another stick. New keys and higher limits then need all three, with infrared between the sticks.' },
 ];
 
 export default function Welcome() {

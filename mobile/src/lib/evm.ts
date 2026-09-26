@@ -17,6 +17,8 @@ import {
   createPublicClient,
   createWalletClient,
   http,
+  keccak256,
+  stringToHex,
   type Abi,
   type Hex,
 } from 'viem';
@@ -80,6 +82,12 @@ export function reason(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+export class PendingTransactionError extends Error {
+  constructor(public readonly hash: Hex) {
+    super('Submitted to Sepolia. Confirmation is still pending; do not send it again.');
+  }
+}
+
 export interface Sent {
   hash: Hex;
   status: 'success' | 'reverted';
@@ -87,6 +95,18 @@ export interface Sent {
 
 /** Simulate, send from the gas wallet, and wait for the receipt. onHash fires once it is sent. */
 async function call(address: Addr, abi: Abi, functionName: string, args: readonly unknown[], onHash?: (h: Hex) => void): Promise<Sent> {
+  const logical = JSON.stringify([address, functionName, args.slice(0, -2)], (_, v) => typeof v === 'bigint' ? v.toString() : v);
+  const journal = `kagi.pending.${keccak256(stringToHex(logical)).slice(2)}`;
+  const existing = await SecureStore.getItemAsync(journal) as Hex | null;
+  const receipt = async (hash: Hex): Promise<Sent> => {
+    onHash?.(hash);
+    try {
+      const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
+      await SecureStore.deleteItemAsync(journal);
+      return { hash, status: r.status };
+    } catch { throw new PendingTransactionError(hash); }
+  };
+  if (existing) return receipt(existing);
   const w = await walletClient();
   try {
     await pub.simulateContract({ account: w.account, address, abi, functionName, args });
@@ -94,9 +114,10 @@ async function call(address: Addr, abi: Abi, functionName: string, args: readonl
     throw new Error(`The account refused it: ${reason(e)}`);
   }
   const hash = await w.writeContract({ address, abi, functionName, args, chain: sepolia, ...(await fees()) });
-  onHash?.(hash);
-  const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
-  return { hash, status: r.status };
+  // Save the public hash before waiting so a retry after restart tracks the same transaction.
+  try { await SecureStore.setItemAsync(journal, hash); }
+  catch { onHash?.(hash); throw new PendingTransactionError(hash); }
+  return receipt(hash);
 }
 
 // ---- which account belongs to which key -------------------------------------------------
@@ -166,20 +187,24 @@ export async function grant(account: Addr, m: { agent: Addr; cap: bigint; expiry
 export async function sendGas(to: Addr, value: bigint): Promise<Sent> {
   const w = await walletClient();
   const hash = await w.sendTransaction({ to, value, chain: sepolia, ...(await fees()) });
-  const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
-  return { hash, status: r.status };
+  try {
+    const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
+    return { hash, status: r.status };
+  } catch {
+    throw new PendingTransactionError(hash);
+  }
 }
 
-export async function revoke(account: Addr, agent: Addr, sig: string) {
-  return call(account, KagiAccountAbi as Abi, 'revoke', [agent, ...split(sig)]);
+export async function revoke(account: Addr, agent: Addr, sig: string, onHash?: (h: Hex) => void) {
+  return call(account, KagiAccountAbi as Abi, 'revoke', [agent, ...split(sig)], onHash);
 }
 
-export async function raiseLimit(account: Addr, m: { agent: Addr; oldCap: bigint; newCap: bigint; expiry: bigint; sig: string }) {
-  return call(account, KagiAccountAbi as Abi, 'raiseLimit', [m.agent, m.oldCap, m.newCap, m.expiry, ...split(m.sig)]);
+export async function raiseLimit(account: Addr, m: { agent: Addr; oldCap: bigint; newCap: bigint; expiry: bigint; sig: string }, onHash?: (h: Hex) => void) {
+  return call(account, KagiAccountAbi as Abi, 'raiseLimit', [m.agent, m.oldCap, m.newCap, m.expiry, ...split(m.sig)], onHash);
 }
 
-export async function declineLimit(account: Addr, agent: Addr, newCap: bigint, sig: string) {
-  return call(account, KagiAccountAbi as Abi, 'declineLimit', [agent, newCap, ...split(sig)]);
+export async function declineLimit(account: Addr, agent: Addr, newCap: bigint, sig: string, onHash?: (h: Hex) => void) {
+  return call(account, KagiAccountAbi as Abi, 'declineLimit', [agent, newCap, ...split(sig)], onHash);
 }
 
 export async function execute(account: Addr, m: { to: Addr; value: bigint; data?: Hex; sig: string }) {

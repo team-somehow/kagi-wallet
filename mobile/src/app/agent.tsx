@@ -16,7 +16,7 @@ import { shortAddr } from '../lib/format';
 import { success, warn } from '../lib/haptics';
 import { colors, fonts, radius, space } from '../theme';
 
-type Phase = 'form' | 'sign' | 'submitting' | 'done' | 'error';
+type Phase = 'form' | 'sign' | 'submitting' | 'done' | 'error' | 'pending';
 
 // The agent pays its own gas, so its key gets a little Sepolia ETH with the grant: enough for
 // a handful of transfers and limit requests at about 1 gwei.
@@ -35,10 +35,10 @@ export default function NewAgentKey() {
   const { info, refresh, sessions } = useChain();
   const [name, setName] = useState(() => {
     const taken = new Set(sessions.map((x) => x.name));
-    if (!taken.has('trader')) return 'trader';
+    if (!taken.has('Agent')) return 'Agent';
     let n = 2;
-    while (taken.has(`trader ${n}`)) n++;
-    return `trader ${n}`;
+    while (taken.has(`Agent ${n}`)) n++;
+    return `Agent ${n}`;
   });
   const [allowance, setAllowance] = useState('0.000005');
   const [minutes, setMinutes] = useState('60');
@@ -103,9 +103,26 @@ export default function NewAgentKey() {
       void refresh();
     } catch (e) {
       setError(evm.reason(e));
+      if (e instanceof evm.PendingTransactionError) { setSentHash(e.hash); setPhase('pending'); return; }
       setPhase('error');
       void warn();
     }
+  };
+
+  const checkGrant = async () => {
+    if (!sentHash || !key) return;
+    setPhase('submitting');
+    try {
+      const receipt = await evm.pub.getTransactionReceipt({ hash: sentHash as `0x${string}` });
+      if (receipt.status !== 'success') { setError('The grant reverted on-chain.'); setPhase('error'); return; }
+      setHash(sentHash);
+      setGasStep('active');
+      try {
+        const gas = await evm.sendGas(key.address as `0x${string}`, AGENT_GAS);
+        setGasStep(gas.status === 'success' ? 'done' : 'failed');
+      } catch { setGasStep('failed'); }
+      setPhase('done'); void success(); void refresh();
+    } catch { setPhase('pending'); }
   };
 
   const copy = async (what: 'link' | 'key') => {
@@ -200,6 +217,13 @@ export default function NewAgentKey() {
         </View>
       ) : null}
 
+      {phase === 'pending' ? <View style={styles.gap}>
+        <Txt size={24}>Grant submitted</Txt>
+        <Txt size={15} color={colors.muted}>Sepolia has not confirmed yet. Your key stays saved while we track this transaction.</Txt>
+        <Button label="Check confirmation" onPress={() => void checkGrant()} />
+        <Button label="View on Etherscan" variant="secondary" onPress={() => void Linking.openURL(`${evm.EXPLORER}/tx/${sentHash}`)} />
+      </View> : null}
+
       {phase === 'error' ? (
         <View style={styles.gap}>
           <Txt size={22} weight="bold">
@@ -228,10 +252,10 @@ export default function NewAgentKey() {
             </Txt>
           ) : null}
           <Txt size={15} color={colors.muted} lineHeight={22}>
-            Copy the connector link and add it to ChatGPT, Claude, Codex or Cursor as an MCP server. It can only spend this allowance. It is not your wallet key, but keep it private.
+            Copy this temporary session key into your agent. It can spend only the approved allowance until it expires. Keep the key private.
           </Txt>
-          <Button label={copied === 'link' ? 'Copied' : 'Copy connector link'} variant="amber" onPress={() => void copy('link')} />
-          <Button label={copied === 'key' ? 'Copied' : 'Copy session key only'} variant="ghost" onPress={() => void copy('key')} />
+          <Button label={copied === 'key' ? 'Copied' : 'Copy session key'} variant="amber" onPress={() => void copy('key')} />
+          <Button label={copied === 'link' ? 'Copied' : 'Copy connector link'} variant="ghost" onPress={() => void copy('link')} />
         </View>
       ) : null}
     </Screen>

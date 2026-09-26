@@ -32,11 +32,11 @@
 #include "secrets.example.h"
 #endif
 
-static const char* FW = "0.2.0";
+static const char* FW = "0.3.1";
 
 // ---- look -----------------------------------------------------------------
 
-static uint16_t C_BG, C_TEXT, C_MUTED, C_FAINT, C_AMBER, C_RED, C_CELL, C_PANEL;
+static uint16_t C_BG, C_TEXT, C_MUTED, C_FAINT, C_ACCENT, C_RED, C_CELL, C_PANEL;
 static M5Canvas canvas(&M5.Display);
 static const int W = 240, H = 135;
 
@@ -183,11 +183,13 @@ static String shortHex(const String& h, int head, int tail) {
 // ETH with no trailing zeros: 0.000020 -> "0.00002 ETH".
 static String ethStr(double eth) {
   char b[32];
-  snprintf(b, sizeof b, "%.6f", eth);
+  bool micro = eth < 0.01;
+  if (eth > 0 && eth < 0.0000000001) return "<0.0001 uETH";
+  snprintf(b, sizeof b, micro ? "%.4f" : "%.6f", micro ? eth * 1000000 : eth);
   String s(b);
   while (s.endsWith("0")) s.remove(s.length() - 1);
   if (s.endsWith(".")) s.remove(s.length() - 1);
-  return s + " ETH";
+  return s + (micro ? " uETH" : " ETH");
 }
 
 static String minutesLeft(const String& expS) {
@@ -211,6 +213,16 @@ static char lastSource = 'u';  // 'u' USB serial, 'n' network: where the current
 
 // Wrist side of the root key.
 static uint8_t rshare[32], rgk[32], rX2new[32];
+// One atomic NVS record survives power loss before/after committing a reshare.
+struct JoinRecord {
+  uint32_t version = 0;
+  uint8_t share[32] = {}, group[32] = {}, vault[33] = {};
+  char id[33] = {};
+  bool committed = false;
+};
+static JoinRecord joinRecord;
+static String proposedJoinId;
+static bool soundsEnabled = true;
 static int rparties = 0;  // 0 none, 2 phone + wrist, 3 with the vault
 // The wallet key itself went through the reshare: after the commit it is 3 of 3, the old
 // 2-of-2 share is gone, and every approval goes phone -> wrist -> IR -> second stick.
@@ -295,10 +307,11 @@ static void flushOutbox() {
 
 // The speaker amp has to be off for the IR receiver to work, so it is on only while beeping.
 static void beep(int freq, int ms) {
+  if (!soundsEnabled) return;
   // The amp needs a moment to power up, and the tone plays from a background task:
   // wait for it to finish before switching the amp back off.
   if (!M5.Speaker.isEnabled()) M5.Speaker.begin();
-  M5.Speaker.setVolume(200);
+  M5.Speaker.setVolume(155);
   delay(30);
   M5.Speaker.tone(freq, ms);
   uint32_t t0 = millis();
@@ -310,16 +323,16 @@ static void beep(int freq, int ms) {
 
 static void buzz(int times = 3) {
   for (int i = 0; i < times; i++) {
-    beep(2600, 90);
+    beep(i % 2 ? 660 : 440, 95);
     delay(60);
   }
 }
 
-static void chirp() { beep(1800, 40); }
+static void chirp() { beep(780, 45); }
 static void chime() {
-  beep(1320, 70);
-  beep(1760, 70);
-  beep(2640, 120);
+  beep(523, 70);
+  beep(659, 70);
+  beep(784, 130);
 }
 
 // ---- storage --------------------------------------------------------------
@@ -366,6 +379,35 @@ static void wipeShare() {
 
 // ---- drawing --------------------------------------------------------------
 
+// A shallow lit surface keeps the tiny screen readable while giving it depth.
+static uint16_t themeGlow(uint8_t amount) {
+  return isVault ? M5.Display.color565(amount, amount * 105 / 255, amount * 126 / 255)
+                 : M5.Display.color565(amount * 90 / 255, amount * 190 / 255, amount);
+}
+static void drawSurface() {
+  for (int y = 0; y < H; y++) {
+    int glow = 27 * (H - y) / H;
+    canvas.drawFastHLine(0, y, W, isVault ? M5.Display.color565(18 + glow, 10 + glow / 3, 18 + glow / 2)
+                                        : M5.Display.color565(8 + glow / 3, 17 + glow / 2, 29 + glow));
+  }
+  canvas.drawRoundRect(1, 1, W - 2, H - 2, 9, themeGlow(70));
+  canvas.drawFastHLine(12, 2, W - 24, themeGlow(110));
+  canvas.drawFastHLine(12, H - 3, W - 24, C_BG);
+}
+static void deviceModel(int x, int y, bool red) {
+  uint16_t light = M5.Display.color565(red ? 197 : 80, red ? 101 : 150, red ? 115 : 210);
+  uint16_t body = M5.Display.color565(red ? 110 : 32, red ? 36 : 79, red ? 52 : 127);
+  canvas.fillRoundRect(x + 2, y + 4, 49, 32, 5, C_BG);
+  canvas.fillRoundRect(x, y, 49, 32, 5, body);
+  canvas.drawRoundRect(x, y, 49, 32, 5, light);
+  canvas.fillRoundRect(x + 5, y + 6, 28, 20, 2, C_BG);
+  canvas.drawFastHLine(x + 8, y + 11, 17, light);
+  canvas.drawFastHLine(x + 8, y + 16, 12, C_MUTED);
+  canvas.fillCircle(x + 41, y + 17, 5, C_BG);
+  canvas.fillCircle(x + 40, y + 15, 5, light);
+  canvas.drawCircle(x + 40, y + 15, 5, C_TEXT);
+}
+
 static void bar(int x, int y, int w, int h, double ratio, int cells = 20) {
   int gap = 2;
   int cw = (w - gap * (cells - 1)) / cells;
@@ -373,11 +415,11 @@ static void bar(int x, int y, int w, int h, double ratio, int cells = 20) {
   for (int i = 0; i < cells; i++) {
     bool on = i < lit;
     bool past = (double)i / cells >= 0.8;
-    uint16_t c = !on ? C_CELL : ratio >= 1 ? C_RED : past ? C_AMBER : C_TEXT;
+    uint16_t c = !on ? C_CELL : ratio >= 1 ? C_RED : past ? C_ACCENT : C_TEXT;
     canvas.fillRoundRect(x + i * (cw + gap), y, cw, h, 1, c);
   }
   int mx = x + (int)(0.8 * cells) * (cw + gap) - 1;
-  canvas.drawFastVLine(mx, y - 3, h + 6, C_AMBER);
+  canvas.drawFastVLine(mx, y - 3, h + 6, C_ACCENT);
 }
 
 
@@ -401,26 +443,28 @@ static void arrowsToA(int y, const char* label) {
     float ph = fmodf(t + i / 3.0f, 1.0f);
     int x = edge - dir * (int)(46 - ph * 40);
     uint8_t a = (uint8_t)(255 * (0.25f + 0.75f * ph));
-    uint16_t c = M5.Display.color565(a, (uint8_t)(a * 177 / 255), (uint8_t)(a * 59 / 255));
+    uint16_t c = themeGlow(a);
     for (int k = 0; k < 3; k++) {
       canvas.drawLine(x - dir * 7 + k * dir, y - 9, x + k * dir, y, c);
       canvas.drawLine(x - dir * 7 + k * dir, y + 9, x + k * dir, y, c);
     }
   }
   canvas.setFont(&fonts::FreeSansBold9pt7b);
-  canvas.setTextColor(C_AMBER);
+  canvas.setTextColor(C_ACCENT);
   canvas.setTextDatum(A_ON_RIGHT ? middle_right : middle_left);
   canvas.drawString(label, A_ON_RIGHT ? W - 58 : 58, y);
 }
 
 // The ring that fills while A is held, with an "A" in the middle.
 static void holdRing(int cx, int cy, int r) {
+  canvas.fillCircle(cx + 2, cy + 4, r + 1, C_BG);
+  canvas.fillCircle(cx, cy, r - 1, C_PANEL);
   canvas.drawCircle(cx, cy, r, C_CELL);
   canvas.drawCircle(cx, cy, r - 1, C_CELL);
-  if (holdProgress > 0) arcRing(cx, cy, r, 6, 0, 360 * holdProgress, C_AMBER);
+  if (holdProgress > 0) arcRing(cx, cy, r, 6, 0, 360 * holdProgress, C_ACCENT);
   canvas.setFont(&fonts::FreeSansBold12pt7b);
   canvas.setTextDatum(middle_center);
-  canvas.setTextColor(holdProgress > 0 ? C_AMBER : C_TEXT);
+  canvas.setTextColor(holdProgress > 0 ? C_ACCENT : C_TEXT);
   canvas.drawString("A", cx, cy + 1);
 }
 
@@ -459,7 +503,7 @@ static void drawIdle() {
     uint8_t a = (uint8_t)(200 * (1 - ph));
     canvas.drawCircle(cx, cy, r, M5.Display.color565(a, a, a));
   }
-  canvas.fillCircle(cx, cy, 5, C_AMBER);
+  canvas.fillCircle(cx, cy, 5, C_ACCENT);
   statusIcons();
 }
 
@@ -488,7 +532,7 @@ static void drawKeygen() {
     float ph = fmodf(t + i / 4.0f, 1.0f);
     int x = x0 + (int)((x1 - x0) * ph);
     int yy = y - (int)(10 * sinf(ph * 3.14159f));
-    canvas.fillCircle(x, yy, 3, C_AMBER);
+    canvas.fillCircle(x, yy, 3, C_ACCENT);
     float ph2 = fmodf(t + i / 4.0f + 0.5f, 1.0f);
     int xb = x1 - (int)((x1 - x0) * ph2);
     int yb = y + (int)(10 * sinf(ph2 * 3.14159f));
@@ -503,26 +547,28 @@ static void drawKeygen() {
 static void drawHome() {
   bool hot = expCap > 0 && expSpent / expCap >= 0.8;
   int cx = 52, cy = 72, r = 40;
+  canvas.fillCircle(cx + 2, cy + 4, r + 1, C_BG);
+  canvas.fillCircle(cx, cy, r - 1, C_PANEL);
   canvas.drawCircle(cx, cy, r, C_CELL);
   canvas.drawCircle(cx, cy, r - 7, C_CELL);
   if (expCap > 0) {
     float left = std::max(0.0, std::min(1.0, expLeft / expCap));
     // The ring sweeps in when the screen appears.
     float shown = left * easeOut(since(700));
-    arcRing(cx, cy, r, 8, 0, 360 * shown, hot ? C_AMBER : C_TEXT);
+    arcRing(cx, cy, r, 8, 0, 360 * shown, hot ? C_ACCENT : C_TEXT);
   }
   canvas.setFont(&fonts::FreeSansBold9pt7b);
   canvas.setTextDatum(middle_center);
-  canvas.setTextColor(expCap > 0 ? (hot ? C_AMBER : C_TEXT) : C_FAINT);
+  canvas.setTextColor(expCap > 0 ? (hot ? C_ACCENT : C_TEXT) : C_FAINT);
   canvas.drawString(expCap > 0 ? String((int)round(100 * expLeft / expCap)) + "%" : "-", cx, cy);
   int x = 106;
-  title("WRIST", C_MUTED);
+  title("ESP32 / WRIST", C_ACCENT);
   canvas.setFont(&fonts::FreeSans9pt7b);
   canvas.setTextDatum(top_left);
   canvas.setTextColor(C_MUTED);
-  canvas.drawString(expCap > 0 ? "Agents can spend" : "No keys yet", x, 38);
+  canvas.drawString(expCap > 0 ? "Remaining" : "No keys yet", x, 38);
   canvas.setFont(&fonts::FreeSansBold12pt7b);
-  canvas.setTextColor(expCap == 0 ? C_FAINT : hot ? C_AMBER : C_TEXT);
+  canvas.setTextColor(expCap == 0 ? C_FAINT : hot ? C_ACCENT : C_TEXT);
   canvas.drawString(expUnit == "ETH" ? ethStr(expCap > 0 ? expLeft : 0) : dollars(expCap > 0 ? expLeft : 0), x, 60);
   canvas.setFont(&fonts::FreeSans9pt7b);
   canvas.setTextColor(C_FAINT);
@@ -533,17 +579,23 @@ static void drawHome() {
 static void drawPrompt() {
   // The card slides in from the right.
   int off = (int)((1 - easeOut(since(260))) * W);
-  canvas.fillRoundRect(4 + off, 4, W - 8, H - 8, 8, C_PANEL);
-  canvas.drawRoundRect(4 + off, 4, W - 8, H - 8, 8, C_AMBER);
+  canvas.fillRoundRect(6 + off, 7, W - 8, H - 8, 8, C_BG);
+  canvas.fillRoundRect(4 + off, 4, W - 10, H - 11, 8, C_PANEL);
+  canvas.drawFastHLine(14 + off, 6, W - 32, themeGlow(170));
+  canvas.drawRoundRect(4 + off, 4, W - 8, H - 8, 8, C_ACCENT);
   canvas.setFont(&fonts::FreeSansBold9pt7b);
   canvas.setTextDatum(top_left);
-  canvas.setTextColor(C_AMBER);
+  canvas.setTextColor(C_ACCENT);
+  if (canvas.textWidth(prompt.title) > W - 28) canvas.setFont(&fonts::Font0);
   canvas.drawString(prompt.title, 14 + off, 12);
   canvas.setFont(&fonts::FreeSansBold18pt7b);
   canvas.setTextColor(C_TEXT);
+  if (canvas.textWidth(prompt.amount) > W - 28) canvas.setFont(&fonts::FreeSansBold12pt7b);
+  if (canvas.textWidth(prompt.amount) > W - 28) canvas.setFont(&fonts::FreeSansBold9pt7b);
   canvas.drawString(prompt.amount, 14 + off, 34);
   canvas.setFont(&fonts::FreeSans9pt7b);
   canvas.setTextColor(C_MUTED);
+  if (canvas.textWidth(prompt.line1) > W - 28) canvas.setFont(&fonts::Font0);
   canvas.drawString(prompt.line1, 14 + off, 70);
   if (prompt.line2.length()) {
     canvas.setFont(&fonts::Font0);
@@ -553,10 +605,10 @@ static void drawPrompt() {
   if (off == 0) {
     int ringX = A_ON_RIGHT ? W - 34 : 34;
     canvas.drawCircle(ringX, 108, 14, C_CELL);
-    if (holdProgress > 0) arcRing(ringX, 108, 14, 4, 0, 360 * holdProgress, C_AMBER);
+    if (holdProgress > 0) arcRing(ringX, 108, 14, 4, 0, 360 * holdProgress, C_ACCENT);
     canvas.setFont(&fonts::FreeSansBold9pt7b);
     canvas.setTextDatum(middle_center);
-    canvas.setTextColor(C_AMBER);
+    canvas.setTextColor(C_ACCENT);
     canvas.drawString("A", ringX, 109);
     canvas.setTextDatum(A_ON_RIGHT ? middle_right : middle_left);
     float bob = 3 * sinf(t01(700) * 6.283f);
@@ -579,7 +631,7 @@ static void drawResult() {
       int r0 = (int)(10 + 30 * e), r1 = (int)(18 + 42 * e);
       uint8_t a = (uint8_t)(255 * (1 - p));
       canvas.drawLine(cx + cosf(ang) * r0, cy + sinf(ang) * r0, cx + cosf(ang) * r1, cy + sinf(ang) * r1,
-                      M5.Display.color565(a, (uint8_t)(a * 177 / 255), (uint8_t)(a * 59 / 255)));
+                      themeGlow(a));
     }
     canvas.fillCircle(cx, cy, (int)(14 * e), resultColor);
     canvas.fillCircle(cx, cy, (int)(9 * e), C_BG);
@@ -600,20 +652,20 @@ static void drawResult() {
 }
 
 static void drawRevoked() {
-  title("WRIST", C_MUTED);
+  title("ESP32 / WRIST", C_ACCENT);
   canvas.setFont(&fonts::FreeSansBold12pt7b);
   canvas.setTextDatum(top_left);
   canvas.setTextColor(C_RED);
-  canvas.drawString("All keys revoked", 12, 42);
+  canvas.drawString("Stopping agents", 12, 42);
   canvas.setFont(&fonts::FreeSans9pt7b);
   canvas.setTextColor(C_MUTED);
-  canvas.drawString("No agent can spend until", 12, 78);
-  canvas.drawString("you issue a new key.", 12, 98);
+  canvas.drawString("Phone is confirming...", 12, 78);
+  canvas.drawString("Check the app for the result.", 12, 98);
   statusIcons();
 }
 
 static void drawConfirm(const char* t, const String& line, const char* hold) {
-  title(t, C_AMBER);
+  title(t, C_ACCENT);
   canvas.setFont(&fonts::FreeSans9pt7b);
   canvas.setTextDatum(top_left);
   canvas.setTextColor(C_TEXT);
@@ -625,17 +677,13 @@ static void drawConfirm(const char* t, const String& line, const char* hold) {
 // Two sticks facing each other, pulses of light between them, and how much has crossed.
 static void drawBeam() {
   bool bad = irui.lastBad && millis() - irui.lastBad < 900;
-  uint16_t beam = bad ? C_RED : C_AMBER;
+  uint16_t beam = bad ? C_RED : C_ACCENT;
   title(irui.label.c_str(), C_TEXT);
   int y = 62;
   // this stick on the left, the other on the right; the light flows from the sender
-  canvas.drawRoundRect(14, y - 22, 36, 44, 6, C_TEXT);
-  canvas.fillRect(20, y - 16, 24, 22, C_CELL);
-  canvas.fillCircle(50, y, 3, irui.sending ? beam : C_FAINT);
-  canvas.drawRoundRect(W - 50, y - 22, 36, 44, 6, C_MUTED);
-  canvas.fillRect(W - 44, y - 16, 24, 22, C_CELL);
-  canvas.fillCircle(W - 50, y, 3, irui.sending ? C_FAINT : beam);
-  int x0 = 58, x1 = W - 58;
+  deviceModel(10, y - 16, isVault);
+  deviceModel(W - 60, y - 16, !isVault);
+  int x0 = 67, x1 = W - 67;
   float t = t01(bad ? 1400 : 700);
   for (int i = 0; i < 5; i++) {
     float ph = fmodf(t + i / 5.0f, 1.0f);
@@ -668,7 +716,7 @@ static void draw() {
     lastDrawnMode = mode;
     modeSince = millis();
   }
-  canvas.fillSprite(C_BG);
+  drawSurface();
   if (isVaultRole() && (mode == Mode::Home || mode == Mode::Unpaired)) {
     drawVault();
     canvas.pushSprite(0, 0);
@@ -808,6 +856,7 @@ static void sendHello() {
   d["t"] = "hello";
   d["id"] = deviceId;
   d["fw"] = FW;
+  d["uiTheme"] = isVault ? "esp32-red-3d" : "esp32-blue-3d";
   d["reset"] = (int)esp_reset_reason();  // 1 power-on, 3 software, 4 panic, 5-7 watchdog, 9 brownout
   d["uptime"] = millis() / 1000;
   d["via"] = ble::connected() ? "ble" : relayUp ? "relay" : tcp.connected() ? "wifi" : "usb";
@@ -1171,10 +1220,31 @@ static void onExposure(JsonDocument& in) {
 // Vault: radio off except for a 2-minute window opened by holding A for 2 s, used only for the
 // reshare. It signs root actions over IR only, after a press of A on the vault itself.
 
+static void saveRoot();
+static bool persistJoin() {
+  Preferences p;
+  p.begin("root", false);
+  bool ok = p.putBytes("join", &joinRecord, sizeof joinRecord) == sizeof joinRecord;
+  p.end();
+  return ok;
+}
+static void applyJoinedShares() {
+  memcpy(rshare, joinRecord.share, 32);
+  memcpy(rgk, joinRecord.group, 32);
+  rparties = 3;
+  rootIsManager = true;
+  memcpy(share, rshare, 32);
+  mgr3 = true;
+  saveShare();
+  saveRoot();
+}
+
 static void loadRoot() {
   Preferences p;
   p.begin("root", false);
   isVault = p.getString("role", "wrist") == "vault";
+  soundsEnabled = p.getBool("sound", true);
+  if (p.getBytes("join", &joinRecord, sizeof joinRecord) != sizeof joinRecord) joinRecord = JoinRecord{};
   if (isVault) {
     if (p.getBytes("vdev", vdevPriv, 32) != 32) {
       frost::keypair(vdevPriv, vdevPub);
@@ -1188,6 +1258,9 @@ static void loadRoot() {
     rootIsManager = rparties && p.getBool("radopt", false);
   }
   p.end();
+  // Committing the single journal record is the durable decision. Complete its writes on boot.
+  if (!isVault && paired && joinRecord.version == 1 && joinRecord.committed &&
+      memcmp(joinRecord.group, groupKey, 32) == 0) applyJoinedShares();
 }
 
 static void saveRoot() {
@@ -1342,6 +1415,11 @@ static void onRootDkg(JsonDocument& in) {
 }
 
 static void onRootReshare(JsonDocument& in) {
+  uint8_t operation[16];
+  String id = in["id"] | "";
+  if (!rootIsManager || id.length() != 32 || !unhex(id.c_str(), operation, 16)) return reject("root_reshare", "bad_request");
+  if (mode == Mode::Prompt || rjob.active || rjob.held) return reject("root_reshare", "busy");
+  proposedJoinId = id;
   if (rparties != 2) return reject("root_reshare", rparties == 3 ? "already_3_of_3" : "no_root_key");
   if (!unhex(in["vaultPub"] | "", pendVaultPub, 33)) return reject("root_reshare", "bad_request");
   Prompt p;
@@ -1395,7 +1473,7 @@ static void onRootSign(JsonDocument& in) {
 
 static void irShowWaiting(const char* text) {
   resultText = text;
-  resultColor = C_AMBER;
+  resultColor = C_ACCENT;
   resultUntil = millis() + 600000;
   mode = Mode::Result;
   draw();
@@ -1659,16 +1737,16 @@ static void drawVault() {
 
   if (win) {
     // Pairing: radio pulses on the left, the code to compare, and the time left.
-    title("PAIRING", C_AMBER);
-    canvas.fillCircle(W - 38, 10, 3, ble::connected() ? C_TEXT : C_AMBER);
+    title("PAIRING", C_ACCENT);
+    canvas.fillCircle(W - 38, 10, 3, ble::connected() ? C_TEXT : C_ACCENT);
     int cx = 34, cy = 70;
     for (int i = 0; i < 3; i++) {
       float ph = fmodf(t01(1800) + i / 3.0f, 1.0f);
       int r = 5 + (int)(ph * 24);
       uint8_t a = (uint8_t)(230 * (1 - ph));
-      canvas.drawCircle(cx, cy, r, M5.Display.color565(a, (uint8_t)(a * 177 / 255), (uint8_t)(a * 59 / 255)));
+      canvas.drawCircle(cx, cy, r, themeGlow(a));
     }
-    canvas.fillCircle(cx, cy, 4, C_AMBER);
+    canvas.fillCircle(cx, cy, 4, C_ACCENT);
     canvas.setFont(&fonts::FreeSans9pt7b);
     canvas.setTextDatum(top_left);
     canvas.setTextColor(C_MUTED);
@@ -1683,7 +1761,7 @@ static void drawVault() {
     float frac = std::min(1.0f, left / 120000.0f);
     int bx = 12, bw = W - 24, by = 104;
     canvas.drawRoundRect(bx, by, bw, 8, 4, C_FAINT);
-    canvas.fillRoundRect(bx + 2, by + 2, std::max(4, (int)((bw - 4) * frac)), 4, 2, frac < 0.2f ? C_RED : C_AMBER);
+    canvas.fillRoundRect(bx + 2, by + 2, std::max(4, (int)((bw - 4) * frac)), 4, 2, frac < 0.2f ? C_RED : C_ACCENT);
     canvas.setFont(&fonts::Font0);
     canvas.setTextDatum(bottom_left);
     canvas.setTextColor(C_FAINT);
@@ -1695,7 +1773,7 @@ static void drawVault() {
 
   if (!vJoined) {
     // Waiting to be added: hold A for 2 s, with the ring filling as you hold.
-    title("2ND STICK", C_MUTED);
+    title("ESP32 / SECOND", C_ACCENT);
     static uint32_t pressAt = 0;
     if (M5.BtnA.isPressed()) {
       if (!pressAt) pressAt = millis();
@@ -1706,10 +1784,10 @@ static void drawVault() {
     int rx = A_ON_RIGHT ? 44 : W - 44, ry = 72, rr = 28;
     canvas.drawCircle(rx, ry, rr, C_CELL);
     canvas.drawCircle(rx, ry, rr - 1, C_CELL);
-    if (hp > 0) arcRing(rx, ry, rr, 6, 0, 360 * hp, C_AMBER);
+    if (hp > 0) arcRing(rx, ry, rr, 6, 0, 360 * hp, C_ACCENT);
     canvas.setFont(&fonts::FreeSansBold12pt7b);
     canvas.setTextDatum(middle_center);
-    canvas.setTextColor(hp > 0 ? C_AMBER : C_TEXT);
+    canvas.setTextColor(hp > 0 ? C_ACCENT : C_TEXT);
     canvas.drawString("A", rx, ry + 1);
     arrowsToA(56, "Hold A");
     canvas.setFont(&fonts::FreeSans9pt7b);
@@ -1722,12 +1800,14 @@ static void drawVault() {
   }
 
   // Joined: a closed ring, and what it is for. Held still: it is listening for the wrist.
-  title("2ND STICK", C_MUTED);
+  title("ESP32 / SECOND", C_ACCENT);
   int cx = 50, cy = 72, r = 38;
   float sweep = easeOut(since(700));
+  canvas.fillCircle(cx + 2, cy + 4, r + 1, C_BG);
+  canvas.fillCircle(cx, cy, r - 1, C_PANEL);
   canvas.drawCircle(cx, cy, r, C_CELL);
   canvas.drawCircle(cx, cy, r - 7, C_CELL);
-  arcRing(cx, cy, r, 7, 0, 360 * sweep, C_AMBER);
+  arcRing(cx, cy, r, 7, 0, 360 * sweep, C_ACCENT);
   canvas.setFont(&fonts::FreeSansBold12pt7b);
   canvas.setTextDatum(middle_center);
   canvas.setTextColor(C_TEXT);
@@ -1746,10 +1826,10 @@ static void drawVault() {
   canvas.drawString("Signs only by IR", x, 80);
   // IR ready: a small beam mark pointing out toward the wrist
   int iy = 108;
-  canvas.fillCircle(x + 4, iy, 3, C_AMBER);
-  for (int i = 1; i <= 3; i++) canvas.drawArc(x + 4, iy, 4 + i * 5, 3 + i * 5, 300, 60, i == 1 ? C_AMBER : C_FAINT);
+  canvas.fillCircle(x + 4, iy, 3, C_ACCENT);
+  for (int i = 1; i <= 3; i++) canvas.drawArc(x + 4, iy, 4 + i * 5, 3 + i * 5, 300, 60, i == 1 ? C_ACCENT : C_FAINT);
   canvas.setTextColor(C_FAINT);
-  canvas.drawString("Face the wrist", x + 30, iy - 8);
+  canvas.drawString("Align", x + 30, iy - 8);
 }
 
 static void approveRoot() {
@@ -1786,6 +1866,14 @@ static void approveRoot() {
       reject("root_reshare", "seal_failed");
       return;
     }
+    JoinRecord previous = joinRecord;
+    joinRecord = JoinRecord{};
+    joinRecord.version = 1;
+    memcpy(joinRecord.share, rX2new, 32);
+    memcpy(joinRecord.group, rgk, 32);
+    memcpy(joinRecord.vault, pendVaultPub, 33);
+    proposedJoinId.toCharArray(joinRecord.id, sizeof joinRecord.id);
+    if (!persistJoin()) { joinRecord = previous; reject("root_reshare", "storage_failed"); return; }
     JsonDocument pc;
     pc["t"] = "reshare_piece";
     pc["to"] = "vault";
@@ -1810,7 +1898,22 @@ static void handle(const String& line) {
   String t = in["t"] | "";
   if (t == "hub_ping") return;  // keeps the WiFi socket alive, says nothing about the phone
   lastPhone = millis();
-  if (t == "hello?") sendHello();
+  if (t == "ui_snapshot" && lastSource == 'u' && !rjob.active && !rjob.held && !vjob.active && mode != Mode::Beam && mode != Mode::Prompt) {
+    Serial.printf("{\"t\":\"ui_snapshot\",\"width\":240,\"height\":135,\"bytes\":97200}\n");
+    for (int y = 0; y < H; y++) {
+      uint8_t row[W * 3];
+      for (int x = 0; x < W; x++) {
+        uint16_t rgb = canvas.readPixel(x, y);
+        row[x * 3] = ((rgb >> 11) & 31) * 255 / 31; row[x * 3 + 1] = ((rgb >> 5) & 63) * 255 / 63; row[x * 3 + 2] = (rgb & 31) * 255 / 31;
+      }
+      size_t sent = 0; uint32_t started = millis();
+      while (sent < sizeof row) { if (!Serial || millis() - started > 1000) return; size_t n = Serial.write(row + sent, sizeof row - sent); if (!n) delay(1); sent += n; }
+    }
+    return;
+  } else if (t == "sound") {
+    soundsEnabled = in["enabled"] | true;
+    Preferences p; p.begin("root", false); p.putBool("sound", soundsEnabled); p.end();
+  } else if (t == "hello?") sendHello();
   else if (t == "ping") {
   } else if (t == "pair") onPair(in);
   else if (t == "pair_cancel") {
@@ -1822,6 +1925,7 @@ static void handle(const String& line) {
     // Start the reshare from the wallet key itself, so the account's key stays the same.
     JsonDocument d;
     d["t"] = "root_adopted";
+    d["joinProtocol"] = 1;
     if (!paired) d["error"] = "not_paired";
     else if (mgr3) d["error"] = "already_3_of_3";
     else {
@@ -1835,22 +1939,28 @@ static void handle(const String& line) {
     }
     send(d);
   } else if (t == "root_commit") {
-    if (rparties == 2) {
-      memcpy(rshare, rX2new, 32);
-      memset(rX2new, 0, 32);
-      rparties = 3;
-      if (rootIsManager) {
-        // The old wallet share is replaced, so phone and wrist alone can no longer sign.
-        memcpy(share, rshare, 32);
-        mgr3 = true;
-        saveShare();
-      }
-      saveRoot();
-      showResult(rootIsManager ? "Now 3 of 3" : "Root is 3 of 3", C_TEXT, 4000, Fx::Burst);
-      chime();
-    }
+    String id = in["id"] | "";
+    uint8_t expectedGroup[32], expectedPublic[33], actualPublic[33];
+    bool valid = !isVault && paired && joinRecord.version == 1 && id == String(joinRecord.id) &&
+      unhex(in["groupKey"] | "", expectedGroup, 32) && unhex(in["X2"] | "", expectedPublic, 33) &&
+      memcmp(expectedGroup, joinRecord.group, 32) == 0 && memcmp(groupKey, joinRecord.group, 32) == 0;
+    if (valid) { frost::pubOf(joinRecord.share, actualPublic); valid = memcmp(expectedPublic, actualPublic, 33) == 0; }
     JsonDocument d;
     d["t"] = "root_committed";
+    d["id"] = id;
+    if (!valid) d["error"] = "no_matching_staged_join";
+    else {
+      bool wasCommitted = joinRecord.committed;
+      joinRecord.committed = true;
+      if (!persistJoin()) { joinRecord.committed = wasCommitted; d["error"] = "storage_failed"; }
+      else {
+        applyJoinedShares();
+        memset(rX2new, 0, 32);
+        d["groupKey"] = hex(rgk, 32);
+        showResult("Now 3 of 3", C_TEXT, 4000, Fx::Burst);
+        if (!wasCommitted) chime();
+      }
+    }
     d["parties"] = rparties;
     send(d);
   } else if (t == "root_sign") onRootSign(in);
@@ -1952,7 +2062,7 @@ static void handle(const String& line) {
   } else if (t == "beep") {
     // Find which stick is which: it beeps and flashes its name.
     buzz(2);
-    showResult(isVault ? "This is the vault" : "This is the wrist", C_AMBER, 3000);
+    showResult(isVault ? "This is the vault" : "This is the wrist", C_ACCENT, 3000);
   } else if (t == "ir_bench_rx") {
     benchInbound = in["inbound"] | false;
     irRxAnimate = in["animate"] | false;
@@ -2379,7 +2489,7 @@ void setup() {
   C_TEXT = M5.Display.color565(236, 233, 225);
   C_MUTED = M5.Display.color565(142, 147, 155);
   C_FAINT = M5.Display.color565(88, 93, 101);
-  C_AMBER = M5.Display.color565(255, 177, 59);
+  C_ACCENT = M5.Display.color565(255, 177, 59);
   C_RED = M5.Display.color565(255, 90, 78);
   C_CELL = M5.Display.color565(38, 41, 47);
   C_PANEL = M5.Display.color565(17, 19, 22);
@@ -2408,6 +2518,10 @@ void setup() {
   ir::onRecvProgress(irOnRecv);
   loadShare();
   loadRoot();
+  C_BG = M5.Display.color565(7, 10, 16);
+  C_ACCENT = isVault ? M5.Display.color565(255, 132, 146) : M5.Display.color565(131, 214, 235);
+  C_PANEL = isVault ? M5.Display.color565(43, 22, 30) : M5.Display.color565(19, 37, 56);
+  C_CELL = isVault ? M5.Display.color565(82, 44, 53) : M5.Display.color565(41, 67, 90);
   // The wrist advertises all the time; the vault only while its window is open.
   ble::begin(String(isVault ? "Kagi vault-" : "Kagi wrist-") + deviceId.substring(6), !isVault);
 #ifndef KAGI_NO_WIFI

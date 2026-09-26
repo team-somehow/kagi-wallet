@@ -7,17 +7,18 @@ import { Txt } from '../../components/Txt';
 import { Button } from '../../components/Button';
 import { Fact } from '../../components/Fact';
 import { ManagerSign } from '../../components/ManagerSign';
-import { fmtEth, useChain } from '../../store/chain';
+import { fmtAmount, fmtEth, useChain } from '../../store/chain';
 import * as evm from '../../lib/evm';
 import { evmDeclineMessage, phoneOnlySign } from '../../lib/frost';
 import { loadShard, rand } from '../../lib/shard';
 import { unlockShard } from '../../lib/biometrics';
+import { success } from '../../lib/haptics';
 import { shortAddr } from '../../lib/format';
 import { colors, radius, space } from '../../theme';
 
 /**
  * An agent hit its allowance and asks for a higher total. This is more future access,
- * not a one-off payment. The decision is made on the stick; the hub confirms the new
+ * not a one-off payment. The decision is made on the stick; the phone confirms the new
  * cap on-chain before the agent retries.
  */
 export default function LimitRequestScreen() {
@@ -34,6 +35,25 @@ export default function LimitRequestScreen() {
       live = false;
     };
   }, [refresh]);
+
+  useEffect(() => {
+    if (r?.status !== 'submitting' || !r.hash) return;
+    let live = true;
+    const hash = r.hash as `0x${string}`;
+    const check = async () => {
+      try {
+        const receipt = await evm.pub.getTransactionReceipt({ hash });
+        if (!live) return;
+        if (receipt.status === 'reverted') {
+          setSent(false);
+          setLimitLocal(r.id, { status: 'waiting', hash: null, error: 'The transaction reverted. Review the current limit and try again.' });
+        } else void refresh();
+      } catch { /* Not mined or temporarily offline: keep tracking the public hash. */ }
+    };
+    void check();
+    const timer = setInterval(() => void check(), 8000);
+    return () => { live = false; clearInterval(timer); };
+  }, [r?.status, r?.hash, r?.id, refresh, setLimitLocal]);
 
   if (!r) {
     return (
@@ -58,10 +78,14 @@ export default function LimitRequestScreen() {
       const i = (await refresh()) ?? info;
       if (!i) throw new Error('Could not read Sepolia.');
       const sig = phoneOnlySign(shard, evmDeclineMessage(i.chainId, r.account, i.nonce, r.agent, r.newCap), rand);
-      const d = await evm.declineLimit(r.account as `0x${string}`, r.agent as `0x${string}`, r.newCap, sig);
+      const d = await evm.declineLimit(r.account as `0x${string}`, r.agent as `0x${string}`, r.newCap, sig, (hash) => setLimitLocal(r.id, { hash }));
       setLimitLocal(r.id, { status: d.status === 'success' ? 'rejected' : 'failed', hash: d.hash, error: d.status === 'success' ? null : 'The decline reverted.' });
       void refresh();
     } catch (e) {
+      if (e instanceof evm.PendingTransactionError) {
+        setLimitLocal(r.id, { status: 'submitting', hash: e.hash, error: e.message });
+        return;
+      }
       setSent(false);
       setLimitLocal(r.id, { status: 'waiting', error: evm.reason(e) });
     }
@@ -71,11 +95,17 @@ export default function LimitRequestScreen() {
     setSent(true);
     setLimitLocal(r.id, { status: 'submitting', error: null });
     try {
-      const x = await evm.raiseLimit(r.account as `0x${string}`, { agent: r.agent as `0x${string}`, oldCap: r.oldCap, newCap: r.newCap, expiry: r.expiry, sig });
+      const x = await evm.raiseLimit(r.account as `0x${string}`, { agent: r.agent as `0x${string}`, oldCap: r.oldCap, newCap: r.newCap, expiry: r.expiry, sig }, (hash) => setLimitLocal(r.id, { hash }));
+      if (x.status === 'success') void success();
       setLimitLocal(r.id, { status: x.status === 'success' ? 'confirmed' : 'failed', hash: x.hash, error: x.status === 'success' ? null : 'The raise reverted on-chain.' });
       void refresh();
     } catch (e) {
-      setLimitLocal(r.id, { status: 'failed', error: evm.reason(e) });
+      if (e instanceof evm.PendingTransactionError) {
+        setLimitLocal(r.id, { status: 'submitting', hash: e.hash, error: e.message });
+        return;
+      }
+      setSent(false);
+      setLimitLocal(r.id, { status: 'waiting', error: evm.reason(e) });
     }
   };
 
@@ -100,19 +130,19 @@ export default function LimitRequestScreen() {
               <Txt size={13} color={colors.muted}>
                 Total now
               </Txt>
-              <Txt mono size={17}>
-                {fmtEth(r.oldCap)}
+              <Txt size={27}>
+                {fmtAmount(r.oldCap)}
               </Txt>
             </View>
             <Txt size={20} color={colors.amber}>
-              {'>'}
+              {'→'}
             </Txt>
             <View style={[styles.capCol, styles.right]}>
               <Txt size={13} color={colors.muted}>
                 New total
               </Txt>
-              <Txt mono size={17} color={colors.amber}>
-                {fmtEth(r.newCap)}
+              <Txt size={27} color={colors.amber}>
+                {fmtAmount(r.newCap)}
               </Txt>
             </View>
           </View>
@@ -135,7 +165,6 @@ export default function LimitRequestScreen() {
           ) : (
             <>
               <ManagerSign
-                autoStart
                 action="Raise limit"
                 phoneDetail="Unlock your share with your fingerprint"
                 payload={{
@@ -151,7 +180,7 @@ export default function LimitRequestScreen() {
                 }}
                 onReject={(reason) => {
                   // B on the stick is a decision. A timeout is not: the owner can try again.
-                  if (reason === 'user') void decline();
+                  if (reason === 'user' || reason === 'vault_rejected') void decline();
                 }}
                 onDone={(sig) => void approve(sig)}
               />
@@ -165,21 +194,25 @@ export default function LimitRequestScreen() {
             {r.error}
           </Txt>
         ) : null}
-        {r.status === 'submitting' ? <Status title="Sending your answer to Sepolia" body="The agent stays paused until it confirms on-chain." /> : null}
+        {r.status === 'submitting' ? <>
+          <Status title="Confirming on Sepolia" body="Your answer is submitted. The agent stays paused until the chain confirms it." />
+          {r.hash ? <Button label="Track transaction" variant="secondary" onPress={() => void Linking.openURL(`${explorer}/tx/${r.hash}`)} /> : null}
+          <Button label="Check confirmation" variant="ghost" onPress={() => void refresh()} />
+        </> : null}
         {r.status === 'confirmed' ? (
           <>
-            <Status title="New limit confirmed" body={`${r.name} can now spend up to ${fmtEth(r.newCap)} in total. It will retry its transfer.`} />
+            <Status title="New limit confirmed" body={`${r.name} can now spend up to ${fmtAmount(r.newCap)} in total. It will retry its transfer.`} />
             {r.hash ? <Button label="View on Etherscan" variant="secondary" onPress={() => void Linking.openURL(`${explorer}/tx/${r.hash}`)} /> : null}
             <Button label="Done" onPress={() => router.back()} />
           </>
         ) : null}
         {r.status === 'rejected' ? (
           <>
-            <Status title="Declined" body={`The limit stays at ${fmtEth(r.oldCap)}. The waiting transfer was not sent.`} />
+            <Status title="Declined" body={`The limit stays at ${fmtAmount(r.oldCap)}. The waiting transfer was not sent.`} />
             <Button label="Done" onPress={() => router.back()} />
           </>
         ) : null}
-        {r.status === 'expired' ? <Status title="Request expired" body={`Nobody answered in time. The limit stays at ${fmtEth(r.oldCap)}.`} /> : null}
+        {r.status === 'expired' ? <Status title="Request expired" body={`Nobody answered in time. The limit stays at ${fmtAmount(r.oldCap)}.`} /> : null}
         {r.status === 'failed' ? <Status title="The raise did not go through" body={r.error ?? 'It failed on-chain. The old limit stands.'} warn /> : null}
       </View>
     </Screen>

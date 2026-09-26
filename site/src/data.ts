@@ -116,10 +116,10 @@ export const MCP_SRC_URL = `${REPO_URL}/tree/main/agent-mcp`;
 // The shared Kagi MCP server. Each person's connector link points here and carries their own key.
 export const MCP_URL = 'https://13-235-16-182.sslip.io';
 export const FIRMWARE = {
-  version: '0.2.0',
+  version: '0.3.1',
   manifest: './firmware/manifest.json',
-  bin: './firmware/kagi-firmware-0.2.0.bin',
-  sha256: '4b91196a4ccc858e206e37849e1a51a0b194b45f93b5ac785600ee2f2c07fb9d',
+  bin: './firmware/kagi-firmware-0.3.1.bin',
+  sha256: '4ffb2a7c769878512ddedd57ee0dbb9da1287427fdeaf742cb1550cd509742fd',
 };
 
 export const sources: { title: string; outlet: string; url: string }[] = [

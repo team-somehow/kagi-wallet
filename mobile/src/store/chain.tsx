@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { AppState } from 'react-native';
 import { router, useRootNavigationState } from 'expo-router';
 import * as bg from '../../modules/kagi-background';
+import { formatEther, formatUnits } from 'viem';
 import { link } from '../lib/link';
 import { buzz } from '../lib/haptics';
 import * as evm from '../lib/evm';
@@ -80,10 +81,8 @@ interface Ctx {
 }
 
 const ChainCtx = createContext<Ctx | null>(null);
-export const fmtEth = (wei: bigint) => {
-  const s = (Number(wei) / 1e18).toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
-  return `${s} ETH`;
-};
+export const fmtEth = (wei: bigint) => `${formatEther(wei)} ETH`;
+export const fmtAmount = (wei: bigint) => wei < 10n ** 16n ? `${formatUnits(wei, 12)} µETH` : fmtEth(wei);
 
 // A stable notification id per request, from its transaction hash.
 const alertId = (hash: string) => parseInt(hash.slice(2, 9), 16);

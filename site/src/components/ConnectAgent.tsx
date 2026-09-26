@@ -29,27 +29,12 @@ type Target = {
 
 const TARGETS: Target[] = [
   {
-    id: 'claude',
-    name: 'Claude',
-    how: 'Web and desktop',
-    copy: (u) => u,
-    open: () => 'https://claude.ai/settings/connectors',
-    after: 'Link copied. In Connectors, choose Add custom connector, name it Kagi and paste.',
-  },
-  {
     id: 'chatgpt',
     name: 'ChatGPT',
     how: 'Developer mode',
     copy: (u) => u,
     open: () => 'https://chatgpt.com/#settings/Connectors',
     after: 'Link copied. Turn on Developer mode under Advanced, create a connector, paste, and pick No authentication.',
-  },
-  {
-    id: 'claude-code',
-    name: 'Claude Code',
-    how: 'Terminal',
-    copy: (u) => `claude mcp add --transport http ${NAME} ${u}`,
-    after: 'Command copied. Run it in your terminal, then start claude.',
   },
   {
     id: 'codex',
@@ -116,7 +101,7 @@ export function ConnectAgent() {
       <div className="wrap">
         <div className="section-head">
           <h2>Connect your AI</h2>
-          <p>Give ChatGPT, Claude or Codex a key of its own. It spends within the allowance you set, and anything more waits for a hold on your stick.</p>
+          <p>Give an agent a key of its own. It spends within the allowance you set, and anything more waits for a hold on your stick.</p>
         </div>
 
         <ol className="steps steps-3">

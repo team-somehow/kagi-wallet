@@ -64,7 +64,6 @@ export function WristBridge() {
           dispatch({ type: 'WRIST', patch: { paired: true, groupKey: String(m.groupKey) } });
           break;
         case 'revoke_all':
-          dispatch({ type: 'REVOKE_ALL' });
           // The wrist asked; the phone's shard alone signs the on-chain revokes.
           void revokeAllOnChain(addressRef.current);
           void buzz();

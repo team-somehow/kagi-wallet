@@ -48,7 +48,9 @@ class Link {
   send(m: Msg): boolean {
     const role: Role = m.to === 'vault' ? 'vault' : 'wrist';
     if (!ble.state()[role]) return false;
-    void ble.send(role, JSON.stringify(m));
+    void ble.send(role, JSON.stringify(m)).then((ok) => {
+      if (!ok) this.listeners.forEach((l) => l({ t: 'delivery_error', role, request: m.t, id: m.id }));
+    });
     return true;
   }
 
@@ -61,8 +63,11 @@ class Link {
 
   /** Resolve with the first message matching pred, reject after ms. */
   waitFor<T extends Msg = Msg>(pred: (m: Msg) => boolean, ms: number, what = 'the wrist'): Promise<T> {
-    return new Promise((resolve, reject) => {
+    const promise = new Promise<T>((resolve, reject) => {
       const off = this.on((m) => {
+        if (m.t === 'delivery_error') {
+          off(); clearTimeout(timer); reject(new Error(`Lost the ${String(m.role)} connection. Reconnect and retry.`)); return;
+        }
         if (!pred(m)) return;
         off();
         clearTimeout(timer);
@@ -73,6 +78,10 @@ class Link {
         reject(new Error(`No answer from ${what}.`));
       }, ms);
     });
+    // Some callers leave before awaiting a response (cancel/disconnect). Preserve rejection for
+    // awaiting callers while preventing an abandoned response from becoming unhandled.
+    void promise.catch(() => {});
+    return promise;
   }
 }
 

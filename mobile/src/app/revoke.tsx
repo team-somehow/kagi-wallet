@@ -1,38 +1,62 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Linking, View } from 'react-native';
 import { router } from 'expo-router';
 import { Screen } from '../components/Screen';
 import { Txt } from '../components/Txt';
 import { Button } from '../components/Button';
-import { LedBar } from '../components/LedBar';
 import { useStore } from '../store/store';
+import { useChain } from '../store/chain';
+import { revokeAllOnChain, useRevocation } from '../lib/chainRevoke';
+import { EXPLORER } from '../lib/evm';
 import { colors, space } from '../theme';
 
 export default function Revoked() {
   const { state } = useStore();
-  const count = state.keys.filter((k) => k.status === 'revoked').length;
+  const { refresh } = useChain();
+  const r = useRevocation();
+  const done = r.phase === 'done';
   return (
-    <Screen footer={<Button label="Back to wallet" onPress={() => router.back()} />}>
-      <View style={styles.body}>
-        <Txt size={32} weight="bold" lineHeight={36} color={colors.red}>
-          Every key is revoked
-        </Txt>
-        <View style={styles.bar}>
-          <LedBar ratio={0} />
-        </View>
-        <Txt size={17} color={colors.text}>
-          {count === 1 ? 'One key' : `${count} keys`} went dead on chain. No agent can move anything from this wallet
-          until you issue a new key.
+    <Screen
+      footer={
+        <Button
+          label="Back to wallet"
+          onPress={() => {
+            void refresh();
+            router.back();
+          }}
+        />
+      }
+    >
+      <View style={{ marginTop: space.xxl, gap: space.l }}>
+        <Txt size={32} weight="bold" lineHeight={38}>
+          {done
+            ? 'Agent access stopped'
+            : r.phase === 'error'
+              ? 'Revocation needs attention'
+              : r.phase === 'idle'
+                ? 'Revoke agent access'
+                : 'Stopping agent access'}
         </Txt>
         <Txt size={17} color={colors.muted}>
-          Your phone did that alone. Any single shard can revoke. It takes both to grant.
+          {done
+            ? `${r.confirmed} ${r.confirmed === 1 ? 'key revoked' : 'keys revoked'} in this run. No saved active session keys remain.`
+            : 'Keys can still spend until their revocation confirms on Sepolia. Keep this phone connected.'}
+        </Txt>
+        {r.error ? <Txt color={colors.amber}>{r.error}</Txt> : null}
+        {r.hash ? (
+          <Button
+            label="Track transaction"
+            variant="secondary"
+            onPress={() => void Linking.openURL(`${EXPLORER}/tx/${r.hash}`)}
+          />
+        ) : null}
+        {r.phase === 'error' || r.phase === 'idle' ? (
+          <Button label="Check and retry" onPress={() => void revokeAllOnChain(state.address).then(() => refresh())} />
+        ) : null}
+        <Txt size={14} color={colors.muted}>
+          The phone can revoke access by itself. Granting more access still needs your devices.
         </Txt>
       </View>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  body: { marginTop: space.xxl, gap: space.l },
-  bar: { paddingRight: 1 },
-});

@@ -14,6 +14,7 @@ import { ChainProvider } from '../store/chain';
 import { colors } from '../theme';
 import { buzz } from '../lib/haptics';
 import { WristBridge } from '../components/WristBridge';
+import { PresentationProvider } from '../components/Presentation';
 import { BackgroundKeeper } from '../components/BackgroundKeeper';
 import { AUTOTEST } from '../lib/biometrics';
 import { View } from 'react-native';
@@ -71,6 +72,7 @@ export default function RootLayout() {
     <StoreProvider>
       <ChainProvider>
       <ThemeProvider value={theme}>
+      <PresentationProvider>
         <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
           <Stack.Screen name="index" />
@@ -92,6 +94,7 @@ export default function RootLayout() {
         <IncomingWatcher />
         <WristBridge />
         <BackgroundKeeper />
+      </PresentationProvider>
       </ThemeProvider>
       </ChainProvider>
     </StoreProvider>

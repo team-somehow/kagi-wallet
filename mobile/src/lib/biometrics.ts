@@ -7,8 +7,8 @@ export type UnlockResult =
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * Gate access to the phone shard. On devices without enrolled biometrics
- * (most simulators) this falls through after a short delay so demos never stall.
+ * Gate access to the phone shard. Use the platform device-passcode fallback when
+ * biometrics are unavailable. Only the explicitly marked AUTOTEST build may bypass this.
  */
 /**
  * EXPO_PUBLIC_AUTOTEST=1 skips the fingerprint so the whole flow can be driven by a script.
@@ -22,15 +22,10 @@ export async function unlockShard(prompt: string): Promise<UnlockResult> {
     return { ok: true, method: 'none' };
   }
   try {
-    const hw = await LocalAuthentication.hasHardwareAsync();
-    const enrolled = hw && (await LocalAuthentication.isEnrolledAsync());
-    if (!hw || !enrolled) {
-      await wait(700);
-      return { ok: true, method: 'none' };
-    }
     const r = await LocalAuthentication.authenticateAsync({
       promptMessage: prompt,
       cancelLabel: 'Cancel',
+      disableDeviceFallback: false,
     });
     if (r.success) return { ok: true, method: 'biometric' };
     if (r.error === 'user_cancel' || r.error === 'app_cancel' || r.error === 'system_cancel') {
@@ -38,8 +33,7 @@ export async function unlockShard(prompt: string): Promise<UnlockResult> {
     }
     return { ok: false, reason: 'Could not verify you. Try again.' };
   } catch {
-    await wait(500);
-    return { ok: true, method: 'none' };
+    return { ok: false, reason: 'Could not verify you. Unlock with your device passcode and try again.' };
   }
 }
 

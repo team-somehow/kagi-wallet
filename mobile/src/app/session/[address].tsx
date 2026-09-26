@@ -9,7 +9,7 @@ import { Button } from '../../components/Button';
 import { Fact } from '../../components/Fact';
 import { HoldButton } from '../../components/HoldButton';
 import { LedBar } from '../../components/LedBar';
-import { fmtEth, useChain } from '../../store/chain';
+import { fmtAmount, fmtEth, useChain } from '../../store/chain';
 import * as evm from '../../lib/evm';
 import { evmRevokeMessage, phoneOnlySign } from '../../lib/frost';
 import { loadShard, rand } from '../../lib/shard';
@@ -112,10 +112,10 @@ export default function SessionDetail() {
 
         <View style={styles.card}>
           <Txt size={13} color={colors.muted}>
-            {s.status === 'active' ? 'Can still spend' : 'Could have spent'}
+            {s.status === 'active' ? 'Allowance remaining' : 'Could have spent'}
           </Txt>
           <Txt mono size={30} weight="bold" color={s.status !== 'active' ? colors.faint : ratio >= 0.8 ? colors.amber : colors.text}>
-            {fmtEth(s.status === 'active' ? left : 0n)}
+            {fmtAmount(s.status === 'active' ? left : 0n)}
           </Txt>
           <LedBar ratio={ratio} />
           <Fact label="Spent" value={fmtEth(s.spent)} />
@@ -144,10 +144,10 @@ export default function SessionDetail() {
 
         {s.status === 'active' && s.local ? (
           <View style={styles.gap}>
-            <Button label={copied === 'link' ? 'Copied' : 'Copy connector link'} variant="secondary" onPress={() => void copy('link')} />
-            <Button label={copied === 'key' ? 'Copied' : 'Copy session key only'} variant="ghost" onPress={() => void copy('key')} />
+            <Button label={copied === 'key' ? 'Copied' : 'Copy session key'} onPress={() => void copy('key')} />
+            <Button label={copied === 'link' ? 'Copied' : 'Copy connector link'} variant="ghost" onPress={() => void copy('link')} />
             <Txt size={13} color={colors.faint}>
-              Add the link to ChatGPT, Claude, Codex or Cursor as an MCP server. It spends only this allowance, so keep it private.
+              Give this temporary key to your agent. It spends only the remaining allowance until expiry. Keep the key private.
             </Txt>
           </View>
         ) : null}

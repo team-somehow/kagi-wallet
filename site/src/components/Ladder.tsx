@@ -6,13 +6,13 @@ const DEVICES: { id: Who; name: string }[] = [
   { id: 'agent', name: 'Agent' },
   { id: 'phone', name: 'Phone' },
   { id: 'wrist', name: 'Wrist' },
-  { id: 'vault', name: 'Vault' },
+  { id: 'vault', name: 'Second stick' },
 ];
 const TIERS: { title: string; you: string; signs: Who[]; tone: 'quiet' | 'human' | 'stop' }[] = [
   { title: 'Spend under the cap', you: 'Nothing', signs: ['agent'], tone: 'quiet' },
-  { title: 'Issue a key, raise a limit', you: 'Face ID, then hold A', signs: ['phone', 'wrist'], tone: 'human' },
-  { title: 'Move the treasury', you: 'Point your wrist at the vault', signs: ['phone', 'wrist', 'vault'], tone: 'human' },
-  { title: 'Stop an agent', you: 'One tap', signs: ['phone'], tone: 'stop' },
+  { title: 'Issue a key, raise a limit', you: 'Unlock phone, then hold A', signs: ['phone', 'wrist'], tone: 'human' },
+  { title: 'Approve after adding a stick', you: 'Unlock phone, hold A on both', signs: ['phone', 'wrist', 'vault'], tone: 'human' },
+  { title: 'Stop an agent', you: 'Hold to revoke', signs: ['phone'], tone: 'stop' },
 ];
 
 function Icon({ id }: { id: Who }) {
@@ -63,7 +63,7 @@ export function Ladder() {
     <section className="section" id="how">
       <div className="wrap">
         <div className="section-head">
-          <h2>More at stake, more devices</h2>
+          <h2>Same wallet. More protection.</h2>
           <p>Pick a level to see who has to sign.</p>
         </div>
 
@@ -104,12 +104,12 @@ export function Ladder() {
             </div>
             <p className="ladder-note">
               {tier.signs.includes('vault')
-                ? 'The vault has no radio. It only answers infrared.'
+                ? 'After joining, grants and limit increases need all three devices. Stick-to-stick approvals use infrared.'
                 : tier.signs.length > 1
                   ? 'One split key. Neither half can sign alone.'
                   : tier.signs[0] === 'agent'
                     ? 'The contract checks the cap and expiry. Nobody is bothered.'
-                    : 'Any single shard can kill a key, instantly.'}
+                    : 'The phone can revoke alone. Access stops when the chain confirms.'}
             </p>
           </div>
         </div>

@@ -1,98 +1,112 @@
-import React from 'react';
-import { StyleSheet, Switch, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Linking, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import { Screen } from '../components/Screen';
+import { TopBar } from '../components/TopBar';
 import { Txt } from '../components/Txt';
 import { Button } from '../components/Button';
-import { TopBar } from '../components/TopBar';
-import { useExposure, useStore } from '../store/store';
-import { link } from '../lib/link';
-import { deleteShard } from '../lib/shard';
-import { colors, space } from '../theme';
+import { useChain } from '../store/chain';
+import { DEMO_RECIPIENT, restoreAgentDemo, runAgentDemo, useAgentDemo } from '../lib/agentDemo';
+import { EXPLORER } from '../lib/evm';
+import { usePresentation } from '../components/Presentation';
+import { colors, radius, space } from '../theme';
 
-/** Stand-in for the agent and the chain. The wrist is real. */
-export default function Demo() {
-  const { state, sim } = useStore();
-  const { live } = useExposure();
-  const noKeys = live.length === 0;
-
-  const then = (fn: () => void, delay = 350) => () => {
-    router.back();
-    setTimeout(fn, delay);
-  };
-
+/** Presentation settings operate the real app. Simulated wallet/reset actions stay out of it. */
+export default function PresentationSettings() {
+  const p = usePresentation();
+  const demo = useAgentDemo();
+  const { info, live } = useChain();
+  const key = live.find((s) => s.cap === 5_000_000_000_000n || s.cap === 20_000_000_000_000n) ?? live[0];
+  useEffect(() => {
+    void restoreAgentDemo();
+  }, []);
   return (
     <Screen scroll>
-      <TopBar left={{ label: 'Close', onPress: () => router.back() }} />
-      <Txt size={32} weight="bold" lineHeight={36}>
-        Demo controls
-      </Txt>
-      <Txt size={15} color={colors.muted} style={styles.lead}>
-        These pretend to be the agent and the chain. The wrist is the real one on your arm.
-      </Txt>
-
-      <View style={styles.group}>
-        <Txt size={15} weight="medium" color={colors.muted}>
-          Agent
+      <TopBar title="Presentation" left={{ label: 'Close', onPress: () => router.back() }} />
+      <View style={styles.body}>
+        <Txt size={32}>Make it physical.</Txt>
+        <Txt size={15} color={colors.muted}>
+          One wallet. Start with your phone and wrist, then add a second stick for infrared approvals.
         </Txt>
-        <Button label="Ask for a $500 key" variant="secondary" onPress={then(() => sim.requestKey(undefined, 500, 24))} />
-        <Button label="Spend a little" variant="secondary" disabled={noKeys} onPress={() => sim.spend()} />
-        <Button label="Try to spend over the cap" variant="secondary" disabled={noKeys} onPress={then(() => sim.overCap())} />
-        <View style={styles.toggle}>
-          <View style={styles.toggleText}>
-            <Txt size={16}>Keep spending on its own</Txt>
+        <View style={styles.row}>
+          <View style={styles.copy}>
+            <Txt>Keep screen awake</Txt>
             <Txt size={13} color={colors.muted}>
-              A small spend every few seconds while a key is live
+              While Kagi is open. Your normal timeout resumes when you leave.
             </Txt>
           </View>
-          <Switch
-            value={state.autopilot}
-            disabled={noKeys}
-            onValueChange={sim.autopilot}
-            trackColor={{ true: colors.amber, false: colors.line }}
-            thumbColor={colors.text}
-          />
+          <Switch accessibilityLabel="Keep Kagi awake" value={p.awake} onValueChange={(awake) => p.update({ awake })} />
         </View>
-      </View>
-
-      <View style={styles.group}>
-        <Txt size={15} weight="medium" color={colors.muted}>
-          Chain
+        <View style={styles.row}>
+          <View style={styles.copy}>
+            <Txt>Wrist sounds</Txt>
+            <Txt size={13} color={colors.muted}>
+              Soft approval cues. Infrared reception stays quiet.
+            </Txt>
+          </View>
+          <Switch accessibilityLabel="Wrist sounds" value={p.sound} onValueChange={(sound) => p.update({ sound })} />
+        </View>
+        <View style={styles.testAgent}>
+          <Txt size={22}>In-app test agent</Txt>
+          <Txt size={14} color={colors.muted}>
+            Real Sepolia transfers from the selected session key. Act one sends 2 + 8 µETH; act two sends 12 µETH after
+            adding the second device.
+          </Txt>
+          <Txt size={12} mono color={colors.muted}>
+            ABC: {DEMO_RECIPIENT}
+          </Txt>
+          <Txt size={14} color={colors.amber}>
+            {demo.message}
+          </Txt>
+          {key && info?.account ? (
+            <>
+              <Txt size={13}>Session: {key.name}</Txt>
+              <Button
+                label={demo.running ? 'Agent running' : demo.saved ? 'Resume saved run' : 'Run act one · 2 + 8 µETH'}
+                loading={demo.running}
+                disabled={!demo.saved && key.cap !== 5_000_000_000_000n}
+                onPress={() => void runAgentDemo(info.account as `0x${string}`, key.address as `0x${string}`)}
+              />
+              {!demo.saved && !demo.running && key.cap === 20_000_000_000_000n ? (
+                <Button
+                  label="Run act two · 12 µETH"
+                  variant="secondary"
+                  onPress={() => void runAgentDemo(info.account as `0x${string}`, key.address as `0x${string}`, true)}
+                />
+              ) : null}
+            </>
+          ) : (
+            <Txt size={14} color={colors.muted}>
+              Create a 5 µETH session key below to start.
+            </Txt>
+          )}
+          {demo.hash ? (
+            <Button
+              label="View transaction"
+              variant="ghost"
+              onPress={() => void Linking.openURL(`${EXPLORER}/tx/${demo.hash}`)}
+            />
+          ) : null}
+        </View>
+        <Button label="Agent access" onPress={() => router.push('/agent')} />
+        <Button label="Second stick" variant="secondary" onPress={() => router.push('/vault')} />
+        <Txt size={12} color={colors.muted}>
+          Real Sepolia test ETH. Keys and approvals are enforced by your wallet contract.
         </Txt>
-        <Button label="Add a second stick" variant="secondary" onPress={() => router.push('/vault')} />
-      </View>
-
-      <View style={styles.group}>
-        <Txt size={15} weight="medium" color={colors.muted}>
-          Clock
-        </Txt>
-        <Button label="Expire the soonest key" variant="secondary" disabled={noKeys} onPress={sim.expireSoonest} />
-      </View>
-
-      <View style={styles.group}>
-        <Txt size={15} weight="medium" color={colors.muted}>
-          Wallet
-        </Txt>
-        <Button
-          label="Wipe phone and wrist, start over"
-          variant="danger"
-          onPress={() => {
-            link.send({ t: 'wipe' });
-            void deleteShard().then(() => {
-              sim.reset();
-              router.dismissAll();
-              router.replace('/onboarding');
-            });
-          }}
-        />
       </View>
     </Screen>
   );
 }
-
 const styles = StyleSheet.create({
-  lead: { marginTop: space.s },
-  group: { marginTop: space.xl, gap: space.s },
-  toggle: { flexDirection: 'row', alignItems: 'center', gap: space.m, paddingVertical: space.s },
-  toggleText: { flex: 1, gap: 2 },
+  testAgent: { backgroundColor: colors.panel, borderRadius: radius.m, padding: space.m, gap: space.m },
+  body: { gap: space.l, marginTop: space.l },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.m,
+    padding: space.m,
+    backgroundColor: colors.panel,
+    borderRadius: radius.m,
+  },
+  copy: { flex: 1, gap: 5 },
 });

@@ -6,9 +6,10 @@ import { Txt } from '../components/Txt';
 import { Button } from '../components/Button';
 import { HoldButton } from '../components/HoldButton';
 import { LedBar } from '../components/LedBar';
+import { SpatialDevices } from '../components/SpatialDevices';
 import { WristChip } from '../components/WristChip';
 import { useStore } from '../store/store';
-import { fmtEth, useChain, type ChainSession } from '../store/chain';
+import { fmtAmount, fmtEth, useChain, type ChainSession } from '../store/chain';
 import * as Clipboard from 'expo-clipboard';
 import * as evm from '../lib/evm';
 import { loadRoot, loadShard } from '../lib/shard';
@@ -58,6 +59,7 @@ export default function Home() {
 
   const revokeAll = () => {
     void revokeAllOnChain(state.address).then(() => refresh());
+    router.push('/revoke');
   };
 
   const ratio = totals.cap > 0n ? Number(totals.spent) / Number(totals.cap) : 0;
@@ -123,11 +125,13 @@ export default function Home() {
             {l.status === 'waiting' ? `${l.name} is waiting for approval` : 'New limit confirming on Sepolia'}
           </Txt>
           <Txt size={14} color={colors.muted}>
-            Raise its total from {fmtEth(l.oldCap)} to {fmtEth(l.newCap)}
+            Raise its total from {fmtAmount(l.oldCap)} to {fmtAmount(l.newCap)}
           </Txt>
         </Pressable>
       ))}
 
+      <SpatialDevices two={Boolean(twoSticks)} joined={Boolean(twoSticks)} connected={state.wrist.connected}
+        value={live.length ? fmtAmount(totals.left) : 'KAGI'} detail={live.length ? 'Agent allowance left' : 'Your physical boundary'} />
       <View style={styles.account}>
         <Txt size={15} color={colors.muted}>
           Wallet on Sepolia
@@ -135,7 +139,7 @@ export default function Home() {
         {info?.account ? (
           <>
             <Txt mono size={40} weight="bold" lineHeight={50}>
-              {fmtEth(info.balance)}
+              {fmtAmount(info.balance)}
             </Txt>
             <Pressable onPress={() => void Linking.openURL(`${explorer}/address/${info.account}`)}>
               <Txt mono size={13} color={colors.muted}>
@@ -177,10 +181,10 @@ export default function Home() {
           {live.length > 0 ? (
             <View style={styles.summary}>
               <Txt mono size={28} weight="bold" color={ratio >= 0.8 ? colors.amber : colors.text}>
-                {fmtEth(totals.left)}
+                {fmtAmount(totals.left)}
               </Txt>
               <Txt size={13} color={colors.muted}>
-                Agents can still spend, across {live.length} {live.length === 1 ? 'key' : 'keys'}
+                Allowance remaining, across {live.length} {live.length === 1 ? 'key' : 'keys'}
               </Txt>
             </View>
           ) : (
@@ -292,7 +296,7 @@ function KeyCard({ k, now }: { k: ChainSession; now: bigint }) {
         <>
           <View style={styles.row}>
             <Txt mono size={15}>
-              {fmtEth(left)} left
+              {fmtAmount(left)} left
             </Txt>
             <Txt mono size={12} color={colors.muted}>
               of {fmtEth(k.cap)}

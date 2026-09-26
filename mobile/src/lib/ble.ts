@@ -197,7 +197,15 @@ class Ble {
     return this.write(c, line);
   }
 
-  private async write(c: Conn, line: string): Promise<boolean> {
+  private writes = new WeakMap<Conn, Promise<boolean>>();
+  private write(c: Conn, line: string): Promise<boolean> {
+    // Queue complete frames, not individual MTU chunks. Independent sticks can write in parallel.
+    const prior = this.writes.get(c) ?? Promise.resolve(true);
+    const next = prior.catch(() => false).then(() => this.writeFrame(c, line));
+    this.writes.set(c, next);
+    return next;
+  }
+  private async writeFrame(c: Conn, line: string): Promise<boolean> {
     if (!this.manager) return false;
     const bytes = utf8(line.endsWith('\n') ? line : `${line}\n`);
     const chunk = Math.max(20, c.mtu - 3);

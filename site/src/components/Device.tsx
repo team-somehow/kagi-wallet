@@ -60,23 +60,25 @@ export function Device({
   screen,
   pressed = false,
   className = '',
+  variant = 'blue',
   style,
   button,
 }: {
   screen: Screen;
   pressed?: boolean;
   className?: string;
+  variant?: 'blue' | 'red';
   style?: CSSProperties;
   button?: ReactNode;
 }) {
   return (
-    <div className={`device ${className}`} style={style}>
+    <div className={`device device-${variant} ${className}`} style={style}>
       <div className="device-face">
         <svg className="lcd" viewBox="0 0 240 135" role="img" aria-label={describe(screen)}>
           <rect width="240" height="135" fill="#000" />
           <Lcd screen={screen} />
         </svg>
-        {button ?? <span className={`device-a ${pressed ? 'is-pressed' : ''}`} aria-hidden="true">A</span>}
+        {button ?? <span className={`device-a ${pressed ? 'is-pressed' : ''}`} aria-hidden="true" />}
       </div>
     </div>
   );
