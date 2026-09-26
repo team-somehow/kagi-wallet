@@ -64,26 +64,22 @@ export default function Spending() {
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <View style={styles.bar}>
         <TopBar title="Spending" />
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Indexed and totalled by Curvegrid MultiBaas"
+          onPress={() => void Linking.openURL('https://www.curvegrid.com/multibaas')}
+          style={({ pressed }) => [styles.source, pressed && styles.pressed]}
+        >
+          <Txt size={13} lineHeight={20} color={colors.faint}>
+            Indexed and totalled by
+          </Txt>
+          <Image source={require('../../../assets/partners/curvegrid.png')} style={styles.curvegrid} resizeMode="contain" />
+          <Txt size={13} lineHeight={20} weight="medium" color={colors.muted}>
+            MultiBaas
+          </Txt>
+        </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.body} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}>
-        {account ? (
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel="Indexed and totalled by Curvegrid MultiBaas"
-            onPress={() => void Linking.openURL('https://www.curvegrid.com/multibaas')}
-            style={styles.source}
-          >
-            <Txt size={12} color={colors.faint}>
-              Indexed and totalled by
-            </Txt>
-            <View style={styles.sourceRow}>
-              <Image source={require('../../../assets/partners/curvegrid.png')} style={styles.curvegrid} resizeMode="contain" />
-              <Txt size={13} weight="medium" color={colors.muted}>
-                MultiBaas
-              </Txt>
-            </View>
-          </Pressable>
-        ) : null}
         {!account ? (
           <Txt size={15} color={colors.muted}>
             Create the wallet on-chain first. Its spending shows up here.
@@ -210,7 +206,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.panel, borderRadius: radius.m, padding: space.m, gap: space.s },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   intercepta: { flexDirection: 'row', alignItems: 'center', gap: space.s, marginTop: space.xs },
-  source: { flexDirection: 'row', alignItems: 'center', gap: space.s, alignSelf: 'flex-start', marginTop: space.s, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.panel },
-  sourceRow: { flexDirection: 'row', alignItems: 'center', gap: space.s },
-  curvegrid: { width: 88, height: 20 },
+  source: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 2, marginBottom: space.m },
+  curvegrid: { width: 78, height: 18, marginTop: 2 },
+  pressed: { opacity: 0.6 },
 });
