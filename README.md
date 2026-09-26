@@ -206,7 +206,7 @@ If Intercepta can't be reached, the payment is **held**, never passed. Intercept
 
 | Recipient | Verdict | Why |
 |---|---|---|
-| `0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0` (contact `ABC`, the gas sponsor wallet, so demo payments flow back into gas) | pass | risk score 0 |
+| `0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0` (the gas sponsor wallet, so demo payments flow back into gas) | pass | risk score 0 |
 | `0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E` | hold | risk score 45: fake phishing transfer |
 | `0x098B716B8Aaf21512996dC57EB0615e2383E2f96` (Tornado Cash) | refuse | known scammer, sanctioned address, blacklist |
 
