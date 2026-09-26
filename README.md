@@ -17,7 +17,7 @@ Integrated with
 
 <a href="https://intercepta.io"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/intercepta-light.png" /><img src="site/public/partners/intercepta-dark.png" alt="Intercepta" height="28" /></picture></a> &nbsp;&nbsp;&nbsp; <a href="https://www.curvegrid.com/multibaas"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/curvegrid-light.png" /><img src="site/public/partners/curvegrid-dark.png" alt="Curvegrid MultiBaas" height="28" /></picture></a>
 
-**[Website](https://kagiwallet.com)** · **[Download the Android app](https://github.com/team-somehow/kagi-wallet/releases/download/v0.2.0/kagi-1.0.0.apk)** · **[Flash a stick in the browser](https://kagiwallet.com/#get)** · **[Connect your AI](https://kagiwallet.com/#connect)** · **[Releases](https://github.com/team-somehow/kagi-wallet/releases)**
+**[Website](https://kagiwallet.com)** · **[Download the Android app](https://github.com/team-somehow/kagi-wallet/releases/download/v0.3.0/kagi-wallet-v0.3.0.apk)** · **[Flash a Kagi Wallet in the browser](https://kagiwallet.com/#get)** · **[Connect your AI](https://kagiwallet.com/#connect)** · **[Releases](https://github.com/team-somehow/kagi-wallet/releases)**
 
 </div>
 
@@ -207,6 +207,21 @@ Or skip the build and install the APK from the [latest release](https://github.c
 
 The phone talks to the ESP32 devices over **Bluetooth LE** and to the chain directly. It keeps a gas wallet in its secure store: fund its address, shown on Home, with a little test ETH.
 
+### 5. Try the whole flow
+
+1. Pair the phone with one Kagi Wallet, create the on-chain account, then **Give an agent a key** (default cap 5 µETH) and connect your AI with the link it copies.
+2. Ask the AI, one at a time:
+
+| Prompt | What happens | Cap / spent after |
+|---|---|---|
+| `Send 0.000002 ETH to 0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0.` | Intercepta passes it; sent within the cap | 5 / 2 µETH |
+| `Send 0.000002 ETH to 0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E.` | Intercepta holds it; approve on the phone and hold the Kagi Wallet's button | 7 / 4 µETH |
+| `Send 0.000004 ETH to 0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0.` | over the 3 µETH left; the agent asks for (4 + 4) × 2 = 16 µETH; approve | 16 / 8 µETH |
+| *Add a second Kagi Wallet from the app* | the key is reshared; same wallet, same allowance | 16 / 8 µETH |
+| `Send 0.00001 ETH to 0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0.` | over the 8 µETH left; asks for (8 + 10) × 2 = 36 µETH; now the phone **and both** Kagi Wallets must approve | 36 / 18 µETH |
+
+3. Ask *"what has my agent spent, and who approved it?"*: the answer comes from MultiBaas (`get_activity`, `get_spending_summary`), and the app's **Spending** tab shows the same totals.
+
 ## Networks
 
 The app runs on the **testnet (Sepolia)** by default. **More → Ethereum mainnet** switches it to Ethereum mainnet after a confirmation. The same phone and Kagi Wallet stay paired; mainnet gets its own wallet account, so the flow starts again from Home with **Create on-chain account**. Switching back brings the testnet wallet back untouched.
@@ -275,12 +290,13 @@ Kagi is a policy-aware transaction agent: the contract enforces the spending lim
 
 The agent MCP's `get_activity` tool reads the wallet's history from the MultiBaas event index: every payment an agent sent, every higher limit it asked for and why, and whether the owner approved it (phone + Kagi Wallet), declined it or revoked the key. You can ask your AI *"what did my agent spend today, and who approved the raise?"* and get an answer drawn from indexed events, not guesses.
 
-On top of the raw history, **MultiBaas Event Queries** aggregate it: `get_spending_summary` (and the app's **Spending** screen, Home → Spending) show what each agent spent and in how many payments, the limit it was granted and raised to, the top recipients, and how many requests were approved, declined, or held or refused by Intercepta, all grouped and added up by MultiBaas. Four **saved queries** (`kagi-spent-by-agent`, `kagi-spent-by-recipient`, `kagi-limit-raises`, `kagi-limit-requests`) give operators a protocol-wide view in the MultiBaas console. The MultiBaas key stays on the agent server; the app asks the server for its own wallet's summary. Details and a diagram: [docs/curvegrid-multibaas.md](docs/curvegrid-multibaas.md).
+On top of the raw history, **MultiBaas Event Queries** aggregate it: `get_spending_summary` (and the app's **Spending** tab) show what each agent spent and in how many payments, the limit it was granted and raised to, the top recipients, and how many requests were approved, declined, or held or refused by Intercepta, all grouped and added up by MultiBaas. Four **saved queries** (`kagi-spent-by-agent`, `kagi-spent-by-recipient`, `kagi-limit-raises`, `kagi-limit-requests`) give operators a protocol-wide view in the MultiBaas console. The MultiBaas key stays on the agent server; the app asks the server for its own wallet's summary. Details and a diagram: [docs/curvegrid-multibaas.md](docs/curvegrid-multibaas.md).
 
 | What | Where |
 |---|---|
 | MultiBaas client: registers the `KagiAccount` ABI, links each wallet with event indexing, reads its events, runs the aggregated Event Queries and keeps the saved queries | [`agent-mcp/multibaas.mjs`](agent-mcp/multibaas.mjs) |
-| The Spending screen in the app | [`mobile/src/app/spending.tsx`](mobile/src/app/spending.tsx) |
+| The Spending tab in the app | [`mobile/src/app/(tabs)/spending.tsx`](<mobile/src/app/(tabs)/spending.tsx>) |
+| The aggregated summary the app reads | [`agent-mcp/server.mjs`](agent-mcp/server.mjs), `/api/summary/<wallet>` and `get_spending_summary` |
 | The `get_activity` MCP tool and how it turns events into sentences | [`agent-mcp/server.mjs`](agent-mcp/server.mjs), `history()` and `get_activity` |
 
 Every user's phone deploys their own wallet, so wallets can't be linked in the MultiBaas console ahead of time. The first time a wallet asks for its history, the server registers the ABI (once per deployment), gives the address an alias and links it with `startingBlock`. After that, calls are just `GET /events?contract_address=…`.
@@ -300,11 +316,16 @@ Connect your AI with a connector link from the Kagi app, make a couple of paymen
 - **Wins:** the deployment was up on the right chain in minutes, and a single `GET /events?contract_address=` call replaced the log scanning we would otherwise do. Free public RPCs refuse `eth_getLogs` without an address, or cap it at 50 blocks. The generated TypeScript SDK's docs were the fastest way to find the exact endpoints and field names.
 - **Friction:** `POST /contracts/{label}` documents `bin` as optional, but a contract without bytecode fails with a database error (`null value in column "bytecode"`). We now send an empty string.
 - **Surprise:** the free plan indexes at most 100 blocks into the past. We found out from a 403 when linking a wallet (`request exceeds the plan's past logs max depth limit`), so we changed the design to link every wallet the moment it first connects. `GET /plan` lists the limits; it would help to mention them in the linking docs.
+- **Event Queries:** grouping and adding up `Spent` by agent and by recipient server side is exactly what a spending dashboard needs. Getting the request body right was the hard part: the filter has to be a `{rule, children}` tree and fields are picked by `inputIndex`, which we worked out from the source of Curvegrid's Google Sheets add-on rather than the API reference. There is no `count` aggregator, and the free plan returns at most 50 rows per query.
 - **Wish:** linking contracts by code hash or factory, so every wallet with the same bytecode gets indexed automatically. Kagi deploys one wallet per user, so linking wallets one by one (up to 10 on the free plan) is the part that doesn't scale.
 
 ## Team
 
-_TODO: names, roles and social handles._
+Built at ETHGlobal Tokyo 2026 by **team somehow**.
+
+| Who | What | Social |
+|---|---|---|
+| **Hussain** | contracts, FROST on the phone and ESP32, firmware, app, agent MCP, Intercepta and MultiBaas integrations, site | [@pettiboy_com](https://x.com/pettiboy_com) |
 
 ## Threat model, in short
 
