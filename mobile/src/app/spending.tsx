@@ -63,7 +63,9 @@ export default function Spending() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
-      <TopBar title="Spending" left={{ label: 'Close', onPress: () => router.back() }} />
+      <View style={styles.bar}>
+        <TopBar title="Spending" left={{ label: 'Close', onPress: () => router.back() }} />
+      </View>
       <ScrollView contentContainerStyle={styles.body} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}>
         {!account ? (
           <Txt size={15} color={colors.muted}>
@@ -187,6 +189,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.ground },
+  bar: { paddingHorizontal: space.l, paddingTop: space.m },
   body: { paddingHorizontal: space.l, paddingBottom: space.xl, gap: space.l },
   hero: { marginTop: space.m, gap: 2 },
   section: { gap: space.s },
