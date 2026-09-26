@@ -49,7 +49,7 @@ export function KeyStats() {
               <text x="90" y="106" textAnchor="middle" className="split-t is-blue">+ Kagi Wallet</text>
             </svg>
             <p>Kagi splits every key. Each half is useless alone.</p>
-            <small>FROST, RFC 9591 · add a second stick for 3 of 3</small>
+            <small>FROST, RFC 9591 · add a second Kagi Wallet for 3 of 3</small>
           </div>
         </div>
       </div>

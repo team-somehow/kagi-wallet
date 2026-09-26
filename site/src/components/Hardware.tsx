@@ -6,7 +6,7 @@ const MAX = 260;
 const SPECS = [
   ['ESP32-S3', 'dual core, 240 MHz'],
   ['1.14" screen', 'shows every request decoded'],
-  ['Infrared', 'stick-to-stick approvals'],
+  ['Infrared', 'between the two Kagi Wallets'],
   ['Motion sensor', 'wear detection'],
   ['20 g', '48 × 24 × 15 mm'],
 ] as const;
@@ -17,8 +17,8 @@ export function Hardware() {
     <section className="section" id="hardware">
       <div className="wrap">
         <div className="section-head">
-          <h2>Two sticks for $43</h2>
-          <p>An off-the-shelf ESP32 stick at $21.50. Start with one on your Kagi Wallet. Add a second to the same wallet whenever you want a stronger boundary.</p>
+          <h2>Two Kagi Wallets for $43</h2>
+          <p>Each Kagi Wallet is an off-the-shelf ESP32 at $21.50. Start with one. Add a second to the same wallet whenever you want a stronger boundary.</p>
         </div>
 
         <div className="hw">
@@ -33,7 +33,7 @@ export function Hardware() {
               <div className="hw-unit">
                 <Device variant="red" screen={{ kind: 'home', line: 'Signs by infrared' }} />
                 <span className="hw-tag">$21.50</span>
-                <small className="hw-role is-second">Second stick · infrared only</small>
+                <small className="hw-role is-second">Second Kagi Wallet · infrared only</small>
               </div>
             </div>
             <ul className="hw-specs">
@@ -68,7 +68,7 @@ export function Hardware() {
               <div>{[0, 50, 100, 150, 200, 250].map((v) => <span key={v} style={{ left: `${(v / MAX) * 100}%` }}>${v}</span>)}</div>
             </div>
             <p className="fine">
-              Kagi buys both sticks for less than one hardware wallet. Prices: <a href={DEVICE_URL} target="_blank" rel="noreferrer">device store</a>, <a href={PRICES_URL} target="_blank" rel="noreferrer">Coin Bureau, Jun 2026</a>. No secure element, so no device is ever trusted alone.
+              Two Kagi Wallets cost less than one hardware wallet. Prices: <a href={DEVICE_URL} target="_blank" rel="noreferrer">device store</a>, <a href={PRICES_URL} target="_blank" rel="noreferrer">Coin Bureau, Jun 2026</a>. No secure element, so no device is ever trusted alone.
             </p>
           </figure>
         </div>

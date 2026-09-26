@@ -38,20 +38,20 @@ const labels: Record<Phase, string> = {
   request: 'Unlock phone',
   unlocked: 'Hold the button on your Kagi Wallet',
   'ir-out': 'Sending by infrared',
-  second: 'Hold the second stick’s button',
+  second: 'Hold the second Kagi Wallet’s button',
   'ir-back': 'Returning signature',
   confirming: 'Confirming on-chain',
-  done: 'Add a second stick',
+  done: 'Add a second Kagi Wallet',
   declined: 'Try approving instead',
-  join: 'Join second stick',
+  join: 'Join second Kagi Wallet',
   joining: 'Joining devices',
   joined: 'Try the IR approval',
 };
 const notes: Record<Phase, string> = {
-  request: 'Approvals happen on your stick.',
+  request: 'Approvals happen on your Kagi Wallet.',
   unlocked: 'Release early to cancel the hold.',
   'ir-out': 'Speaker quiet while IR is receiving.',
-  second: 'The second stick makes the final decision.',
+  second: 'The second Kagi Wallet makes the final decision.',
   'ir-back': 'Your allowance has not changed yet.',
   confirming: 'Waiting for the transaction receipt.',
   done: 'Same account. Your agent continues.',
@@ -173,7 +173,7 @@ export function Demo() {
     </>
   ) : join ? (
     <>
-      One more stick.
+      One more Kagi Wallet.
       <br />
       <em>The same wallet.</em>
     </>
@@ -196,7 +196,7 @@ export function Demo() {
   const proof: [string, boolean][] = [
     ['Phone', phoneOK],
     ['Kagi Wallet', wristOK],
-    ...(dual ? [['2nd stick', secondOK] as [string, boolean]] : []),
+    ...(dual ? [['2nd Kagi Wallet', secondOK] as [string, boolean]] : []),
   ];
   const currentSpent = done ? spent + payment : spent;
   const route =
@@ -210,7 +210,7 @@ export function Demo() {
   function device(second: boolean) {
     const active = phase === (second ? 'second' : 'unlocked'),
       approved = second ? secondOK : wristOK;
-    let top = second ? 'SECOND STICK' : 'LIMIT REQUEST',
+    let top = second ? 'KAGI WALLET 2' : 'LIMIT REQUEST',
       value = second ? 'IR IDLE' : `${old} → ${cap}`,
       detail = second ? 'Ready when you are' : 'µETH · unlock phone';
     if (active) {
@@ -219,7 +219,7 @@ export function Demo() {
       detail = 'µETH · HOLD';
     }
     if (join) {
-      top = second ? 'SECOND STICK' : 'KAGI WALLET';
+      top = second ? 'KAGI WALLET 2' : 'KAGI WALLET';
       value = phase === 'joined' ? '3 OF 3' : second ? 'HELLO' : '2 OF 2';
       detail = 'Same wallet. Same address.';
     }
@@ -231,7 +231,7 @@ export function Demo() {
     if (phase === 'second' && !second) {
       top = 'KAGI WALLET';
       value = 'WAITING';
-      detail = 'Second stick approval';
+      detail = 'Second Kagi Wallet approval';
     }
     if (phase === 'confirming') {
       top = 'SIGNED';
@@ -239,7 +239,7 @@ export function Demo() {
       detail = 'Awaiting chain receipt';
     }
     if (done) {
-      top = second ? 'SECOND STICK' : 'ALLOWANCE';
+      top = second ? 'KAGI WALLET 2' : 'ALLOWANCE';
       value = second ? 'APPROVED' : `${cap - spent - payment} µETH`;
       detail = second ? 'Back to IR idle' : 'Left for your agent';
     }
@@ -265,7 +265,7 @@ export function Demo() {
           </div>
           <button
             className="kg-physical"
-            aria-label={`Hold the button on the ${second ? 'second stick' : 'Kagi Wallet'} to approve`}
+            aria-label={`Hold the button on the ${second ? 'second Kagi Wallet' : 'Kagi Wallet'} to approve`}
             disabled={!active}
             data-held={active && hold > 0}
             onPointerDown={(e) => {
@@ -295,7 +295,7 @@ export function Demo() {
             <span className="kg-target" />
           </button>
         </div>
-        <div className="kg-device-caption">{second ? '02 / SECOND STICK' : '01 / YOUR KAGI WALLET'}</div>
+        <div className="kg-device-caption">{second ? '02 / SECOND KAGI WALLET' : '01 / YOUR KAGI WALLET'}</div>
       </div>
     );
   }
@@ -342,7 +342,7 @@ export function Demo() {
                   }}
                 >
                   <b>0{n}</b>
-                  {n === 1 ? 'Phone + one stick' : 'Add a second stick'}
+                  {n === 1 ? 'Phone + one Kagi Wallet' : 'Add a second Kagi Wallet'}
                 </button>
               ))}
             </nav>
@@ -485,7 +485,7 @@ export function Demo() {
                         <Row label="Phone" value="Connected" />
                         <Row label="Kagi Wallet" value="Connected" />
                         <Row
-                          label="Second stick"
+                          label="Second Kagi Wallet"
                           value={phase === 'joined' ? 'Joined' : phase === 'joining' ? 'Joining…' : 'Ready to join'}
                         />
                       </>
@@ -514,7 +514,7 @@ export function Demo() {
                         disabled={!['request', 'declined', 'join', 'joined', ...(dual ? [] : ['done'])].includes(phase)}
                       >
                         {phase === 'request' ? <Fingerprint /> : join ? <Plus /> : done ? <Check /> : <Radio />}
-                        {done && dual ? 'Both sticks approved' : labels[phase]}
+                        {done && dual ? 'Both Kagi Wallets approved' : labels[phase]}
                       </button>
                       <div className="kg-phone-note">{notes[phase]}</div>
                     </div>
@@ -554,7 +554,7 @@ export function Demo() {
             </section>
             <footer className="kg-bottom">
               <span>SIMULATION · NO REAL TRANSACTIONS</span>
-              <span>{dual ? 'PHONE + TWO STICKS / 3 OF 3' : 'PHONE + KAGI WALLET / 2 OF 2'}</span>
+              <span>{dual ? 'PHONE + TWO KAGI WALLETS / 3 OF 3' : 'PHONE + KAGI WALLET / 2 OF 2'}</span>
             </footer>
           </div>
         </div>

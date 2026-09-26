@@ -9,7 +9,7 @@ const FLAGGED = '0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E';
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const PROMPTS = [
   { id: 'clean', label: 'Goes straight through', text: `Send 0.000002 ETH to ${CLEAN}.` },
-  { id: 'held', label: 'Held by Intercepta for your stick', text: `Send 0.000002 ETH to ${FLAGGED}.` },
+  { id: 'held', label: 'Held by Intercepta for your Kagi Wallet', text: `Send 0.000002 ETH to ${FLAGGED}.` },
 ];
 const NAME = 'kagi';
 // Where the box starts: the public demo wallet, so every button works before anyone types.
@@ -96,12 +96,12 @@ const RUN: { who: 'you' | 'tool' | 'stick' | 'ai'; text: string; tone?: 'ok' | '
   { who: 'tool', text: `send_eth: Intercepta says clean (risk 0), 0.000002 sent`, tone: 'ok' },
   { who: 'you', text: `Send 0.000002 ETH to ${short(FLAGGED)}.` },
   { who: 'tool', text: `send_eth: Intercepta flags a fake phishing transfer (risk 45). Not signed, held for the owner`, tone: 'wait' },
-  { who: 'stick', text: 'The phone shows “Intercepta held this payment” with the reason. Hold the stick’s button to pay anyway, tap it to refuse.' },
+  { who: 'stick', text: 'The phone shows “Intercepta held this payment” with the reason. Hold the Kagi Wallet’s button to pay anyway, tap it to refuse.' },
   { who: 'tool', text: 'wait_for_approval: approved, 0.000002 sent', tone: 'ok' },
-  { who: 'ai', text: 'The first payment went straight through. The second was held until you approved it on your stick.' },
+  { who: 'ai', text: 'The first payment went straight through. The second was held until you approved it on your Kagi Wallet.' },
 ];
 
-const WHO = { you: 'You', tool: 'Tool', stick: 'Stick', ai: 'AI' } as const;
+const WHO = { you: 'You', tool: 'Tool', stick: 'Kagi Wallet', ai: 'AI' } as const;
 
 async function copyText(t: string) {
   try {
@@ -133,13 +133,13 @@ export function ConnectAgent() {
       <div className="wrap">
         <div className="section-head">
           <h2>Connect your AI</h2>
-          <p>Give an agent a key of its own. It spends within the allowance you set, and anything more waits for a hold on your stick.</p>
+          <p>Give an agent a key of its own. It spends within the allowance you set, and anything more waits for a hold on your Kagi Wallet.</p>
         </div>
 
         <ol className="steps steps-3">
           <li>
             <b>Make an agent key</b>
-            <span>In the Kagi app, tap New agent key. Pick a total allowance and an expiry, then hold the stick’s button.</span>
+            <span>In the Kagi app, tap New agent key. Pick a total allowance and an expiry, then hold the Kagi Wallet’s button.</span>
           </li>
           <li>
             <b>Copy the session key</b>
@@ -215,7 +215,7 @@ export function ConnectAgent() {
               </div>
             ))}
             <p className="connect-note">
-              Every recipient is screened by <b>Intercepta</b> before the agent's key signs. Clean addresses are paid within the allowance, flagged ones wait for your stick, and sanctioned or scam addresses are refused outright.
+              Every recipient is screened by <b>Intercepta</b> before the agent's key signs. Clean addresses are paid within the allowance, flagged ones wait for your Kagi Wallet, and sanctioned or scam addresses are refused outright.
             </p>
             <p className="connect-note">
               Anyone with your own link can spend what is left of that key's allowance. That is all they can do. They cannot raise the limit or outlast the expiry, and you can revoke the key from the phone.

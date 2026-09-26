@@ -6,12 +6,12 @@ const DEVICES: { id: Who; name: string }[] = [
   { id: 'agent', name: 'Agent' },
   { id: 'phone', name: 'Phone' },
   { id: 'wrist', name: 'Kagi Wallet' },
-  { id: 'vault', name: 'Second stick' },
+  { id: 'vault', name: 'Second Kagi Wallet' },
 ];
 const TIERS: { title: string; you: string; signs: Who[]; tone: 'quiet' | 'human' | 'stop' }[] = [
   { title: 'Spend under the cap', you: 'Nothing', signs: ['agent'], tone: 'quiet' },
-  { title: 'Issue a key, raise a limit', you: 'Unlock phone, then hold the stick’s button', signs: ['phone', 'wrist'], tone: 'human' },
-  { title: 'Approve after adding a stick', you: 'Unlock phone, hold the button on both', signs: ['phone', 'wrist', 'vault'], tone: 'human' },
+  { title: 'Issue a key, raise a limit', you: 'Unlock phone, then hold the Kagi Wallet’s button', signs: ['phone', 'wrist'], tone: 'human' },
+  { title: 'Approve with a second Kagi Wallet', you: 'Unlock phone, hold the button on both', signs: ['phone', 'wrist', 'vault'], tone: 'human' },
   { title: 'Stop an agent', you: 'Hold to revoke', signs: ['phone'], tone: 'stop' },
 ];
 
@@ -104,7 +104,7 @@ export function Ladder() {
             </div>
             <p className="ladder-note">
               {tier.signs.includes('vault')
-                ? 'After joining, grants and limit increases need all three devices. Stick-to-stick approvals use infrared.'
+                ? 'After joining, grants and limit increases need all three devices. The two Kagi Wallets talk by infrared.'
                 : tier.signs.length > 1
                   ? 'One split key. Neither half can sign alone.'
                   : tier.signs[0] === 'agent'

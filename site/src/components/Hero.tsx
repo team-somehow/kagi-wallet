@@ -39,13 +39,13 @@ export function Hero() {
           Give your agent a spending key.
           <span>Keep the wallet.</span>
         </h1>
-        <p className="hero-sub">Capped, expiring keys for AI agents. Raising a limit takes your phone and a hold on your stick.</p>
+        <p className="hero-sub">Capped, expiring keys for AI agents. Raising a limit takes your phone and a hold on your Kagi Wallet.</p>
         <div className="hero-cta">
           <a className="btn btn-primary" href="#demo">Try the demo</a>
           <a className="btn btn-ghost" href="#get">Get the app and firmware</a>
         </div>
         <dl className="hero-facts">
-          <div><dt>$43</dt><dd>for both sticks</dd></div>
+          <div><dt>$43</dt><dd>for two Kagi Wallets</dd></div>
           <div><dt>2 → 3</dt><dd>approval devices, one wallet</dd></div>
           <div><dt>1 phone</dt><dd>can revoke agent access</dd></div>
         </dl>
@@ -77,7 +77,7 @@ export function Hero() {
             }}
           />
         </motion.div>
-        <p className="stage-cap" aria-hidden="true">ONE WALLET · PHONE + TWO STICKS</p>
+        <p className="stage-cap" aria-hidden="true">ONE WALLET · PHONE + TWO KAGI WALLETS</p>
       </div>
     </header>
   );
