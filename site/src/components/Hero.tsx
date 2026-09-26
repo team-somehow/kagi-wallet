@@ -1,6 +1,7 @@
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from 'motion/react';
 import { useEffect, useState, type PointerEvent } from 'react';
 import { Device } from './Device';
+import { BuiltWith } from './Partners';
 
 export function Hero() {
   const reduce = useReducedMotion();
@@ -48,6 +49,7 @@ export function Hero() {
           <div><dt>2 → 3</dt><dd>approval devices, one wallet</dd></div>
           <div><dt>1 phone</dt><dd>can revoke agent access</dd></div>
         </dl>
+        <BuiltWith />
       </div>
 
       <div className="hero-stage" onPointerMove={onMove} onPointerLeave={() => { mx.set(0); my.set(0); }}>

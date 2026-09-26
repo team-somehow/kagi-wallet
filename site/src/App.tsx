@@ -25,6 +25,7 @@ export function App() {
             <a href="#how">How</a>
             <a href="#hardware">Hardware</a>
             <a href="#connect">Connect AI</a>
+            <a href="#partners">Integrations</a>
             <a href={REPO_URL} target="_blank" rel="noreferrer">GitHub</a>
             <a className="btn btn-primary btn-sm" href="#get">Download</a>
           </div>
