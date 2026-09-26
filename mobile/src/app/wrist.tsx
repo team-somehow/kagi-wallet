@@ -105,6 +105,16 @@ export default function WristSettings() {
 
       <View style={styles.section}>
         <Txt size={15} weight="medium" color={colors.muted}>
+          Another device
+        </Txt>
+        <Txt size={14} color={colors.faint}>
+          Add a second stick. Every approval then needs both, and they sign together by infrared.
+        </Txt>
+        <Button label="Connect another device" variant="secondary" onPress={() => router.push('/vault')} />
+      </View>
+
+      <View style={styles.section}>
+        <Txt size={15} weight="medium" color={colors.muted}>
           Saved networks
         </Txt>
         {networks === null ? (

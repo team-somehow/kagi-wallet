@@ -22,7 +22,7 @@ export type SignPayload =
   | { kind: 'evm_grant'; agent: string; chainId: number; account: string; nonce: bigint; agentAddress: string; cap: bigint; expiry: bigint }
   | { kind: 'evm_limit'; agent: string; chainId: number; account: string; nonce: bigint; agentAddress: string; oldCap: bigint; newCap: bigint; expiry: bigint };
 
-type Phase = 'idle' | 'unlocking' | 'wrist' | 'ir_out' | 'stick' | 'ir_back' | 'combining' | 'done' | 'error';
+type Phase = 'idle' | 'unlocking' | 'wrist' | 'ir_out' | 'stick' | 'ir_back' | 'retry' | 'combining' | 'done' | 'error';
 
 interface Props {
   action: string;
@@ -51,6 +51,8 @@ const REJECT_TEXT: Record<string, string> = {
   vault_rejected: 'You said no on the second stick. Nothing was signed.',
   vault_timeout: 'The second stick did not answer. Face the sticks and try again.',
   root_not_3_of_3: 'The wrist is not set up with a second stick yet.',
+  nothing_to_retry: 'The wrist no longer has this request. Start over.',
+  expired: 'The request waited too long and was dropped. Start over.',
   needs_second_stick: 'This wallet needs both sticks now.',
 };
 
@@ -83,7 +85,10 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
   // Leaving the screen mid-request clears it off the wrist.
   useEffect(
     () => () => {
-      if (pendingId.current) link.send({ t: 'sign_cancel', id: pendingId.current });
+      if (pendingId.current) {
+        link.send({ t: 'sign_cancel', id: pendingId.current });
+        link.send({ t: 'root_cancel', id: pendingId.current });
+      }
     },
     [],
   );
@@ -201,13 +206,74 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
   };
 
   // Phone, then wrist, then the second stick over infrared, then back. Every part is checked.
+  // If the infrared leg fails, the job is paused on the wrist and on the phone, and a retry
+  // sends it again: no new fingerprint, no new press on the wrist.
+  const job = useRef<{ id: string; n1: ReturnType<typeof rootNonces>; m: Uint8Array; root: RootShare; off: () => void } | null>(null);
+
+  const endJob = () => {
+    job.current?.off();
+    job.current = null;
+    pendingId.current = null;
+  };
+
+  const waitThree = async () => {
+    const j = job.current;
+    if (!j) return;
+    let reply: Msg;
+    try {
+      reply = await link.waitFor(
+        (x: Msg) => (x.t === 'root_share' || x.t === 'sign_reject' || x.t === 'root_stalled') && x.id === j.id,
+        300000,
+        'the sticks',
+      );
+    } catch {
+      setError('No answer from the sticks. Face them and retry.');
+      setPhase('retry');
+      void warn();
+      return;
+    }
+    if (job.current !== j) return;
+    if (reply.t === 'root_stalled') {
+      setError(REJECT_TEXT[String(reply.reason)] ?? 'The infrared step did not finish.');
+      setPhase('retry');
+      void warn();
+      return;
+    }
+    if (reply.t === 'sign_reject') {
+      endJob();
+      onReject?.(String(reply.reason) === 'vault_rejected' ? 'user' : String(reply.reason));
+      return fail(REJECT_TEXT[String(reply.reason)] ?? `Refused: ${String(reply.reason)}.`);
+    }
+    setPhase('combining');
+    await new Promise((r) => setTimeout(r, 30));
+    try {
+      const cs = [
+        { id: 1, D: j.n1.D, E: j.n1.E },
+        { id: 2, D: String(reply.D2), E: String(reply.E2) },
+        { id: 3, D: String(reply.D3), E: String(reply.E3) },
+      ];
+      const z1 = partial(j.root.share, j.root.groupKey, j.m, cs, 1, j.n1);
+      const signature = combineRoot(j.root, j.m, cs, { 1: z1, 2: String(reply.z2), 3: String(reply.z3) });
+      endJob();
+      setSig(signature);
+      setPhase('done');
+      void success();
+      onDone(signature);
+    } catch (e) {
+      endJob();
+      fail(e instanceof Error ? e.message : 'The signature did not verify.');
+    }
+  };
+
   const runThree = async (root: RootShare, m: Uint8Array) => {
     if (payload.kind === 'evm' && payload.data !== '0x') return fail('With two sticks, the wallet only signs plain transfers here.');
+    job.current?.off();
     const n1 = rootNonces(rand);
     const id = uid();
     pendingId.current = id;
     onPhoneSigned?.();
     setLostAt(0);
+    setError(null);
     setPhase('wrist');
     const off = link.on((x: Msg) => {
       if (x.t !== 'root_progress' || x.id !== id) return;
@@ -216,8 +282,8 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
       if (x.step === 'ir_from_vault') setPhase('ir_back');
       if (x.step === 'ir_miss') setLostAt(Date.now());
     });
-    const answer = link.waitFor((x: Msg) => (x.t === 'root_share' || x.t === 'sign_reject') && x.id === id, 300000, 'the sticks');
-    const base = { chainId: String(payload.kind.startsWith('evm') ? (payload as { chainId: number }).chainId : 0), account: (payload as { account: string }).account, nonce: (payload as { nonce: bigint }).nonce.toString() };
+    job.current = { id, n1, m, root, off };
+    const base = { chainId: String((payload as { chainId: number }).chainId), account: (payload as { account: string }).account, nonce: (payload as { nonce: bigint }).nonce.toString() };
     const wire =
       payload.kind === 'evm_limit'
         ? { kind: 'evm_limit', agent: payload.agent, ...base, agentAddress: payload.agentAddress, oldCap: payload.oldCap.toString(), newCap: payload.newCap.toString(), expiry: payload.expiry.toString() }
@@ -227,39 +293,30 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
             ? { kind: 'evm', agent: payload.agent, ...base, to: payload.to, value: payload.value.toString() }
             : null;
     if (!wire || !link.send({ t: 'root_sign', id, ...wire, D: n1.D, E: n1.E })) {
-      off();
+      endJob();
       return fail('The wrist is not connected. Nothing was signed.');
     }
-    let reply: Msg;
-    try {
-      reply = await answer;
-    } catch (e) {
-      off();
-      return fail(e instanceof Error ? e.message : 'No answer from the sticks.');
+    await waitThree();
+  };
+
+  const retryThree = async () => {
+    const j = job.current;
+    if (!j) return void run();
+    setError(null);
+    setLostAt(0);
+    setPhase('ir_out');
+    if (!link.send({ t: 'root_retry', id: j.id })) {
+      setError('The wrist is not connected. Reconnect it and retry.');
+      setPhase('retry');
+      return;
     }
-    off();
-    pendingId.current = null;
-    if (reply.t === 'sign_reject') {
-      onReject?.(String(reply.reason) === 'vault_rejected' ? 'user' : String(reply.reason));
-      return fail(REJECT_TEXT[String(reply.reason)] ?? `Refused: ${String(reply.reason)}.`);
-    }
-    setPhase('combining');
-    await new Promise((r) => setTimeout(r, 30));
-    try {
-      const cs = [
-        { id: 1, D: n1.D, E: n1.E },
-        { id: 2, D: String(reply.D2), E: String(reply.E2) },
-        { id: 3, D: String(reply.D3), E: String(reply.E3) },
-      ];
-      const z1 = partial(root.share, root.groupKey, m, cs, 1, n1);
-      const signature = combineRoot(root, m, cs, { 1: z1, 2: String(reply.z2), 3: String(reply.z3) });
-      setSig(signature);
-      setPhase('done');
-      void success();
-      onDone(signature);
-    } catch (e) {
-      fail(e instanceof Error ? e.message : 'The signature did not verify.');
-    }
+    await waitThree();
+  };
+
+  const startOver = () => {
+    if (job.current) link.send({ t: 'root_cancel', id: job.current.id });
+    endJob();
+    void run();
   };
 
   const started = useRef(false);
@@ -275,9 +332,9 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
   const phoneState: Step['state'] =
     phase === 'idle' ? 'todo' : phase === 'unlocking' ? 'active' : phoneFailed ? 'failed' : 'done';
   const wristState: Step['state'] =
-    phase === 'wrist' || (phase === 'combining' && !three) ? 'active' : phase === 'done' || (three && ['ir_out', 'stick', 'ir_back', 'combining'].includes(phase)) ? 'done' : wristFailed ? 'failed' : 'todo';
+    phase === 'wrist' || (phase === 'combining' && !three) ? 'active' : phase === 'done' || (three && ['ir_out', 'stick', 'ir_back', 'retry', 'combining'].includes(phase)) ? 'done' : wristFailed ? 'failed' : 'todo';
   const stickState: Step['state'] =
-    phase === 'ir_out' || phase === 'stick' || phase === 'ir_back' || phase === 'combining' ? 'active' : phase === 'done' ? 'done' : wristFailed ? 'failed' : 'todo';
+    phase === 'retry' ? 'failed' : phase === 'ir_out' || phase === 'stick' || phase === 'ir_back' || phase === 'combining' ? 'active' : phase === 'done' ? 'done' : wristFailed ? 'failed' : 'todo';
   const lost = lostAt > 0 && now - lostAt < 1500;
   const beam: Beam = lost ? 'lost' : phase === 'ir_out' ? 'out' : phase === 'ir_back' ? 'back' : 'off';
 
@@ -297,7 +354,9 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
             ? `${status.text}.`
             : 'Press A on the wrist when it buzzes';
 
-  const stickText = wristFailed
+  const stickText = phase === 'retry'
+    ? `${error ?? 'The infrared step did not finish.'} Your phone and wrist parts are kept.`
+    : wristFailed
     ? (error ?? 'Something went wrong.')
     : lost
       ? "Can't read the other stick. Face them, 5 to 30 cm apart."
@@ -343,6 +402,12 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
           Waiting for the wrist
         </Txt>
       ) : null}
+      {phase === 'retry' ? (
+        <View style={styles.retry}>
+          <Button label="Retry infrared" variant="amber" onPress={() => void retryThree()} />
+          <Button label="Start over" variant="ghost" onPress={startOver} />
+        </View>
+      ) : null}
       {three && (phase === 'ir_out' || phase === 'stick' || phase === 'ir_back') ? (
         <Txt size={14} color={lost ? colors.red : colors.muted} align="center">
           {lost ? 'The sticks lost each other. It keeps trying.' : 'Keep the sticks facing each other'}
@@ -359,4 +424,5 @@ function phaseBeforeWrist(error: string | null): boolean {
 
 const styles = StyleSheet.create({
   wrap: { gap: space.m },
+  retry: { gap: space.s },
 });

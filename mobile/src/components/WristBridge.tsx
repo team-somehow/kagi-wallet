@@ -24,6 +24,9 @@ export function WristBridge() {
   useEffect(() => {
     link.start();
     const off = link.on((m) => {
+      // The second stick answers too (hello, status). It is not the wrist: never let it overwrite
+      // the wrist's pairing, or the wrist looks like it belongs to another wallet.
+      if (m.from === 'vault') return;
       switch (m.t) {
         case 'hub':
           dispatch({

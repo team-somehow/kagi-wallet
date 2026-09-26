@@ -72,6 +72,13 @@ bool decode(const rmt_symbol_word_t* s, size_t n, std::vector<uint8_t>& frame) {
       p.back().second += mark + space;
       continue;
     }
+    // A weak signal can also cut a mark in two with a tiny gap. No real gap is that short
+    // (the shortest is 560 us), so join the pieces back into one mark.
+    if (!p.empty() && p.back().second < 250) {
+      p.back().first += p.back().second + mark;
+      p.back().second = space;
+      continue;
+    }
     p.push_back({mark, space});
   }
   size_t i = 0;
@@ -191,7 +198,9 @@ bool begin() {
   if (rmt_new_tx_channel(&tc, &txChan) != ESP_OK) return false;
   rmt_carrier_config_t cc = {};
   cc.frequency_hz = 38000;
-  cc.duty_cycle = 0.25;  // gentler on the supply; still well inside the receiver's range
+  // 40%: a stronger 38 kHz tone than the 25% this used to run at. A stick with a weaker LED was
+  // only just readable at 25% (its marks arrived half length and broken up).
+  cc.duty_cycle = 0.40;
   if (rmt_apply_carrier(txChan, &cc) != ESP_OK) return false;
   rmt_copy_encoder_config_t ec = {};
   if (rmt_new_copy_encoder(&ec, &copyEnc) != ESP_OK) return false;
@@ -222,7 +231,9 @@ bool send(const uint8_t* data, size_t len, uint32_t timeoutMs) {
     bool last = off + n >= len;
     bool acked = false;
     if (sendCb) sendCb(off, len, false);
-    for (int attempt = 0; attempt < 15 && !acked; attempt++) {
+    // Keep resending this frame until it is acknowledged or the whole send runs out of time:
+    // a hand over the window for a few seconds should slow the transfer, not end it.
+    for (int attempt = 0; !acked; attempt++) {
       if (attempt) {
         st.retries++;
         if (sendCb) sendCb(off, len, true);

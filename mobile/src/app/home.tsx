@@ -79,6 +79,22 @@ export default function Home() {
         </Txt>
         <View style={styles.barRight}>
           <WristChip wrist={state.wrist} address={state.address} onPress={() => router.push('/wrist')} />
+          {twoSticks === false ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add a device"
+              hitSlop={8}
+              onPress={() => {
+                void tap();
+                router.push('/vault');
+              }}
+              style={({ pressed }) => [styles.more, styles.addDevice, pressed && styles.pressed]}
+            >
+              <Txt size={13} weight="medium" color={colors.amber}>
+                + Device
+              </Txt>
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             hitSlop={8}
@@ -301,6 +317,7 @@ const styles = StyleSheet.create({
   barRight: { flexDirection: 'row', alignItems: 'center', gap: space.s },
   mark: { letterSpacing: -0.5 },
   more: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: radius.m, borderWidth: 1, borderColor: colors.line },
+  addDevice: { borderColor: colors.amber },
   pressed: { opacity: 0.5 },
   top: { marginTop: space.m },
   gap: { gap: space.m },

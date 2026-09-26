@@ -226,6 +226,11 @@ struct IrUi {
   int bad = 0;
 };
 static IrUi irui;
+// Bench: pretend a message is expected, so the receive screen behaves as in a real signature.
+static bool benchInbound = false;
+// Redraw the screen while receiving. Off by default: display updates disturb the IR receiver,
+// and with a weak sender that is the difference between a clean transfer and a lost one.
+static bool irRxAnimate = false;
 static uint8_t pendX[65], pendR[65], pendS[32], pendVaultPub[33];
 
 struct RootJob {
@@ -237,6 +242,10 @@ struct RootJob {
   uint8_t D[3][33], E[3][33];
   frost::Nonce n;
   uint32_t sentAt = 0;
+  // Approved on the wrist, nonces committed, but the second stick has not answered yet: the
+  // same request can be sent again (the wrist signs its part only once, when the answer comes).
+  bool held = false;
+  uint32_t heldSince = 0;
 };
 static RootJob rjob;
 
@@ -721,7 +730,7 @@ static void irOnSend(size_t done, size_t total, bool retry) {
 
 // Called by the IR layer as frames arrive. A message starting to arrive shows the beam.
 static void irOnRecv(size_t bytes, bool bad) {
-  bool inbound = isVault ? (mode != Mode::Prompt) : rjob.active;
+  bool inbound = benchInbound || (isVault ? (mode != Mode::Prompt) : (rjob.active || rjob.held));
   if (!inbound) return;
   if (mode != Mode::Beam) {
     if (bad) return;  // stray infrared, a TV remote say: not ours to warn about
@@ -729,12 +738,18 @@ static void irOnRecv(size_t bytes, bool bad) {
     irui.label = isVault ? "From your wrist" : "From your 2nd stick";
     irui.sending = false;
     mode = Mode::Beam;
+    draw();  // one still frame; the screen stays quiet until the message is in
+    irui.lastDraw = millis();
     rootProgress("ir_from_vault");
   }
   irui.done = bytes;
   irui.lastRecv = millis();
-  if (bad) irMiss();
-  if (millis() - irui.lastDraw > 60) {
+  if (bad) {
+    // No beep here: the speaker amp must stay off while receiving. The sender beeps instead.
+    irui.lastBad = millis();
+    irui.bad++;
+  }
+  if (irRxAnimate && millis() - irui.lastDraw > 60) {
     irui.lastDraw = millis();
     draw();
   }
@@ -742,7 +757,8 @@ static void irOnRecv(size_t bytes, bool bad) {
 
 // Screens that move redraw on their own.
 static bool animating() {
-  if (mode == Mode::Unpaired || mode == Mode::Pairing || mode == Mode::Prompt || mode == Mode::Beam) return true;
+  if (mode == Mode::Beam) return irui.sending || irRxAnimate;  // receiving: hold still
+  if (mode == Mode::Unpaired || mode == Mode::Pairing || mode == Mode::Prompt) return true;
   if (mode == Mode::ConfirmWipe || mode == Mode::ConfirmWifi) return true;
   if (mode == Mode::Result) return millis() - modeSince < 1000;
   if (mode == Mode::Home) return millis() - modeSince < 800;
@@ -1337,10 +1353,12 @@ static void onRootReshare(JsonDocument& in) {
   showPrompt(p);
 }
 
+static void rootDrop();
 static void onRootSign(JsonDocument& in) {
   String id = in["id"] | "";
   if (rparties != 3) return reject(id, "root_not_3_of_3");
   if (rjob.active) return reject(id, "busy");
+  if (rjob.held) rootDrop();  // a paused request the phone gave up on
   Prompt p;
   p.id = id;
   p.kind = "root_sign";
@@ -1382,9 +1400,26 @@ static void irShowWaiting(const char* text) {
   draw();
 }
 
-// Wrist: after A, commit our nonces and send the whole request to the vault over IR.
-static void rootSignToVault() {
-  frost::commit(rjob.n, rjob.D[1], rjob.E[1]);
+// Wrist: the job is paused, not lost. The phone can ask to send it again.
+static void rootStall(const char* reason) {
+  rjob.active = false;
+  rjob.held = true;
+  rjob.heldSince = millis();
+  JsonDocument d;
+  d["t"] = "root_stalled";
+  d["id"] = rjob.id;
+  d["reason"] = reason;
+  send(d);
+}
+
+static void rootDrop() {
+  frost::wipe(rjob.n);
+  rjob.active = rjob.held = false;
+  rjob.id = "";
+}
+
+// Wrist: send the request to the second stick over IR. Used for the first try and for retries.
+static void rootSendToVault() {
   // 'S' | type | compact | D1 E1 D2 E2
   size_t cl = compactLen(rjob.type);
   uint8_t pkt[2 + 88 + 4 * 33];
@@ -1397,15 +1432,15 @@ static void rootSignToVault() {
   memcpy(q + 66, rjob.D[1], 33);
   memcpy(q + 99, rjob.E[1], 33);
   size_t pktLen = 2 + cl + 132;
+  rjob.held = false;
   irSending(rootIsManager ? "To your 2nd stick" : "To the vault");
   JsonDocument st;
   st["t"] = "root_progress";
   st["id"] = rjob.id;
   st["step"] = "ir_to_vault";
   send(st);
-  if (!ir::send(pkt, pktLen, 60000)) {
-    frost::wipe(rjob.n);
-    reject(rjob.id, "ir_failed");
+  if (!ir::send(pkt, pktLen, 45000)) {
+    rootStall("ir_failed");
     buzz(3);
     showResult(rootIsManager ? "2nd stick not in sight" : "Vault not in sight", C_RED, 4000, Fx::Shake);
     return;
@@ -1421,13 +1456,21 @@ static void rootSignToVault() {
   send(d);
 }
 
+// Wrist: after A, commit our nonces once, then send.
+static void rootSignToVault() {
+  frost::commit(rjob.n, rjob.D[1], rjob.E[1]);
+  rootSendToVault();
+}
+
 // Wrist: the vault answered over IR.
 static void rootFromVault(const std::vector<uint8_t>& m) {
-  if (!rjob.active) return;
-  rjob.active = false;
+  // A late answer, after a timeout paused the job, still counts.
+  if (!rjob.active && !rjob.held) return;
+  rjob.active = rjob.held = false;
   if (m[0] == 'R' || m.size() < 1 + 33 + 33 + 32) {
-    frost::wipe(rjob.n);
-    reject(rjob.id, "vault_rejected");
+    String id = rjob.id;
+    rootDrop();
+    reject(id, "vault_rejected");
     showResult("Vault said no", C_MUTED, 3000);
     return;
   }
@@ -1436,8 +1479,12 @@ static void rootFromVault(const std::vector<uint8_t>& m) {
   const uint8_t* z3 = m.data() + 67;
   uint8_t ids[3] = {1, 2, 3};
   uint8_t z2[32];
-  if (!frost::respond(rshare, rgk, rjob.msg, 3, ids, rjob.D, rjob.E, 2, rjob.n, z2)) {
+  bool signedOk = frost::respond(rshare, rgk, rjob.msg, 3, ids, rjob.D, rjob.E, 2, rjob.n, z2);
+  // Our nonces are used now, whatever happens: never again for this job.
+  frost::wipe(rjob.n);
+  if (!signedOk) {
     reject(rjob.id, "sign_failed");
+    rjob.id = "";
     showResult("Signing failed", C_RED);
     return;
   }
@@ -1451,7 +1498,9 @@ static void rootFromVault(const std::vector<uint8_t>& m) {
   d["E3"] = hex(rjob.E[2], 33);
   d["z3"] = hex(z3, 32);
   send(d);
-  showResult("Root signed", C_TEXT, 2600, Fx::Burst);
+  rjob.id = "";  // finished: nothing left to retry
+  showResult(rootIsManager ? "Signed by both sticks" : "Root signed", C_TEXT, 2600, Fx::Burst);
+  chime();
 }
 
 // Vault: a root request arrived over IR.
@@ -1482,6 +1531,23 @@ static void vaultRequest(const std::vector<uint8_t>& m) {
 }
 
 static void vaultApprove() {
+  // The hand that just held A is usually over the stick. Wait for it to let go and give it a
+  // moment to settle, so the reply goes out with the window clear and pointing at the wrist.
+  irSending("Let go, aim at the wrist");
+  uint32_t t0 = millis();
+  while (M5.BtnA.isPressed() && millis() - t0 < 4000) {
+    M5.update();
+    delay(20);
+  }
+  uint32_t t1 = millis();
+  while (millis() - t1 < 700) {
+    if (millis() - irui.lastDraw > 60) {
+      irui.lastDraw = millis();
+      draw();
+    }
+    delay(20);
+  }
+  irui.label = "Back to your wrist";
   frost::commit(vjob.n, vjob.D[2], vjob.E[2]);
   uint8_t ids[3] = {1, 2, 3};
   uint8_t z3[32];
@@ -1494,7 +1560,6 @@ static void vaultApprove() {
   memcpy(pkt + 1, vjob.D[2], 33);
   memcpy(pkt + 34, vjob.E[2], 33);
   memcpy(pkt + 67, z3, 32);
-  irSending("Back to your wrist");
   bool ok = ir::send(pkt, sizeof pkt, 60000);
   if (!ok) buzz(3);
   showResult(ok ? "Signed" : "Wrist not in sight", ok ? C_TEXT : C_RED, 2600, ok ? Fx::Burst : Fx::Shake);
@@ -1707,6 +1772,18 @@ static void handle(const String& line) {
     d["parties"] = rparties;
     send(d);
   } else if (t == "root_sign") onRootSign(in);
+  else if (t == "root_retry") {
+    // Send the paused request again. No new approval: the wrist already said yes to this.
+    String id = in["id"] | "";
+    if (rjob.held && rjob.id == id) rootSendToVault();
+    else reject(id, "nothing_to_retry");
+  } else if (t == "root_cancel") {
+    String id = in["id"] | "";
+    if ((rjob.held || rjob.active) && rjob.id == id) {
+      rootDrop();
+      mode = restingMode();
+    }
+  }
   else if (t == "reshare_piece") onResharePiece(in);
   else if (t == "open_window") {
     // Over the USB cable only: plugging in is physical presence, like holding A.
@@ -1794,6 +1871,15 @@ static void handle(const String& line) {
     // Find which stick is which: it beeps and flashes its name.
     buzz(2);
     showResult(isVault ? "This is the vault" : "This is the wrist", C_AMBER, 3000);
+  } else if (t == "ir_bench_rx") {
+    benchInbound = in["inbound"] | false;
+    irRxAnimate = in["animate"] | false;
+    if (!benchInbound && mode == Mode::Beam) mode = restingMode();
+    JsonDocument d;
+    d["t"] = "ir_bench_rx";
+    d["inbound"] = benchInbound;
+    d["animate"] = irRxAnimate;
+    send(d);
   } else if (t == "ir_rate") {
     ir::rateTest(in["frames"] | 30, in["gap"] | 40);
     JsonDocument d;
@@ -2282,7 +2368,7 @@ void loop() {
   static std::vector<uint8_t> irMsg;
   bool irGot = ir::poll(irMsg);
   // A message that started arriving and then stopped: say so, and go back.
-  if (mode == Mode::Beam && !irui.sending && !irGot && irui.lastRecv && millis() - irui.lastRecv > 6000) {
+  if (mode == Mode::Beam && !irui.sending && !irGot && irui.lastRecv && millis() - irui.lastRecv > 15000) {
     buzz(2);
     showResult("Lost the other stick", C_RED, 3000, Fx::Shake);
   }
@@ -2330,11 +2416,16 @@ void loop() {
   // Vault: hold A for 2 seconds on the home screen to open the 2-minute reshare window.
   if (isVault && !windowUntil && mode == Mode::Home && M5.BtnA.pressedFor(2000)) openWindow();
   // Wrist: the vault has two minutes to answer a root request.
-  if (rjob.active && millis() - rjob.sentAt > 120000) {
-    rjob.active = false;
-    frost::wipe(rjob.n);
-    reject(rjob.id, "vault_timeout");
-    showResult("Vault timed out", C_MUTED, 3000);
+  if (rjob.active && millis() - rjob.sentAt > 90000) {
+    rootStall("vault_timeout");
+    buzz(2);
+    showResult(rootIsManager ? "No answer: retry on phone" : "Vault timed out", C_MUTED, 3000);
+  }
+  // A paused request nobody retried within five minutes is dropped.
+  if (rjob.held && millis() - rjob.heldSince > 300000) {
+    String id = rjob.id;
+    rootDrop();
+    reject(id, "expired");
   }
 
   // Buttons.
