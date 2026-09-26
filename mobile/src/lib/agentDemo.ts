@@ -19,6 +19,7 @@ type Job = {
   pending?: { hash: Hex; kind: 'spend' | 'request'; newCap?: string };
   waiting?: { newCap: string; fromBlock: string };
   completed?: boolean;
+  outcome?: 'confirmed' | 'declined' | 'session-ended';
 };
 type State = { running: boolean; message: string; hash?: Hex; saved: boolean };
 let snapshot: State = {
@@ -48,11 +49,25 @@ export async function restoreAgentDemo() {
   const raw = await SecureStore.getItemAsync(STORAGE);
   if (raw && !snapshot.running) {
     const job: Job = JSON.parse(raw);
+    // Recover runs marked complete by the earlier approval-timeout behavior.
+    // A declined request remains stopped; only an expired request is retryable.
+    if (job.completed && !job.outcome && job.waiting && job.index < job.amounts.length) {
+      const block = await evm.pub.getBlock();
+      const events = await evm.events(job.account, BigInt(job.waiting.fromBlock), block.number);
+      const declined = events.some((e) => e.kind === 'declined' && e.agent.toLowerCase() === job.agent.toLowerCase() && e.newCap === BigInt(job.waiting!.newCap));
+      if (!declined && block.number - BigInt(job.waiting.fromBlock) > 50n) {
+        job.completed = false;
+        delete job.waiting;
+        await save(job);
+      }
+    }
     publish({
       saved: !job.completed,
       hash: job.pending?.hash,
       message: job.completed
-        ? 'Last run finished. See Wallet activity for its receipts.'
+        ? job.index === job.amounts.length
+          ? 'Transfers confirmed. See Wallet activity for their receipts.'
+          : 'Last run stopped. The remaining transfer was not sent.'
         : 'A run is saved. Resume it to check the pending transaction and continue.',
     });
   }
@@ -135,6 +150,7 @@ export async function runAgentDemo(account: Hex, agent: Hex, secondAct = false) 
       const block = await evm.pub.getBlock();
       if (session.expiry <= block.timestamp) {
         job.completed = true;
+        job.outcome = 'session-ended';
         await save(job);
         throw new Error('This session expired or was revoked. No further transfers were sent.');
       }
@@ -154,14 +170,15 @@ export async function runAgentDemo(account: Hex, agent: Hex, secondAct = false) 
           )
         ) {
           job.completed = true;
+          job.outcome = 'declined';
           await save(job);
           publish({ saved: false, message: 'Declined. The waiting transfer was not sent.' });
           return;
         }
         if (block.number - BigInt(job.waiting.fromBlock) > 50n) {
-          job.completed = true;
+          delete job.waiting;
           await save(job);
-          throw new Error('The approval request expired. No waiting transfer was sent.');
+          throw new Error('The approval request expired. Resume to request approval again; confirmed transfers will not repeat.');
         }
         publish({
           message: `Agent paused. Approve ${(BigInt(job.waiting.newCap) / MICRO).toString()} µETH total on your devices, or decline on the phone.`,
@@ -186,6 +203,7 @@ export async function runAgentDemo(account: Hex, agent: Hex, secondAct = false) 
       await send('spend', [job.agent, DEMO_RECIPIENT, value, Number(sig.v), sig.r, sig.s]);
     }
     job.completed = true;
+    job.outcome = 'confirmed';
     await save(job);
     publish({ saved: false, message: 'Transfers confirmed. Open Wallet activity to see each Sepolia receipt.' });
   } catch (e) {

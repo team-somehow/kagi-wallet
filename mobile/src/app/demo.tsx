@@ -18,7 +18,7 @@ export default function PresentationSettings() {
   const { info, live } = useChain();
   const key = live.find((s) => s.cap === 5_000_000_000_000n || s.cap === 20_000_000_000_000n) ?? live[0];
   useEffect(() => {
-    void restoreAgentDemo();
+    void restoreAgentDemo().catch(() => {}); // Reopening retries if Sepolia is temporarily unavailable.
   }, []);
   return (
     <Screen scroll>
