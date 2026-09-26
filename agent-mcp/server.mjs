@@ -476,7 +476,7 @@ function buildServer(current, setKey) {
         'Send test ETH from the agent wallet, within its allowance. "to" is a 0x address or a contact name from get_wallet. ' +
         'Returns status "confirmed" with a tx link, or "waiting_for_owner" with a request_id when the owner must approve a higher limit.',
       inputSchema: {
-        to: z.string().describe('0x address or contact name, e.g. ABC'),
+        to: z.string().describe('0x address, or a contact name from get_wallet if the wallet has any'),
         amount_eth: z.string().describe('Amount in ETH, e.g. "0.000002"'),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },

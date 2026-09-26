@@ -43,10 +43,10 @@ await tx(await phone.writeContract({ address: account, abi: KagiAccountAbi, func
 await tx(await phone.sendTransaction({ to: agent, value: parseEther('0.01') }));
 check(true, 'granted a 0.000005 ETH key and sent it gas');
 
-const ABC = '0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0';
+const RECIPIENT = '0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0'; // the gas sponsor wallet
 const srv = spawn('node', ['server.mjs'], {
   cwd: new URL('..', import.meta.url).pathname,
-  env: { ...process.env, SESSION_KEY: `kagi:${account}:0x${agentKey}`, RPC_URL: RPC, MCP_TOKEN: 't', PORT: '8795', CONTACTS: JSON.stringify({ ABC }) },
+  env: { ...process.env, SESSION_KEY: `kagi:${account}:0x${agentKey}`, RPC_URL: RPC, MCP_TOKEN: 't', PORT: '8795', CONTACTS: JSON.stringify({ gas: RECIPIENT }) },
   stdio: ['ignore', 'pipe', 'inherit'],
 });
 srv.stdout.on('data', (d) => process.stdout.write(`  [mcp] ${d}`));
@@ -98,7 +98,7 @@ try {
   const TO = '0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E';
   const s1 = await call('send_eth', { to: TO, amount_eth: '0.000002' });
   check(s1.status === 'confirmed' && (await pub.getBalance({ address: TO })) === parseEther('0.000002'), `first transfer, to a raw address: ${s1.status}`);
-  const s2 = await call('send_eth', { to: 'ABC', amount_eth: '0.000008' });
+  const s2 = await call('send_eth', { to: 'gas', amount_eth: '0.000008' });
   check(s2.status === 'waiting_for_owner' && s2.requested_total === '0.00002 ETH', `second transfer asks for ${s2.requested_total} (${s2.status})`);
   const answered = phoneAnswers(true);
   const w1 = await call('wait_for_approval', { request_id: s2.request_id });
@@ -107,7 +107,7 @@ try {
   const w2 = await call('get_wallet');
   check(w2.allowance_left === '0.00001 ETH' && w2.allowance_total === '0.00002 ETH', `after: ${w2.allowance_left} left of ${w2.allowance_total}`);
 
-  const s3 = await call('send_eth', { to: 'ABC', amount_eth: '0.00002' });
+  const s3 = await call('send_eth', { to: 'gas', amount_eth: '0.00002' });
   check(s3.status === 'waiting_for_owner', `third transfer asks again (${s3.status})`);
   const declined = phoneAnswers(false);
   const w3 = await call('wait_for_approval', { request_id: s3.request_id });
@@ -115,15 +115,15 @@ try {
   check(w3.status === 'rejected', `declined: ${w3.status}`);
   const w4 = await call('get_wallet');
   check(w4.allowance_total === '0.00002 ETH' && w4.spent === '0.00001 ETH', `decline kept the limit (${w4.allowance_total}) and sent nothing more (${w4.spent} spent)`);
-  const bal = await pub.getBalance({ address: ABC });
-  check(bal === parseEther('0.000008'), `ABC received ${formatEther(bal)} ETH`);
+  const bal = await pub.getBalance({ address: RECIPIENT });
+  check(bal === parseEther('0.000008'), `the recipient received ${formatEther(bal)} ETH`);
   const s4 = await call('send_eth', { to: 'Bob', amount_eth: '0.000001' });
   check(s4.status === 'unknown_recipient', `unknown contact: ${s4.status}`);
 
   // A server with no demo key: a connection starts empty, then use_my_key switches it to the user's key.
   const bare = spawn('node', ['server.mjs'], {
     cwd: new URL('..', import.meta.url).pathname,
-    env: { ...process.env, SESSION_KEY: '', RPC_URL: RPC, PORT: '8797', CONTACTS: JSON.stringify({ ABC }) },
+    env: { ...process.env, SESSION_KEY: '', RPC_URL: RPC, PORT: '8797', CONTACTS: JSON.stringify({ gas: RECIPIENT }) },
     stdio: ['ignore', 'ignore', 'inherit'],
   });
   try {
