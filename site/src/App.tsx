@@ -1,5 +1,6 @@
 import { Compare } from './components/Compare';
 import { Demo } from './components/Demo';
+import { GetLeash } from './components/GetLeash';
 import { Hardware } from './components/Hardware';
 import { Hero } from './components/Hero';
 import { KeyStats } from './components/KeyStats';
@@ -22,7 +23,8 @@ export function App() {
             <a href="#incidents">Why</a>
             <a href="#how">How</a>
             <a href="#hardware">Hardware</a>
-            <a className="btn btn-ghost btn-sm" href={REPO_URL} target="_blank" rel="noreferrer">GitHub</a>
+            <a href={REPO_URL} target="_blank" rel="noreferrer">GitHub</a>
+            <a className="btn btn-primary btn-sm" href="#get">Get Leash</a>
           </div>
         </div>
       </nav>
@@ -35,6 +37,7 @@ export function App() {
         <Ladder />
         <Hardware />
         <Compare />
+        <GetLeash />
 
         <section className="section" id="sources">
           <div className="wrap">

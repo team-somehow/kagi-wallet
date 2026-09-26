@@ -6,6 +6,19 @@ revoke every key. Goes to sleep as a signer after 2 minutes without motion.
 
 Development firmware: no secure boot, no flash encryption, reflashable any time.
 
+## Flash without building
+
+The website's Get Leash section flashes the release image from Chrome or Edge over
+Web Serial, and can set a device's vault role over the same cable. The image is also
+attached to each GitHub release as `leash-firmware-<version>.bin`, a merged image
+that goes at offset 0:
+
+```bash
+esptool.py --chip esp32s3 write_flash 0x0 leash-firmware-0.1.0.bin
+```
+
+Release images are built without `src/secrets.h`; add WiFi networks from the phone.
+
 ## WiFi
 
 The wrist joins a 2.4 GHz network and dials out to the hub on TCP port 8788. It never

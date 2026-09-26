@@ -1,6 +1,5 @@
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from 'motion/react';
 import { useEffect, useState, type PointerEvent } from 'react';
-import { REPO_URL } from '../data';
 import { Device } from './Device';
 
 export function Hero() {
@@ -42,7 +41,7 @@ export function Hero() {
         <p className="hero-sub">Capped, expiring keys for AI agents. Raising a limit takes your phone and a press on your wrist.</p>
         <div className="hero-cta">
           <a className="btn btn-primary" href="#demo">Try the demo</a>
-          <a className="btn btn-ghost" href={REPO_URL} target="_blank" rel="noreferrer">View the code</a>
+          <a className="btn btn-ghost" href="#get">Get the app and firmware</a>
         </div>
         <dl className="hero-facts">
           <div><dt>$43</dt><dd>hardware for both signers</dd></div>

@@ -109,6 +109,15 @@ export const prices = [
 export const DEVICE_URL = 'https://shop.m5stack.com/products/m5sticks3-esp32s3-mini-iot-dev-kit';
 export const PRICES_URL = 'https://coinbureau.com/analysis/trezor-vs-ledger';
 export const REPO_URL = 'https://github.com/team-somehow/leash-wallet';
+export const RELEASE_URL = `${REPO_URL}/releases/tag/v0.1.0`;
+export const APK_URL = `${REPO_URL}/releases/download/v0.1.0/leash-1.0.0.apk`;
+export const FIRMWARE_SRC_URL = `${REPO_URL}/tree/main/firmware/wrist`;
+export const FIRMWARE = {
+  version: '0.1.0',
+  manifest: './firmware/manifest.json',
+  bin: './firmware/leash-firmware-0.1.0.bin',
+  sha256: '2b4a39340fa94ae3a274112458f62ffa5a899e5b2c6a8fae07608a43e3a0783a',
+};
 
 export const sources: { title: string; outlet: string; url: string }[] = [
   { title: 'How one trader exploited Grok and Morse code', outlet: 'CryptoSlate, May 2026', url: losses[4].source },
