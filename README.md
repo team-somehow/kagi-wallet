@@ -13,6 +13,10 @@ Everything above the cap climbs a ladder of physical devices: your wrist, then a
 ![ESP32](https://img.shields.io/badge/ESP32--S3-PlatformIO-e7352c?logo=espressif)
 ![Network](https://img.shields.io/badge/network-on--chain-627eea?logo=ethereum)
 
+Integrated with
+
+<a href="https://intercepta.io"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/intercepta-light.png" /><img src="site/public/partners/intercepta-dark.png" alt="Intercepta" height="28" /></picture></a> &nbsp;&nbsp;&nbsp; <a href="https://www.curvegrid.com/multibaas"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/curvegrid-light.png" /><img src="site/public/partners/curvegrid-dark.png" alt="Curvegrid MultiBaas" height="28" /></picture></a>
+
 **[Website](https://kagiwallet.web.app)** · **[Download the Android app](https://github.com/team-somehow/kagi-wallet/releases/download/v0.2.0/kagi-1.0.0.apk)** · **[Flash a stick in the browser](https://kagiwallet.web.app/#get)** · **[Connect your AI](https://kagiwallet.web.app/#connect)** · **[Releases](https://github.com/team-somehow/kagi-wallet/releases)**
 
 </div>
@@ -186,6 +190,8 @@ The phone's `src/lib/frost.ts` and the firmware's `src/frost.cpp` must match byt
 
 ## Intercepta: every payment screened before the agent signs
 
+<a href="https://intercepta.io"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/intercepta-light.png" /><img src="site/public/partners/intercepta-dark.png" alt="Intercepta" height="32" /></picture></a>
+
 The spending cap limits *how much* an agent can lose. Intercepta decides *who* it may pay. Before the session key signs anything, the agent MCP screens the recipient with the Intercepta API, and the verdict picks the step of Kagi's ladder the payment goes to:
 
 | Verdict | When | What happens |
@@ -222,6 +228,8 @@ The contract needs no changes: a held payment travels through the existing `requ
 - Missing: a single "should I pay this address?" endpoint that returns a recommended verdict (allow / review / deny) alongside the score, and a `chain` parameter to make clear which network the data covers.
 
 ## Curvegrid MultiBaas
+
+<a href="https://www.curvegrid.com/multibaas"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/curvegrid-light.png" /><img src="site/public/partners/curvegrid-dark.png" alt="Curvegrid MultiBaas" height="32" /></picture></a>
 
 Kagi is a policy-aware transaction agent: the contract enforces the spending limit, and a person has to approve anything above it. The chain can tell you the current state, like how much allowance is left, but not the story behind it. **MultiBaas gives the agent a memory of what happened.**
 

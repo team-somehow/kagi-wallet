@@ -6,6 +6,8 @@ pays its gas from the key's own address (the phone tops it up at grant). The key
 its on-chain allowance. For more, it files a limit request on-chain; the owner's phone sees it,
 and the owner approves on their Kagi stick or declines.
 
+Integrated with <a href="https://intercepta.io"><picture><source media="(prefers-color-scheme: dark)" srcset="../site/public/partners/intercepta-light.png" /><img src="../site/public/partners/intercepta-dark.png" alt="Intercepta" height="24" /></picture></a> &nbsp; <a href="https://www.curvegrid.com/multibaas"><picture><source media="(prefers-color-scheme: dark)" srcset="../site/public/partners/curvegrid-light.png" /><img src="../site/public/partners/curvegrid-dark.png" alt="Curvegrid MultiBaas" height="24" /></picture></a>: Intercepta screens every recipient before the key signs, and Curvegrid MultiBaas indexes the wallet's history for `get_activity`.
+
 ## Tools
 
 | Tool | What it does |
