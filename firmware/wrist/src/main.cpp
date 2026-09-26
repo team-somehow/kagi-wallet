@@ -32,7 +32,7 @@
 #include "secrets.example.h"
 #endif
 
-static const char* FW = "0.4.0";
+static const char* FW = "0.4.1";
 
 // ---- look -----------------------------------------------------------------
 
@@ -68,6 +68,7 @@ static bool pairWaitingPhone = false;
 static Prompt prompt;
 static String resultText;
 static uint16_t resultColor;
+static bool resultMark = false;  // show Intercepta's mark above the text (its alerts only)
 static uint32_t resultUntil = 0;
 static uint32_t lastPhone = 0;
 static bool dirty = true;
@@ -646,10 +647,17 @@ static void drawResult() {
   } else if (resultFx == Fx::Shake) {
     dx = (int)(10 * sinf(p * 6.283f * 4) * (1 - p));
   }
+  int ty = resultFx == Fx::Burst ? 108 : 68;
+  if (resultMark) {
+    // Intercepta's mark: a 3 x 4 grid of dots (their logo, drawn in ink), above the reason.
+    for (int row = 0; row < 4; row++)
+      for (int col = 0; col < 3; col++) canvas.fillCircle(cx + dx - 10 + col * 10, 18 + row * 10, 3, C_TEXT);
+    ty = 100;
+  }
   canvas.setFont(&fonts::FreeSansBold12pt7b);
   canvas.setTextDatum(resultFx == Fx::Burst ? middle_center : middle_center);
   canvas.setTextColor(resultColor);
-  canvas.drawString(resultText, cx + dx, resultFx == Fx::Burst ? 108 : 68);
+  canvas.drawString(resultText, cx + dx, ty);
 }
 
 static void drawRevoked() {
@@ -842,6 +850,7 @@ static void showResult(const String& text, uint16_t color, uint32_t ms = 1800, F
   resultFx = fx;
   resultText = text;
   resultColor = color;
+  resultMark = false;
   resultUntil = millis() + ms;
   mode = Mode::Result;
   dirty = true;
@@ -1917,8 +1926,11 @@ static void handle(const String& line) {
     // interrupts a prompt the owner is already looking at.
     bool red = String(in["level"] | "amber") == "red";
     buzz(red ? 3 : 2);
-    if (mode == Mode::Home || mode == Mode::Revoked || mode == Mode::Result)
-      showResult(String(in["text"] | "Check your phone"), red ? C_RED : C_ACCENT, 4000, red ? Fx::Shake : Fx::None);
+    if (mode == Mode::Home || mode == Mode::Revoked || mode == Mode::Result) {
+      String text = String(in["text"] | "Check your phone");
+      showResult(text, red ? C_RED : C_ACCENT, 4000, red ? Fx::Shake : Fx::None);
+      resultMark = text.startsWith("Intercepta");
+    }
   } else if (t == "sound") {
     soundsEnabled = in["enabled"] | true;
     Preferences p; p.begin("root", false); p.putBool("sound", soundsEnabled); p.end();

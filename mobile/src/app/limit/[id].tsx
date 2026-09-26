@@ -7,6 +7,7 @@ import { Txt } from '../../components/Txt';
 import { Button } from '../../components/Button';
 import { Fact } from '../../components/Fact';
 import { ManagerSign } from '../../components/ManagerSign';
+import { InterceptaMark } from '../../components/BrandMarks';
 import { fmtAmount, fmtEth, interceptaFlag, useChain } from '../../store/chain';
 import * as evm from '../../lib/evm';
 import { evmDeclineMessage, phoneOnlySign } from '../../lib/frost';
@@ -132,9 +133,12 @@ export default function LimitRequestScreen() {
         </Txt>
         {held ? (
           <View style={styles.flag}>
-            <Txt size={13} weight="bold" color={colors.red}>
-              {flag === 'blocked' ? 'INTERCEPTA BLOCKED THIS PAYMENT' : 'INTERCEPTA HELD THIS PAYMENT'}
-            </Txt>
+            <View style={styles.flagHead}>
+              <InterceptaMark size={18} />
+              <Txt size={13} weight="bold" color={colors.red} style={styles.flagTitle}>
+                {flag === 'blocked' ? 'INTERCEPTA BLOCKED THIS PAYMENT' : 'INTERCEPTA HELD THIS PAYMENT'}
+              </Txt>
+            </View>
             <Txt size={15} lineHeight={22}>
               {r.reason.replace(/^Intercepta (held|blocked): /, '')}
             </Txt>
@@ -264,4 +268,6 @@ const styles = StyleSheet.create({
   right: { alignItems: 'flex-end' },
   note: { borderLeftWidth: 2, borderLeftColor: colors.amber, paddingLeft: space.m },
   flag: { borderWidth: 1, borderColor: colors.red, borderRadius: radius.m, padding: space.m, gap: space.xs },
+  flagHead: { flexDirection: 'row', alignItems: 'center', gap: space.s },
+  flagTitle: { flex: 1 },
 });
