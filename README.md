@@ -17,7 +17,7 @@ Integrated with
 
 <a href="https://intercepta.io"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/intercepta-light.png" /><img src="site/public/partners/intercepta-dark.png" alt="Intercepta" height="28" /></picture></a> &nbsp;&nbsp;&nbsp; <a href="https://www.curvegrid.com/multibaas"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/curvegrid-light.png" /><img src="site/public/partners/curvegrid-dark.png" alt="Curvegrid MultiBaas" height="28" /></picture></a>
 
-**[Website](https://kagiwallet.web.app)** · **[Download the Android app](https://github.com/team-somehow/kagi-wallet/releases/download/v0.2.0/kagi-1.0.0.apk)** · **[Flash a stick in the browser](https://kagiwallet.web.app/#get)** · **[Connect your AI](https://kagiwallet.web.app/#connect)** · **[Releases](https://github.com/team-somehow/kagi-wallet/releases)**
+**[Website](https://kagiwallet.com)** · **[Download the Android app](https://github.com/team-somehow/kagi-wallet/releases/download/v0.2.0/kagi-1.0.0.apk)** · **[Flash a stick in the browser](https://kagiwallet.com/#get)** · **[Connect your AI](https://kagiwallet.com/#connect)** · **[Releases](https://github.com/team-somehow/kagi-wallet/releases)**
 
 </div>
 
@@ -83,7 +83,7 @@ firmware/    ESP32-S3 firmware (PlatformIO). One build runs as the Kagi Wallet o
   irprobe/     bench tool for the IR link
 mobile/      Expo / React Native app. The phone shard, the control surface, and its own on-chain client
 agent-mcp/   Node. A bare-bones MCP server that gives ChatGPT, Claude, Claude Code, Codex, Cursor or VS Code an agent wallet
-site/        the landing page, live at https://kagiwallet.web.app
+site/        the landing page, live at https://kagiwallet.com
 IDEA.md      the full design, threat model and demo script
 ```
 
@@ -160,7 +160,7 @@ pio run -e sticks3 -t upload
 pio device monitor
 ```
 
-No toolchain? Flash a stick from Chrome or Edge at [kagiwallet.web.app](https://kagiwallet.web.app/#get).
+No toolchain? Flash a stick from Chrome or Edge at [kagiwallet.com](https://kagiwallet.com/#get).
 
 Flash the same build to both ESP32 devices, then give the second one the vault role (`set_role`, stored in NVS). See [`firmware/wrist/README.md`](firmware/wrist/README.md) for WiFi quirks and first-flash steps.
 
