@@ -8,10 +8,10 @@ import {Bip340} from "./Bip340.sol";
 /// signature over
 ///   m = sha256("KAGI/evm" || chainid || this || nonce || to || value || data)
 /// The wrist rebuilds m itself from what it shows on screen before it signs. Anyone may
-/// submit a signed call and pay its gas (in practice the hub's relayer).
+/// submit a signed call and pay its gas (in practice the phone's gas wallet).
 ///
-/// Storage: slot 0 nonce, slot 1 groupKey. Children append after these; the hub's simulations
-/// and the phone read these slots directly, so don't reorder them.
+/// Storage: slot 0 nonce, slot 1 groupKey. Children append after these; the phone and the
+/// agent MCP server read these slots directly, so don't reorder them.
 abstract contract KagiBase {
     /// Messages signed by the group key. Bumped by every signed action, so none replays.
     uint256 public nonce;

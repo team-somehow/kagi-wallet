@@ -125,8 +125,8 @@ contract KagiAccount is KagiBase {
     }
 
     /// Sends plain ETH from the account, signed by the agent's own ephemeral key. No calldata,
-    /// so a session can't approve tokens or call out. Revert reasons are plain strings so the
-    /// relayer can tell the phone why.
+    /// so a session can't approve tokens or call out. Revert reasons are plain strings so
+    /// whoever submits it (the agent MCP server) can tell the agent why.
     function spend(address agent, address to, uint256 value, uint8 v, bytes32 r, bytes32 s) external {
         Session storage sess = _sessions[agent];
         uint256 sn = sess.nonce;

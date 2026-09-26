@@ -283,3 +283,5 @@ This is a hackathon build. What isn't done yet:
 - **FROST runs in RAM.** Secure storage protects shards at rest, but each shard is in memory for a few hundred ms per signature.
 
 See **[IDEA.md](IDEA.md)** for the full design, the threat model and the two-act demo.
+
+**Papers:** [The Kagi protocol](docs/kagi-protocol.md) (the contracts, the spending ladder, the standards) and [The cryptography behind Kagi](docs/kagi-cryptography.md) (FROST, BIP340 on Ethereum via `ecrecover`, and how the ERCs fit).
