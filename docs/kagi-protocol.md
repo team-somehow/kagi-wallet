@@ -51,8 +51,8 @@ flowchart LR
         Stop["revoke · decline"]
     end
 
-    Manager["Manager key<br/>2-of-2"]
-    Root["Root key<br/>3-of-3"]
+    Manager["Manager key 2-of-2"]
+    Root["Root key 3-of-3"]
     Treasury["RootTreasury"]
 
     Agent -- "pays under the cap" --> Spend
@@ -66,6 +66,18 @@ flowchart LR
     Kagi --> Root
     Second --> Root
     Root --> Treasury
+
+    classDef agent fill:#EEF0F3,stroke:#5C6674,color:#111820
+    classDef device fill:#DCE9F4,stroke:#1C6296,color:#0B3A5E
+    classDef key fill:#F3E4D5,stroke:#B35F17,color:#5A2E08
+    classDef fn fill:#FFFFFF,stroke:#8A939F,color:#111820
+    classDef vault fill:#F8E8EB,stroke:#AA3448,color:#5C1422
+    class Agent agent
+    class Phone,Kagi,Second device
+    class Manager,Root key
+    class Spend,Request,Admin,Stop fn
+    class Treasury vault
+    style Account fill:#F8FAFC,stroke:#CBD2DA,color:#111820
 ```
 
 The arrows are the only ways in. The agent can reach two functions, and one of them only emits an event. Every other function needs a signature from keys the owner's devices hold.

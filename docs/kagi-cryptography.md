@@ -24,20 +24,31 @@ Every piece is a standard, stacked so that each layer only sees the layer below 
 
 ```mermaid
 flowchart LR
-    Pair["Pairing<br/>FROST key generation"]
-    Shares["Key shares<br/>phone · Kagi Wallet"]
-    Sign["FROST signing<br/>2 rounds"]
-    Sig["One BIP340<br/>signature"]
-    Verify["Bip340.sol<br/>ecrecover trick"]
+    Pair["FROST key generation"]
+    Shares["Phone + Kagi Wallet shares"]
+    Sign["FROST signing, 2 rounds"]
+    Sig["One BIP340 signature"]
+    Verify["Bip340.sol: ecrecover trick"]
     Account["KagiAccount"]
-    ERCs["ERC-1271 · ERC-165<br/>ERC-721 · ERC-1155"]
+    ERCs["ERC-1271, 165, 721, 1155"]
 
-    AgentKey["Agent key<br/>ECDSA"]
+    AgentKey["Agent key (ECDSA)"]
     Ecrecover["ecrecover"]
     Spend["spend"]
 
     Pair --> Shares --> Sign --> Sig --> Verify --> Account --> ERCs
     AgentKey --> Ecrecover --> Spend
+
+    classDef device fill:#DCE9F4,stroke:#1C6296,color:#0B3A5E
+    classDef crypto fill:#F3E4D5,stroke:#B35F17,color:#5A2E08
+    classDef chain fill:#FFFFFF,stroke:#8A939F,color:#111820
+    classDef std fill:#E4F2E8,stroke:#3C7A52,color:#163A22
+    classDef agent fill:#EEF0F3,stroke:#5C6674,color:#111820
+    class Pair,Shares device
+    class Sign,Sig crypto
+    class Verify,Account,Ecrecover,Spend chain
+    class ERCs std
+    class AgentKey agent
 ```
 
 ## 2. FROST: one key, split across devices
