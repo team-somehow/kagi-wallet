@@ -3,16 +3,18 @@
 // and Revoked event, so an agent (or its owner) can ask what happened and who approved it.
 //
 // Accounts are deployed per user by their phone, so they can't be linked ahead of time. The
-// first time an account asks, this registers the KagiAccount ABI (once per deployment), gives
-// the address an alias, and links it with event indexing on. Later calls just read events.
+// first time an account uses this server, track() registers the KagiAccount ABI (once per
+// deployment), gives the address an alias, and links it with event indexing on. The free plan
+// indexes at most 100 blocks back, so history starts about 20 minutes before that first call;
+// linking early (on any tool, not only get_activity) is what makes the history complete.
 //
 //   MULTIBAAS_URL      https://<deployment>.multibaas.com
 //   MULTIBAAS_API_KEY  an API key in the deployment's Administrators or Members group
-//   MULTIBAAS_START    how far back to index a newly linked account, default -50000 (about a week)
+//   MULTIBAAS_START    how far back to index a newly linked account, default -100 (the free plan's maximum)
 
 const BASE = process.env.MULTIBAAS_URL?.trim().replace(/\/+$/, '') || null;
 const KEY = process.env.MULTIBAAS_API_KEY?.trim() || null;
-const START = process.env.MULTIBAAS_START?.trim() || '-50000';
+const START = process.env.MULTIBAAS_START?.trim() || '-100';
 const LABEL = 'kagi_account';
 const VERSION = '1.0';
 
@@ -39,7 +41,8 @@ async function ensureLinked(account, abi) {
   if (linked.has(a)) return false;
   contractReady ??= (async () => {
     if (await mb('GET', `/contracts/${LABEL}`)) return;
-    await mb('POST', `/contracts/${LABEL}`, { label: LABEL, contractName: 'KagiAccount', version: VERSION, rawAbi: JSON.stringify(abi) });
+    // bin is "optional" in the API docs, but the deployment rejects a null bytecode. Events only need the ABI.
+    await mb('POST', `/contracts/${LABEL}`, { label: LABEL, contractName: 'KagiAccount', version: VERSION, rawAbi: JSON.stringify(abi), bin: '' });
   })().catch((e) => {
     contractReady = null;
     throw e;
@@ -55,6 +58,12 @@ async function ensureLinked(account, abi) {
   await mb('POST', `/chains/ethereum/addresses/${a}/contracts`, { label: LABEL, version: VERSION, startingBlock: START });
   linked.add(a);
   return true;
+}
+
+/** Start indexing an account in the background. Never fails the tool that called it. */
+export function track(account, abi) {
+  if (!multibaasEnabled()) return;
+  ensureLinked(account, abi).catch((e) => console.log('multibaas link failed:', e.message));
 }
 
 const field = (inputs, name) => inputs.find((i) => i.name === name)?.value;

@@ -191,6 +191,8 @@ The agent MCP's `get_activity` tool reads the wallet's history from the MultiBaa
 
 Every user's phone deploys their own wallet, so wallets can't be linked in the MultiBaas console ahead of time. The first time a wallet asks for its history, the server registers the ABI (once per deployment), gives the address an alias and links it with `startingBlock`. After that, calls are just `GET /events?contract_address=…`.
 
+MultiBaas's free plan indexes at most 100 blocks (about 20 minutes) into the past, so the server links a wallet the first time it connects, on any tool and not only `get_activity`. History runs from then on.
+
 **Try it:** create a MultiBaas deployment on the same testnet, make an API key in the Administrators group, then:
 
 ```bash
@@ -200,7 +202,11 @@ MULTIBAAS_URL=https://<deployment>.multibaas.com MULTIBAAS_API_KEY=<key> npm sta
 
 Connect your AI with a connector link from the Kagi app, make a couple of payments and one limit request, then ask it for your wallet's activity.
 
-**Our experience with MultiBaas:** _TODO after the live run: what went well, what was confusing, what was missing._
+**Our experience with MultiBaas:**
+- **Wins:** the deployment was up on the right chain in minutes, and a single `GET /events?contract_address=` call replaced the log scanning we would otherwise do. Free public RPCs refuse `eth_getLogs` without an address, or cap it at 50 blocks. The generated TypeScript SDK's docs were the fastest way to find the exact endpoints and field names.
+- **Friction:** `POST /contracts/{label}` documents `bin` as optional, but a contract without bytecode fails with a database error (`null value in column "bytecode"`). We now send an empty string.
+- **Surprise:** the free plan indexes at most 100 blocks into the past. We found out from a 403 when linking a wallet (`request exceeds the plan's past logs max depth limit`), so we changed the design to link every wallet the moment it first connects. `GET /plan` lists the limits; it would help to mention them in the linking docs.
+- **Wish:** linking contracts by code hash or factory, so every wallet with the same bytecode gets indexed automatically. Kagi deploys one wallet per user, so linking wallets one by one (up to 10 on the free plan) is the part that doesn't scale.
 
 ## Team
 

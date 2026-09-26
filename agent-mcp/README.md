@@ -46,7 +46,7 @@ It's one Node file with a Dockerfile, so Render, Railway, Fly or any container h
 | `RPC_URL` | Optional. Defaults to a public RPC |
 | `MULTIBAAS_URL` | Optional. `https://<deployment>.multibaas.com`, which turns on `get_activity` |
 | `MULTIBAAS_API_KEY` | With `MULTIBAAS_URL`: an API key in the deployment's Administrators group |
-| `MULTIBAAS_START` | Optional. How far back to index a newly linked wallet, default `-50000` blocks |
+| `MULTIBAAS_START` | Optional. How far back to index a newly linked wallet, default `-100` blocks, the free plan's maximum |
 | `CONTACTS` | Optional JSON of names to addresses. Defaults to `contacts.json` |
 
 Nothing else needs to run: no hub, no laptop.

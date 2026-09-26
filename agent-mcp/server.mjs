@@ -40,7 +40,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount, sign } from 'viem/accounts';
 import { z } from 'zod';
-import { activity as mbActivity, multibaasEnabled } from './multibaas.mjs';
+import { activity as mbActivity, multibaasEnabled, track } from './multibaas.mjs';
 
 const here = (f) => new URL(f, import.meta.url);
 const ABI = JSON.parse(readFileSync(here('./abi.json'), 'utf8'));
@@ -112,6 +112,7 @@ function forKey(parsed) {
       const code = await pub.getCode({ address: ACCOUNT });
       if (!code || code === '0x') throw new Error(`There is no Kagi account at ${ACCOUNT} on this network. Copy the key again from the Kagi phone app.`);
       ACCOUNTS.add(ACCOUNT);
+      track(ACCOUNT, ABI); // start MultiBaas indexing now, so get_activity has the history later
     }
     const [[cap, spent, expiry, nonce], balance, gas, block] = await Promise.all([
       pub.readContract({ address: ACCOUNT, abi: ABI, functionName: 'session', args: [AGENT.address] }),
