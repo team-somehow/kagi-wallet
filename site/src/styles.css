@@ -416,10 +416,12 @@ p { margin: 0; }
 .connect-field small.is-bad { color: var(--red); }
 .connect-targets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .connect-target {
-  font: inherit; color: var(--text); text-align: left; cursor: pointer; display: grid; gap: 2px;
+  font: inherit; color: var(--text); text-align: left; cursor: pointer; display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; align-items: center;
   padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line-2); background: rgba(17, 24, 32, 0.02);
   transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
 }
+.connect-target img { grid-row: span 2; width: 28px; height: 28px; object-fit: contain; }
+.connect-target b, .connect-target span { grid-column: 2; }
 .connect-target b { font-size: 15px; }
 .connect-target span { color: var(--faint); font-size: 13px; }
 .connect-target:hover:not(:disabled) { border-color: var(--amber); background: rgba(179, 95, 23, 0.06); }
