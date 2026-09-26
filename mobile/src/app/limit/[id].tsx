@@ -111,6 +111,9 @@ export default function LimitRequestScreen() {
 
   const minutes = info ? Math.max(0, Math.round(Number(r.expiry - info.now) / 60)) : null;
   const extra = r.newCap - r.oldCap;
+  // The agent server screens every recipient with Intercepta before its key signs. A flagged
+  // one comes here as a request for exactly that payment, with the reasons in the text.
+  const held = r.reason.startsWith('Intercepta held:');
   const explorer = info?.explorer ?? 'https://sepolia.etherscan.io';
 
   return (
@@ -118,11 +121,22 @@ export default function LimitRequestScreen() {
       <TopBar title="Limit request" left={{ label: 'Close', onPress: () => router.back() }} />
       <View style={styles.gap}>
         <Txt size={26} weight="bold" lineHeight={32}>
-          {r.name} wants a higher limit
+          {held ? `${r.name} wants to pay a flagged address` : `${r.name} wants a higher limit`}
         </Txt>
-        <Txt size={15} color={colors.muted} lineHeight={22}>
-          {r.reason || 'Its next transfer does not fit in what is left.'}
-        </Txt>
+        {held ? (
+          <View style={styles.flag}>
+            <Txt size={13} weight="bold" color={colors.red}>
+              INTERCEPTA HELD THIS PAYMENT
+            </Txt>
+            <Txt size={15} lineHeight={22}>
+              {r.reason.replace('Intercepta held: ', '')}
+            </Txt>
+          </View>
+        ) : (
+          <Txt size={15} color={colors.muted} lineHeight={22}>
+            {r.reason || 'Its next transfer does not fit in what is left.'}
+          </Txt>
+        )}
 
         <View style={styles.card}>
           <View style={styles.caps}>
@@ -153,7 +167,9 @@ export default function LimitRequestScreen() {
 
         <View style={styles.note}>
           <Txt size={14} color={colors.amber} lineHeight={20}>
-            This is extra future access. The agent can spend {fmtEth(extra)} more on its own, not just the one waiting transfer.
+            {held
+              ? `Approve only if you trust this recipient. Approving adds ${fmtEth(extra)}, exactly this payment, and the agent sends it. Decline and nothing is sent.`
+              : `This is extra future access. The agent can spend ${fmtEth(extra)} more on its own, not just the one waiting transfer.`}
           </Txt>
         </View>
 
@@ -239,4 +255,5 @@ const styles = StyleSheet.create({
   capCol: { gap: 2 },
   right: { alignItems: 'flex-end' },
   note: { borderLeftWidth: 2, borderLeftColor: colors.amber, paddingLeft: space.m },
+  flag: { borderWidth: 1, borderColor: colors.red, borderRadius: radius.m, padding: space.m, gap: space.xs },
 });

@@ -143,7 +143,7 @@ npm test                # anvil end to end: spend, ask for more, approve, declin
 
 See [`agent-mcp/README.md`](agent-mcp/README.md) to connect ChatGPT or Claude.
 
-To turn on `get_activity`, the history tool backed by Curvegrid MultiBaas, set `MULTIBAAS_URL` and `MULTIBAAS_API_KEY` before `npm start` (see [Curvegrid MultiBaas](#curvegrid-multibaas)).
+To screen every payment with Intercepta, set `INTERCEPTA_API_KEY` (a free key from [intercepta.io/ethglobal](https://intercepta.io/ethglobal)). To turn on `get_activity`, the history tool backed by Curvegrid MultiBaas, set `MULTIBAAS_URL` and `MULTIBAAS_API_KEY` before `npm start` (see [Curvegrid MultiBaas](#curvegrid-multibaas)).
 
 ### 3. Firmware
 
@@ -177,6 +177,43 @@ The phone talks to the ESP32 devices over **Bluetooth LE** and to the chain dire
 | `cd agent-mcp && npm test` | on anvil: the phone's message builders, the contract and the MCP server, through a spend, a limit raise and a decline |
 
 The phone's `src/lib/frost.ts` and the firmware's `src/frost.cpp` must match byte for byte. The fixture test is what catches it when they drift.
+
+## Intercepta: every payment screened before the agent signs
+
+The spending cap limits *how much* an agent can lose. Intercepta decides *who* it may pay. Before the session key signs anything, the agent MCP screens the recipient with the Intercepta API, and the verdict picks the step of Kagi's ladder the payment goes to:
+
+| Verdict | When | What happens |
+|---|---|---|
+| **Pass** | clean address | the agent pays on its own, within its cap |
+| **Hold** | risk score ≥ 30, or exposure traits such as phishing transfers, mixer use or contact with sanctioned addresses | the agent doesn't sign. It files an on-chain request for exactly that payment, with Intercepta's reasons in it. The phone shows **"Intercepta held this payment"** with the reasons, and it only goes out if the owner approves with fingerprint + wrist press. **This applies even when the payment is under the cap** |
+| **Refuse** | the recipient itself is sanctioned, a known scammer, blacklisted, or ran a rug pull | refused before signing: no signature, no request to the owner. The AI is told why and not to route around it |
+
+If Intercepta can't be reached, the payment is **held**, never passed. Intercepta's data covers mainnet, so the recipient is screened as a mainnet address while the payment itself runs on a testnet.
+
+**Demo addresses** (live verdicts):
+
+| Recipient | Verdict | Why |
+|---|---|---|
+| `0xD130448ff0c82Cd4f8044E41ACE6cA5289A88107` (contact `ABC`) | pass | risk score 0 |
+| `0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E` | hold | risk score 45: fake phishing transfer |
+| `0x098B716B8Aaf21512996dC57EB0615e2383E2f96` (Tornado Cash) | refuse | known scammer, sanctioned address, blacklist |
+
+**Where the API is called:**
+
+| What | Where |
+|---|---|
+| Quick Scan Address, then Deep Scan (`toxic-score`) on anything flagged, and the pass / hold / refuse policy | [`agent-mcp/intercepta.mjs`](agent-mcp/intercepta.mjs), `screen()` |
+| The check inside the payment flow, before the key signs | [`agent-mcp/server.mjs`](agent-mcp/server.mjs), `transfer()` |
+| A held payment becomes an on-chain request for the owner | [`agent-mcp/server.mjs`](agent-mcp/server.mjs), the `send_eth` tool |
+| The owner sees the verdict before approving on the wrist | [`mobile/src/app/limit/[id].tsx`](mobile/src/app/limit/[id].tsx) |
+
+The contract needs no changes: a held payment travels through the existing `requestLimit` → `raiseLimit` path, so it still needs the 2-of-2 threshold signature from phone and wrist.
+
+**Feedback on the API:**
+- Time to first call: under five minutes. It's one GET with an `X-API-KEY` header, and the response (`toxicScore` + named `traits` with descriptions) is easy to turn into a reason a person can read.
+- Confusing: Quick and Deep scans score the same address very differently. Our phishing-dust example is 45 on quick and 100 on deep, so we couldn't use the deep score as a threshold and base refusals on traits instead. The docs don't say what score ranges mean, or which traits mark the address as the *victim* rather than the *culprit* (`fake_phishing_transfer`).
+- Rate limits: a quick scan followed immediately by a deep scan got HTTP 429 on the free tier, and the limit isn't documented. We skip the deep scan when the quick one is already decisive, and fall back to the quick result.
+- Missing: a single "should I pay this address?" endpoint that returns a recommended verdict (allow / review / deny) alongside the score, and a `chain` parameter to make clear which network the data covers.
 
 ## Curvegrid MultiBaas
 

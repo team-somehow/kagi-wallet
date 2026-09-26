@@ -11,7 +11,7 @@ and the owner approves on their Kagi stick or declines.
 | Tool | What it does |
 | --- | --- |
 | `get_wallet` | Allowance left, total, expiry, wallet balance, contacts |
-| `send_eth` | Sends ETH to a `0x` address or a contact such as `ABC`. Over the allowance, it asks the owner for a higher limit and returns a `request_id` |
+| `send_eth` | Sends ETH to a `0x` address or a contact such as `ABC`. With Intercepta on, it screens the recipient first: refused recipients never get a signature, and flagged ones are held for the owner. Over the allowance, it asks the owner for a higher limit and returns a `request_id` |
 | `wait_for_approval` | Waits up to 45 s for the owner. Once the new limit confirms, it sends the waiting payment |
 | `get_activity` | With MultiBaas set up: the wallet's history, meaning payments, limit requests and the owner's approvals, declines and revokes, from the Curvegrid MultiBaas event index |
 | `request_higher_limit` | Asks for a higher total without a payment attached |
@@ -44,6 +44,8 @@ It's one Node file with a Dockerfile, so Render, Railway, Fly or any container h
 | `SESSION_KEY` | Optional. A single key served at `/mcp/<MCP_TOKEN>`, as `kagi:<account>:<key>` |
 | `MCP_TOKEN` | With `SESSION_KEY`: a random string for that endpoint |
 | `RPC_URL` | Optional. Defaults to a public RPC |
+| `INTERCEPTA_API_KEY` | Optional. Screens every recipient before the key signs: pass, hold for the owner, or refuse |
+| `RISK_HOLD` | Optional. Quick-scan risk score at which a payment is held, default `30` |
 | `MULTIBAAS_URL` | Optional. `https://<deployment>.multibaas.com`, which turns on `get_activity` |
 | `MULTIBAAS_API_KEY` | With `MULTIBAAS_URL`: an API key in the deployment's Administrators group |
 | `MULTIBAAS_START` | Optional. How far back to index a newly linked wallet, default `-100` blocks, the free plan's maximum |

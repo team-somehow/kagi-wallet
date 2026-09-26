@@ -17,6 +17,7 @@
 //   EXPLORER     default https://sepolia.etherscan.io
 //   CONTACTS     JSON name -> address; default contacts.json next to this file
 //   MULTIBAAS_URL, MULTIBAAS_API_KEY  optional: Curvegrid MultiBaas, for get_activity (multibaas.mjs)
+//   INTERCEPTA_API_KEY  optional: screen every destination before the key signs (intercepta.mjs)
 //   PORT         default 8790
 //   HOST         default 0.0.0.0; 127.0.0.1 behind a reverse proxy
 import http from 'node:http';
@@ -41,6 +42,7 @@ import {
 import { privateKeyToAccount, sign } from 'viem/accounts';
 import { z } from 'zod';
 import { activity as mbActivity, multibaasEnabled, track } from './multibaas.mjs';
+import { interceptaEnabled, screen } from './intercepta.mjs';
 
 const here = (f) => new URL(f, import.meta.url);
 const ABI = JSON.parse(readFileSync(here('./abi.json'), 'utf8'));
@@ -172,7 +174,11 @@ function forKey(parsed) {
   };
   const explain = (r) => (EXPLAIN[r] ?? r).replace('${agent}', AGENT?.address ?? 'the agent key');
 
-  async function transfer(to, amount_eth) {
+  /**
+   * Pay `to`. Intercepta screens the destination first, unless the owner already approved this
+   * exact payment after seeing its verdict (`approved`).
+   */
+  async function transfer(to, amount_eth, { approved = false } = {}) {
     const rcpt = resolveRecipient(to);
     if (!rcpt) return { status: 'unknown_recipient', message: explain('unknown_recipient'), contacts: Object.keys(contacts()) };
     let value;
@@ -184,9 +190,27 @@ function forKey(parsed) {
     if (value <= 0n) return { status: 'bad_amount', message: explain('bad_amount') };
     const s = await state();
     if (s.status !== 'active') return { status: s.status, message: explain(s.status) };
+    // Screen who gets paid before anything is signed. The verdict decides the next step.
+    let risk = null;
+    if (!approved && interceptaEnabled()) {
+      risk = await screen(rcpt.address);
+      log(`intercepta: ${risk.verdict}, ${risk.summary}`);
+      if (risk.verdict === 'block') {
+        return {
+          status: 'blocked',
+          message: `Refused before signing: Intercepta flagged ${rcpt.address} (${risk.summary}). Nothing was sent and the owner was not asked.`,
+          intercepta: risk,
+        };
+      }
+      if (risk.verdict === 'hold') {
+        // Held even under the cap: ask for exactly this payment more, so only the owner's
+        // phone and stick can let it through.
+        return { status: 'held', needed: value, proposedCap: s.cap + value, remaining: s.remaining, intercepta: risk, to: rcpt.address };
+      }
+    }
     if (value > s.remaining) {
       // Propose a total that covers this transfer with room to spare: double what it needs.
-      return { status: 'over_allowance', remaining: s.remaining, needed: value, proposedCap: (s.spent + value) * 2n, cap: s.cap };
+      return { status: 'over_allowance', remaining: s.remaining, needed: value, proposedCap: (s.spent + value) * 2n, cap: s.cap, intercepta: risk };
     }
     if (value > s.balance) return { status: 'insufficient_funds', message: explain('insufficient_funds') };
     const digest = keccak256(
@@ -200,7 +224,10 @@ function forKey(parsed) {
     try {
       const r = await send('spend', [AGENT.address, rcpt.address, value, Number(sig.v), sig.r, sig.s]);
       const shown = rcpt.label ? `${rcpt.label} (${rcpt.address})` : rcpt.address;
-      if (r.status === 'success') return { status: 'confirmed', sent: eth(value), to: shown, tx: txLink(r.hash) };
+      if (r.status === 'success') {
+        const screened = approved ? 'approved by the owner after an Intercepta hold' : risk ? `Intercepta: ${risk.summary}` : undefined;
+        return { status: 'confirmed', sent: eth(value), to: shown, tx: txLink(r.hash), ...(screened ? { screened } : {}) };
+      }
       return { status: 'failed', message: 'The transfer reverted on-chain.', tx: txLink(r.hash) };
     } catch (e) {
       const w = why(e);
@@ -333,6 +360,11 @@ function buildServer(current, setKey) {
         'and an expiry set by its owner. Call get_wallet first. Use send_eth for payments. If a payment is over the ' +
         'allowance, send_eth asks the owner for a higher limit automatically; then call wait_for_approval with the ' +
         'request_id, which sends the payment once the owner approves. ' +
+        (interceptaEnabled()
+          ? 'Every recipient is screened by Intercepta before the key signs: status "blocked" means the payment was refused ' +
+            '(tell the user why, and do not retry or route around it); "waiting_for_owner" with held_by "intercepta" means the ' +
+            'owner must approve that payment. '
+          : '') +
         (multibaasEnabled() ? 'get_activity shows the wallet history: past payments, requests and approvals. ' : '') +
         'Never claim a payment was sent unless a tool ' +
         'returned status "confirmed" with a tx link.' +
@@ -411,9 +443,25 @@ function buildServer(current, setKey) {
     },
     guarded(async (a, { to, amount_eth }) => {
       const r = await a.transfer(to, amount_eth);
+      if (r.status === 'held') {
+        // Intercepta wants a person to decide. The reason travels with the on-chain request,
+        // so the owner reads it on their phone before approving on the stick.
+        const short = `${r.to.slice(0, 6)}…${r.to.slice(-4)}`;
+        const why = `Intercepta held: ${r.intercepta.summary}. Pay ${amount_eth} ETH to ${short}?`;
+        const ask = await a.askForMore(r.proposedCap, why.slice(0, 200), { to, amount_eth, approved: true });
+        if (ask.status !== 'waiting_for_owner') return reply({ ...ask, intercepta: r.intercepta });
+        return reply({
+          ...ask,
+          held_by: 'intercepta',
+          intercepta: r.intercepta,
+          payment: `${amount_eth} ETH to ${to} (not sent: held for the owner)`,
+          next: 'Intercepta flagged this recipient, so the owner must approve it on their Kagi phone and stick. Call wait_for_approval with this request_id.',
+        });
+      }
       if (r.status !== 'over_allowance') return reply(r);
       // Over the allowance: ask the owner for more on-chain, and remember the payment to send after.
-      const ask = await a.askForMore(r.proposedCap, `Send ${amount_eth} ETH to ${to}. Only ${eth(r.remaining)} left.`, { to, amount_eth });
+      const screened = r.intercepta ? ` Intercepta: ${r.intercepta.summary}.` : '';
+      const ask = await a.askForMore(r.proposedCap, `Send ${amount_eth} ETH to ${to}. Only ${eth(r.remaining)} left.${screened}`.slice(0, 200), { to, amount_eth });
       if (ask.status !== 'waiting_for_owner') return reply(ask);
       return reply({
         ...ask,
@@ -473,7 +521,7 @@ function buildServer(current, setKey) {
       const pending = req?.payment;
       if (!pending) return reply(result);
       req.payment = null;
-      return reply({ ...result, payment: await a.transfer(pending.to, pending.amount_eth) });
+      return reply({ ...result, payment: await a.transfer(pending.to, pending.amount_eth, { approved: Boolean(pending.approved) }) });
     }),
   );
 
