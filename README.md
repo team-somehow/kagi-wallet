@@ -23,6 +23,8 @@ Integrated with
 
 ---
 
+> **The Kagi Wallet Protocol.** Read the [whitepaper](whitepaper.md).
+>
 > **In one sentence:** Kagi gives an AI agent a capped, expiring on-chain spending key, and anything above the cap needs you to approve on your phone and press a button on a device on your Kagi Wallet.
 
 ## The problem
@@ -326,4 +328,4 @@ This is a hackathon build. What isn't done yet:
 
 See **[IDEA.md](IDEA.md)** for the full design, the threat model and the two-act demo.
 
-**Papers:** [The Kagi protocol](docs/kagi-protocol.md) (the contracts, the spending ladder, the standards) and [The cryptography behind Kagi](docs/kagi-cryptography.md) (FROST, BIP340 on Ethereum via `ecrecover`, and how the ERCs fit).
+**Papers:** [the Kagi Wallet Protocol whitepaper](whitepaper.md), [the contracts in depth](docs/kagi-protocol.md) (the contracts, the spending ladder, the standards) and [The cryptography behind Kagi](docs/kagi-cryptography.md) (FROST, BIP340 on Ethereum via `ecrecover`, and how the ERCs fit).

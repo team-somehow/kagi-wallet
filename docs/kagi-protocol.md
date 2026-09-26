@@ -1,4 +1,4 @@
-# The Kagi protocol
+# The Kagi Wallet Protocol: contracts in depth
 
 **A smart account that gives AI agents a spending key, not the wallet.**
 

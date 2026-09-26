@@ -2,7 +2,7 @@
 
 **How FROST, BIP340, `ecrecover` and the ERCs fit together.**
 
-Companion to [The Kagi protocol](kagi-protocol.md). Code: [`mobile/src/lib/frost.ts`](../mobile/src/lib/frost.ts) and [`root.ts`](../mobile/src/lib/root.ts) (phone), [`firmware/wrist/src/frost.cpp`](../firmware/wrist/src/frost.cpp) (sticks), [`contracts/src/Bip340.sol`](../contracts/src/Bip340.sol) (chain).
+Part of the [Kagi Wallet Protocol](../whitepaper.md). Code: [`mobile/src/lib/frost.ts`](../mobile/src/lib/frost.ts) and [`root.ts`](../mobile/src/lib/root.ts) (phone), [`firmware/wrist/src/frost.cpp`](../firmware/wrist/src/frost.cpp) (sticks), [`contracts/src/Bip340.sol`](../contracts/src/Bip340.sol) (chain).
 
 ---
 

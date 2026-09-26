@@ -2,7 +2,7 @@
 
 **MultiBaas is Kagi's memory: what agents spent, who they paid, and who approved it.**
 
-Companion to [The Kagi protocol](kagi-protocol.md).
+Part of the [Kagi Wallet Protocol](../whitepaper.md).
 
 ---
 
