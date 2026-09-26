@@ -7,10 +7,11 @@ import { Button } from '../../components/Button';
 import { HoldButton } from '../../components/HoldButton';
 import { LedBar } from '../../components/LedBar';
 import { Logo } from '../../components/Logo';
+import { InterceptaMark } from '../../components/BrandMarks';
 import { SpatialDevices } from '../../components/SpatialDevices';
 import { WristChip } from '../../components/WristChip';
 import { useStore } from '../../store/store';
-import { fmtAmount, fmtEth, useChain, type ChainSession } from '../../store/chain';
+import { fmtAmount, interceptaFlag, fmtEth, useChain, type ChainSession } from '../../store/chain';
 import * as Clipboard from 'expo-clipboard';
 import * as evm from '../../lib/evm';
 import { loadRoot, loadShard } from '../../lib/shard';
@@ -106,16 +107,27 @@ export default function Home() {
         </Txt>
       ) : null}
 
-      {waiting.map((l) => (
-        <Pressable key={l.id} onPress={() => router.push(`/limit/${l.id}`)} style={({ pressed }) => [styles.request, pressed && styles.pressed]}>
-          <Txt size={17} weight="medium">
-            {l.status === 'waiting' ? `${l.name} is waiting for approval` : 'New limit confirming on-chain'}
-          </Txt>
-          <Txt size={14} color={colors.muted}>
-            Raise its total from {fmtAmount(l.oldCap)} to {fmtAmount(l.newCap)}
-          </Txt>
-        </Pressable>
-      ))}
+      {waiting.map((l) => {
+        const flag = interceptaFlag(l.reason);
+        return (
+          <Pressable key={l.id} onPress={() => router.push(`/limit/${l.id}`)} style={({ pressed }) => [styles.request, flag && styles.requestFlagged, pressed && styles.pressed]}>
+            {flag ? (
+              <View style={styles.requestFlag}>
+                <InterceptaMark size={22} />
+                <Txt size={13} weight="bold" color={colors.red}>
+                  {flag === 'blocked' ? 'Intercepta blocked a payment' : 'Intercepta held a payment'}
+                </Txt>
+              </View>
+            ) : null}
+            <Txt size={17} weight="medium">
+              {l.status !== 'waiting' ? 'New limit confirming on-chain' : flag ? `${l.name} needs you to decide` : `${l.name} is waiting for approval`}
+            </Txt>
+            <Txt size={14} color={colors.muted}>
+              {flag ? 'Decline, or bypass it with all your devices.' : `Raise its total from ${fmtAmount(l.oldCap)} to ${fmtAmount(l.newCap)}`}
+            </Txt>
+          </Pressable>
+        );
+      })}
 
       <SpatialDevices two={Boolean(twoSticks)} joined={Boolean(twoSticks)} connected={state.wrist.connected}
         value={live.length ? fmtAmount(totals.left) : undefined} detail={live.length ? 'Agent allowance left' : 'Your physical boundary'} />
@@ -345,6 +357,8 @@ const styles = StyleSheet.create({
   addressActions: { flexDirection: 'row', gap: space.s, marginTop: space.xs },
   chip: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: colors.line },
   chipInk: { backgroundColor: colors.text, borderColor: colors.text },
+  requestFlagged: { borderLeftColor: colors.red },
+  requestFlag: { flexDirection: 'row', alignItems: 'center', gap: space.s, marginBottom: 2 },
   request: { marginTop: space.l, padding: space.m, gap: 4, borderRadius: radius.m, backgroundColor: colors.panel, borderLeftWidth: 3, borderLeftColor: colors.amber },
   section: { marginTop: space.xl, gap: space.s },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

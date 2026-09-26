@@ -34,7 +34,7 @@
 #include "secrets.example.h"
 #endif
 
-static const char* FW = "0.6.1";
+static const char* FW = "0.6.2";
 
 // ---- look -----------------------------------------------------------------
 
@@ -674,10 +674,23 @@ static void drawResult() {
   }
   int ty = resultFx == Fx::Burst ? 108 : 68;
   if (resultMark) {
-    // Intercepta's mark: a 3 x 4 grid of dots (their logo, drawn in ink), above the reason.
+    // An Intercepta alert: their mark (a 3 x 4 grid of dots, from their logo) large on the left,
+    // who flagged it and what happened on the right.
+    int mx = 22 + dx, my = 30;
     for (int row = 0; row < 4; row++)
-      for (int col = 0; col < 3; col++) canvas.fillCircle(cx + dx - 10 + col * 10, 18 + row * 10, 3, C_TEXT);
-    ty = 100;
+      for (int col = 0; col < 3; col++) canvas.fillCircle(mx + 5 + col * 15, my + 5 + row * 16, 5, C_TEXT);
+    int x = 86 + dx;
+    canvas.setTextDatum(top_left);
+    canvas.setFont(&fonts::FreeSansBold12pt7b);
+    canvas.setTextColor(C_TEXT);
+    canvas.drawString("Intercepta", x, 28);
+    canvas.setFont(&fonts::FreeSansBold18pt7b);
+    canvas.setTextColor(resultColor);
+    canvas.drawString(resultText.endsWith("blocked") ? "Blocked" : "Held", x, 54);
+    canvas.setFont(&fonts::FreeSans9pt7b);
+    canvas.setTextColor(C_MUTED);
+    canvas.drawString("Check your phone", x, 96);
+    return;
   }
   canvas.setFont(&fonts::FreeSansBold12pt7b);
   canvas.setTextDatum(resultFx == Fx::Burst ? middle_center : middle_center);
@@ -1930,8 +1943,10 @@ static void handle(const String& line) {
     buzz(red ? 3 : 2);
     if (mode == Mode::Home || mode == Mode::Revoked || mode == Mode::Result) {
       String text = String(in["text"] | "Check your phone");
-      showResult(text, red ? C_RED : C_ACCENT, 4000, red ? Fx::Shake : Fx::None);
-      resultMark = text.startsWith("Intercepta");
+      bool flagged = text.startsWith("Intercepta");
+      // Intercepta alerts stay up longer: they are why the owner looks down at the stick.
+      showResult(text, red ? C_RED : C_ACCENT, flagged ? 6000 : 4000, red ? Fx::Shake : Fx::None);
+      resultMark = flagged;
     }
   } else if (t == "sound") {
     soundsEnabled = in["enabled"] | true;

@@ -135,7 +135,7 @@ export default function LimitRequestScreen() {
         {held ? (
           <View style={styles.flag}>
             <View style={styles.flagHead}>
-              <InterceptaMark size={18} />
+              <InterceptaMark size={28} />
               <Txt size={13} weight="bold" color={colors.red} style={styles.flagTitle}>
                 {flag === 'blocked' ? 'INTERCEPTA BLOCKED THIS PAYMENT' : 'INTERCEPTA HELD THIS PAYMENT'}
               </Txt>
