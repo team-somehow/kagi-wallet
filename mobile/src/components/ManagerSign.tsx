@@ -496,7 +496,7 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
             ? `${fmtAmount(payload.oldCap)} → ${fmtAmount(payload.newCap)}`
             : payload.kind === 'evm_grant'
               ? fmtAmount(payload.cap)
-              : 'Kagi'
+              : undefined
         }
       />
       {phase !== 'idle' ? <Steps steps={steps} /> : null}

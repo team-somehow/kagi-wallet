@@ -1,0 +1,18 @@
+# Repo-wide junk. Each project keeps its own .gitignore for build output.
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Secrets
+.env
+.env*.local

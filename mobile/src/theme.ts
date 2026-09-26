@@ -19,6 +19,15 @@ export const colors = {
   onFill: '#FFFFFF',
 } as const;
 
+// The Kagi Wallet stick, from the app icon (assets/logo.png). Used wherever a stick is drawn.
+export const BRAND = {
+  case: '#0061DA',
+  depth: '#01347D',
+  lcd: '#071525',
+  kanji: '#ACDFFC',
+  wallet: '#0175FA',
+} as const;
+
 export const fonts = {
   sans: 'SchibstedGrotesk_400Regular',
   sansMedium: 'SchibstedGrotesk_500Medium',

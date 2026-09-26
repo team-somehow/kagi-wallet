@@ -1,0 +1,76 @@
+<!doctype html>
+<!--
+  Renders the derived brand assets from the Kagi Wallet stick logo. assets/icon.png and
+  assets/favicon.png are the original logo artwork, used as is; this draws the rest.
+  Open with ?v=<name> in headless Chrome and screenshot at the listed size, e.g.
+    chrome --headless=new --window-size=1840,772 --default-background-color=00000000 \
+      --screenshot=logo.png "file://$PWD/scripts/brand-assets.html?v=logo"
+  logo 1840x772 -> assets/logo.png (in-app logo, transparent)
+  splash 1024x1024 -> assets/splash-icon.png
+  mono 1024x1024 -> assets/android-icon-monochrome.png
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&family=Schibsted+Grotesk:wght@700;800&display=block" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { overflow: hidden; background: transparent; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+<script>
+// Kagi Wallet stick logo. Case 880 x 350 with a 40 x 36 extrusion, drawn in a 920 x 386 box.
+const B = { case: '#0061DA', depth: '#01347D', lcd: '#071525', kanji: '#ACDFFC', rule: '#C5CEDB', word: '#FFFFFF', wallet: '#0175FA', btnL: '#83CEFD', btnR: '#32A4FE' };
+const ground = '#0B0D11';
+
+function stick({ mono = false, text = true } = {}) {
+  const fill = (c) => (mono ? '#fff' : c);
+  let depth = '';
+  for (let i = 40; i > 0; i -= 2) depth += `<rect x="${i}" y="${i * 0.9}" width="880" height="350" rx="48" fill="${fill(B.depth)}"/>`;
+  const face = mono
+    ? `<mask id="m"><rect width="920" height="386" fill="#fff"/><rect x="60" y="52" width="598" height="265" rx="22" fill="#000"/>
+         <circle cx="768" cy="175" r="67" fill="#000"/><circle cx="768" cy="175" r="54" fill="#fff"/></mask>`
+    : '';
+  const lcdText = text
+    ? `<text x="190" y="252" text-anchor="middle" font-family="Noto Sans JP" font-weight="700" font-size="178" fill="${fill(B.kanji)}">鍵</text>
+       <rect x="319" y="112" width="4" height="146" rx="2" fill="${fill(B.rule)}" opacity="${mono ? 1 : 0.7}"/>
+       <text x="358" y="173" font-family="Schibsted Grotesk" font-weight="800" font-size="92" letter-spacing="-2" fill="${fill(B.word)}">Kagi</text>
+       <text x="358" y="262" font-family="Schibsted Grotesk" font-weight="800" font-size="92" letter-spacing="-2" fill="${fill(B.wallet)}">Wallet</text>`
+    : `<text x="359" y="262" text-anchor="middle" font-family="Noto Sans JP" font-weight="700" font-size="200" fill="${fill(B.kanji)}">鍵</text>`;
+  const button = mono
+    ? ''
+    : `<clipPath id="c"><circle cx="768" cy="175" r="67"/></clipPath>
+       <g clip-path="url(#c)"><rect x="700" y="100" width="68" height="150" fill="${B.btnL}"/><rect x="768" y="100" width="68" height="150" fill="${B.btnR}"/></g>`;
+  return `${face}<g ${mono ? 'mask="url(#m)"' : ''}>${depth}<rect width="880" height="350" rx="48" fill="${fill(B.case)}"/></g>
+    ${mono ? '' : `<rect x="60" y="52" width="598" height="265" rx="22" fill="${B.lcd}"/>`}
+    ${lcdText}${button}`;
+}
+
+// Place the 920 x 386 stick centred in a square or custom canvas at a given width.
+function canvas(w, h, stickW, { bg = null, mono = false, glow = false, text = true } = {}) {
+  const k = stickW / 920, x = (w - stickW) / 2, y = (h - 386 * k) / 2;
+  const g = glow ? `<defs><radialGradient id="g" cx="50%" cy="55%" r="55%"><stop offset="0" stop-color="#0061DA" stop-opacity=".28"/><stop offset="1" stop-color="#0061DA" stop-opacity="0"/></radialGradient></defs><rect width="${w}" height="${h}" fill="url(#g)"/>` : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    ${bg ? `<rect width="${w}" height="${h}" fill="${bg}"/>` : ''}${g}
+    <g transform="translate(${x} ${y}) scale(${k})">${stick({ mono, text })}</g></svg>`;
+}
+
+const v = new URLSearchParams(location.search).get('v');
+const S = {
+  logo: () => canvas(1840, 772, 1840),                          // transparent master lockup
+  icon: () => canvas(1024, 1024, 860, { bg: ground, glow: true }),
+  fg: () => canvas(1024, 1024, 620),                              // adaptive: inside the 66% safe zone
+  bg: () => canvas(1024, 1024, 0, { bg: ground, glow: true }),
+  mono: () => canvas(1024, 1024, 620, { mono: true }),
+  splash: () => canvas(1024, 1024, 1000),
+  favicon: () => canvas(192, 192, 188, { text: false }),
+  svg: () => canvas(64, 64, 62, { text: false }),
+}[v]();
+document.body.innerHTML = S;
+if (v === 'svg') document.title = 'svg';
+window.__svg = S;
+</script>
+</body>
+</html>

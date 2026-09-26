@@ -254,7 +254,6 @@ export function Demo() {
         style={{ '--kg-hold': `${active ? hold * 100 : 0}%` } as CSSProperties}
         aria-hidden={second && !dual}
       >
-        <div className="kg-port" />
         <div className="kg-case">
           <div className="kg-lcd">
             <div className="kg-lcd-top">

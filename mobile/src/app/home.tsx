@@ -6,6 +6,7 @@ import { Txt } from '../components/Txt';
 import { Button } from '../components/Button';
 import { HoldButton } from '../components/HoldButton';
 import { LedBar } from '../components/LedBar';
+import { Logo } from '../components/Logo';
 import { SpatialDevices } from '../components/SpatialDevices';
 import { WristChip } from '../components/WristChip';
 import { useStore } from '../store/store';
@@ -76,9 +77,7 @@ export default function Home() {
       }
     >
       <View style={styles.bar}>
-        <Txt size={20} weight="bold" style={styles.mark}>
-          Kagi
-        </Txt>
+        <Logo height={30} />
         <View style={styles.barRight}>
           <WristChip wrist={state.wrist} address={state.address} onPress={() => router.push('/wrist')} />
           {twoSticks === false ? (
@@ -131,7 +130,7 @@ export default function Home() {
       ))}
 
       <SpatialDevices two={Boolean(twoSticks)} joined={Boolean(twoSticks)} connected={state.wrist.connected}
-        value={live.length ? fmtAmount(totals.left) : 'KAGI'} detail={live.length ? 'Agent allowance left' : 'Your physical boundary'} />
+        value={live.length ? fmtAmount(totals.left) : undefined} detail={live.length ? 'Agent allowance left' : 'Your physical boundary'} />
       <View style={styles.account}>
         <Txt size={15} color={colors.muted}>
           Wallet on-chain
@@ -319,7 +318,6 @@ const styles = StyleSheet.create({
   off: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.line },
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
   barRight: { flexDirection: 'row', alignItems: 'center', gap: space.s },
-  mark: { letterSpacing: -0.5 },
   more: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: radius.m, borderWidth: 1, borderColor: colors.line },
   addDevice: { borderColor: colors.amber },
   pressed: { opacity: 0.5 },
