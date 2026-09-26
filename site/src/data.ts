@@ -110,16 +110,16 @@ export const DEVICE_URL = 'https://shop.m5stack.com/products/m5sticks3-esp32s3-m
 export const PRICES_URL = 'https://coinbureau.com/analysis/trezor-vs-ledger';
 export const REPO_URL = 'https://github.com/team-somehow/kagi-wallet';
 export const RELEASE_URL = `${REPO_URL}/releases/tag/v0.2.0`;
-export const APK_URL = `${REPO_URL}/releases/download/v0.2.0/kagi-1.0.0.apk`;
+export const APK_URL = `${REPO_URL}/releases/download/v0.3.0/kagi-wallet-v0.3.0.apk`;
 export const FIRMWARE_SRC_URL = `${REPO_URL}/tree/main/firmware/wrist`;
 export const MCP_SRC_URL = `${REPO_URL}/tree/main/agent-mcp`;
 // The shared Kagi MCP server. Each person's connector link points here and carries their own key.
 export const MCP_URL = 'https://13-235-16-182.sslip.io';
 export const FIRMWARE = {
-  version: '0.3.1',
+  version: '0.6.2',
   manifest: './firmware/manifest.json',
-  bin: './firmware/kagi-firmware-0.3.1.bin',
-  sha256: '4ffb2a7c769878512ddedd57ee0dbb9da1287427fdeaf742cb1550cd509742fd',
+  bin: './firmware/kagi-firmware-0.6.2.bin',
+  sha256: '986434f2f3e60cd9de89b535190278ab4de798a7a33d1778f7cac44b4c72cb6d',
 };
 
 export const sources: { title: string; outlet: string; url: string }[] = [

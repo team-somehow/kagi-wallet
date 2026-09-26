@@ -14,7 +14,7 @@ attached to each GitHub release as `kagi-firmware-<version>.bin`, a merged image
 that goes at offset 0:
 
 ```bash
-esptool.py --chip esp32s3 write_flash 0x0 kagi-firmware-0.2.0.bin
+esptool.py --chip esp32s3 write_flash 0x0 kagi-firmware-0.6.2.bin
 ```
 
 Release images are built without `src/secrets.h`; add WiFi networks from the phone.

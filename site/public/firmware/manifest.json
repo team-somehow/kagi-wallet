@@ -1,13 +1,13 @@
 {
   "name": "Kagi Wallet firmware",
-  "version": "0.3.1",
+  "version": "0.6.2",
   "new_install_prompt_erase": true,
   "builds": [
     {
       "chipFamily": "ESP32-S3",
       "parts": [
         {
-          "path": "kagi-firmware-0.3.1.bin",
+          "path": "kagi-firmware-0.6.2.bin",
           "offset": 0
         }
       ]
