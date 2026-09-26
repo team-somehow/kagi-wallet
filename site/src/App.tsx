@@ -1,7 +1,7 @@
 import { Compare } from './components/Compare';
 import { ConnectAgent } from './components/ConnectAgent';
 import { Demo } from './components/Demo';
-import { GetLeash } from './components/GetLeash';
+import { GetKagi } from './components/GetKagi';
 import { Hardware } from './components/Hardware';
 import { Hero } from './components/Hero';
 import { KeyStats } from './components/KeyStats';
@@ -16,8 +16,8 @@ export function App() {
       <nav className="nav">
         <div className="wrap nav-inner">
           <a className="brand" href="#top">
-            <svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="8" cy="18" r="4.2" fill="none" stroke="#ece9e1" strokeWidth="2.2" /><path d="M11 15.5 C 14 12, 15 9.5, 20 6" fill="none" stroke="#ffb13b" strokeWidth="2.2" strokeLinecap="round" /></svg>
-            Leash
+            <svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="8.5" cy="13" r="4.6" fill="none" stroke="#ece9e1" strokeWidth="2.2" /><path d="M13 13h10M19 13v4M22.5 13v3" fill="none" stroke="#ffb13b" strokeWidth="2.2" strokeLinecap="round" /></svg>
+            Kagi Wallet
           </a>
           <div className="nav-links">
             <a href="#demo">Demo</a>
@@ -26,7 +26,7 @@ export function App() {
             <a href="#hardware">Hardware</a>
             <a href="#connect">Connect AI</a>
             <a href={REPO_URL} target="_blank" rel="noreferrer">GitHub</a>
-            <a className="btn btn-primary btn-sm" href="#get">Get Leash</a>
+            <a className="btn btn-primary btn-sm" href="#get">Download</a>
           </div>
         </div>
       </nav>
@@ -39,7 +39,7 @@ export function App() {
         <Ladder />
         <Hardware />
         <Compare />
-        <GetLeash />
+        <GetKagi />
         <ConnectAgent />
 
         <section className="section" id="sources">
@@ -61,8 +61,8 @@ export function App() {
 
       <footer className="footer">
         <div className="wrap footer-inner">
-          <span>Leash runs on the Sepolia testnet. Development firmware, not audited.</span>
-          <a href={REPO_URL} target="_blank" rel="noreferrer">github.com/team-somehow/leash-wallet</a>
+          <span>Kagi Wallet runs on the Sepolia testnet. Development firmware, not audited.</span>
+          <a href={REPO_URL} target="_blank" rel="noreferrer">github.com/team-somehow/kagi-wallet</a>
         </div>
       </footer>
     </>

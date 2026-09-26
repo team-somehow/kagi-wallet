@@ -1,4 +1,4 @@
-# Leash Wallet
+# Kagi Wallet
 
 ## One-liner
 An MPC wallet where the AI agent gets a capped, expiring key it can spend freely under, and everything above the cap climbs a ladder of physical devices: wrist, then a vault that can only be reached by light.
@@ -34,7 +34,7 @@ One FROST key has one threshold and a signature doesn't say who signed, so roles
 - No self-calls: can't add owners, swap validators, upgrade
 
 ## Standards the account speaks
-- ERC-1271: `isValidSignature` says yes only for the manager key, over sha256("LEASH/1271" || chainid || account || hash). Unlocks SIWE, Permit2, CoW / UniswapX / Seaport orders, Snapshot
+- ERC-1271: `isValidSignature` says yes only for the manager key, over sha256("KAGI/1271" || chainid || account || hash). Unlocks SIWE, Permit2, CoW / UniswapX / Seaport orders, Snapshot
 - Why manager only: a Permit2 or order signature moves money without going through `spend`, so an agent key that could sign one would walk around the cap
 - Chainid and account are in the signed message, so a signature can't be replayed on another account or chain that shares the group key. No nonce: replay protection is the verifying app's job, same as an EOA
 - ERC-721 / ERC-1155 receiver hooks: `safeTransferFrom` and `safeMint` into the account work. Only the manager's `execute` can move NFTs out

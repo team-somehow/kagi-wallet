@@ -2,22 +2,22 @@
 pragma solidity ^0.8.24;
 
 import {Bip340} from "./Bip340.sol";
-import {LeashBase} from "./LeashBase.sol";
+import {KagiBase} from "./KagiBase.sol";
 
-/// @title LeashAccount
+/// @title KagiAccount
 /// @notice The agent-facing smart account. Three kinds of signer:
 ///   manager key  2-of-2 threshold Schnorr (phone + wrist), BIP340. Moves anything, grants keys.
 ///   phone key    the phone's shard on its own, BIP340. Can only revoke.
 ///   session key  an agent's ephemeral ECDSA key. Spends plain ETH under its cap until it expires.
 ///
 /// Signed messages (sha256 for Schnorr, keccak256 for the agent's ECDSA):
-///   execute  sha256("LEASH/evm"    || chainid || this || nonce || to || value || data)
-///   grant    sha256("LEASH/grant"  || chainid || this || nonce || agent || cap || expiry)
-///   revoke   sha256("LEASH/revoke" || chainid || this || nonce || agent)
-///   limit    sha256("LEASH/limit"  || chainid || this || nonce || agent || oldCap || newCap || expiry)
-///   decline  sha256("LEASH/decline"|| chainid || this || nonce || agent || newCap)
-///   spend    keccak256("LEASH/spend" || chainid || this || agent || sessionNonce || to || value)
-///   1271     sha256("LEASH/1271"   || chainid || this || hash), signature = rx || s (64 bytes)
+///   execute  sha256("KAGI/evm"    || chainid || this || nonce || to || value || data)
+///   grant    sha256("KAGI/grant"  || chainid || this || nonce || agent || cap || expiry)
+///   revoke   sha256("KAGI/revoke" || chainid || this || nonce || agent)
+///   limit    sha256("KAGI/limit"  || chainid || this || nonce || agent || oldCap || newCap || expiry)
+///   decline  sha256("KAGI/decline"|| chainid || this || nonce || agent || newCap)
+///   spend    keccak256("KAGI/spend" || chainid || this || agent || sessionNonce || to || value)
+///   1271     sha256("KAGI/1271"   || chainid || this || hash), signature = rx || s (64 bytes)
 /// The wrist rebuilds the manager messages itself from what it shows before it signs.
 ///
 /// Limits: the cap counts ETH value only, a session can't call contracts or this account,
@@ -30,7 +30,7 @@ import {LeashBase} from "./LeashBase.sol";
 /// orders and permits is the verifying app's job, as with any EOA signature.
 ///
 /// Storage: 0 nonce, 1 groupKey, 2 phoneKey, sessions at keccak(agent . 3) + 0..3.
-contract LeashAccount is LeashBase {
+contract KagiAccount is KagiBase {
     struct Session {
         uint256 cap;
         uint256 spent;
@@ -52,7 +52,7 @@ contract LeashAccount is LeashBase {
     event LimitRequested(address indexed agent, uint256 oldCap, uint256 newCap, string reason);
     event LimitDeclined(address indexed agent, uint256 newCap);
 
-    constructor(uint256 groupKey_, uint256 phoneKey_) payable LeashBase(groupKey_) {
+    constructor(uint256 groupKey_, uint256 phoneKey_) payable KagiBase(groupKey_) {
         phoneKey = phoneKey_;
     }
 
@@ -67,7 +67,7 @@ contract LeashAccount is LeashBase {
     /// session for the same key and resets what it has spent.
     function grant(address agent, uint256 cap, uint256 expiry, uint256 rx, uint256 s) external {
         uint256 n = nonce;
-        bytes32 m = sha256(abi.encodePacked("LEASH/grant", block.chainid, address(this), n, agent, cap, expiry));
+        bytes32 m = sha256(abi.encodePacked("KAGI/grant", block.chainid, address(this), n, agent, cap, expiry));
         require(Bip340.verify(m, rx, s, groupKey), "bad signature");
         nonce = n + 1;
         Session storage sess = _sessions[agent];
@@ -85,7 +85,7 @@ contract LeashAccount is LeashBase {
         require(sess.cap == oldCap && sess.expiry == expiry, "session changed");
         require(newCap > oldCap, "limit must increase");
         uint256 n = nonce;
-        bytes32 m = sha256(abi.encodePacked("LEASH/limit", block.chainid, address(this), n, agent, oldCap, newCap, expiry));
+        bytes32 m = sha256(abi.encodePacked("KAGI/limit", block.chainid, address(this), n, agent, oldCap, newCap, expiry));
         require(Bip340.verify(m, rx, s, groupKey), "bad signature");
         nonce = n + 1;
         sess.cap = newCap;
@@ -96,7 +96,7 @@ contract LeashAccount is LeashBase {
     /// declining only keeps the current limit. It exists so the agent learns the answer.
     function declineLimit(address agent, uint256 newCap, uint256 rx, uint256 s) external {
         uint256 n = nonce;
-        bytes32 m = sha256(abi.encodePacked("LEASH/decline", block.chainid, address(this), n, agent, newCap));
+        bytes32 m = sha256(abi.encodePacked("KAGI/decline", block.chainid, address(this), n, agent, newCap));
         require(Bip340.verify(m, rx, s, phoneKey) || Bip340.verify(m, rx, s, groupKey), "bad signature");
         nonce = n + 1;
         emit LimitDeclined(agent, newCap);
@@ -105,7 +105,7 @@ contract LeashAccount is LeashBase {
     /// Any single shard can stop a key: the phone alone, or phone and wrist together.
     function revoke(address agent, uint256 rx, uint256 s) external {
         uint256 n = nonce;
-        bytes32 m = sha256(abi.encodePacked("LEASH/revoke", block.chainid, address(this), n, agent));
+        bytes32 m = sha256(abi.encodePacked("KAGI/revoke", block.chainid, address(this), n, agent));
         require(Bip340.verify(m, rx, s, phoneKey) || Bip340.verify(m, rx, s, groupKey), "bad signature");
         nonce = n + 1;
         _sessions[agent].expiry = 0;
@@ -130,7 +130,7 @@ contract LeashAccount is LeashBase {
     function spend(address agent, address to, uint256 value, uint8 v, bytes32 r, bytes32 s) external {
         Session storage sess = _sessions[agent];
         uint256 sn = sess.nonce;
-        bytes32 h = keccak256(abi.encodePacked("LEASH/spend", block.chainid, address(this), agent, sn, to, value));
+        bytes32 h = keccak256(abi.encodePacked("KAGI/spend", block.chainid, address(this), agent, sn, to, value));
         address signer = ecrecover(h, v, r, s);
         require(agent != address(0) && signer == agent, "bad agent signature");
         require(sess.expiry > block.timestamp, "key expired or revoked");
@@ -149,7 +149,7 @@ contract LeashAccount is LeashBase {
     /// ERC-1271. Manager key only, over the wrapped message above.
     function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4) {
         if (signature.length != 64) return ERC1271_FAIL;
-        bytes32 m = sha256(abi.encodePacked("LEASH/1271", block.chainid, address(this), hash));
+        bytes32 m = sha256(abi.encodePacked("KAGI/1271", block.chainid, address(this), hash));
         (uint256 rx, uint256 s) = abi.decode(signature, (uint256, uint256));
         return Bip340.verify(m, rx, s, groupKey) ? ERC1271_MAGIC : ERC1271_FAIL;
     }

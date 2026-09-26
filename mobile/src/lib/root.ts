@@ -9,8 +9,8 @@
  * The phone never sees r2, so phone and wrist together cannot rebuild the vault's share.
  *
  * Signing is FROST for n parties with compressed points, matching firmware/wrist/src/frost.cpp:
- *   rho_i = H("LEASH/rhoN" || i || m || D_1 || E_1 || ... || D_n || E_n) mod n
- * Encryption to the vault: ECIES, key = sha256("LEASH/ecies" || ECDH x), AES-256-GCM,
+ *   rho_i = H("KAGI/rhoN" || i || m || D_1 || E_1 || ... || D_n || E_n) mod n
+ * Encryption to the vault: ECIES, key = sha256("KAGI/ecies" || ECDH x), AES-256-GCM,
  * wire format ephPub(33) || iv(12) || tag(16) || ciphertext.
  */
 import { gcm } from '@noble/ciphers/aes.js';
@@ -54,7 +54,7 @@ export function ecies(pub: string, msg: Uint8Array, rand: RandomBytes): string {
   const V = pt(pub);
   const k = randomScalar(rand);
   const S = V.multiply(k);
-  const key = sha256(concatBytes(utf8ToBytes('LEASH/ecies'), xOnly(S)));
+  const key = sha256(concatBytes(utf8ToBytes('KAGI/ecies'), xOnly(S)));
   const iv = rand(12);
   const sealed = gcm(key, iv).encrypt(msg); // ciphertext || tag(16)
   const ct = sealed.slice(0, sealed.length - 16);
@@ -65,7 +65,7 @@ export function ecies(pub: string, msg: Uint8Array, rand: RandomBytes): string {
 export function eciesOpen(priv: bigint, hex: string): Uint8Array {
   const b = hexToBytes(hex);
   const K = Point.fromBytes(b.slice(0, 33));
-  const key = sha256(concatBytes(utf8ToBytes('LEASH/ecies'), xOnly(K.multiply(priv))));
+  const key = sha256(concatBytes(utf8ToBytes('KAGI/ecies'), xOnly(K.multiply(priv))));
   return gcm(key, b.slice(33, 45)).decrypt(concatBytes(b.slice(61), b.slice(45, 61)));
 }
 
@@ -104,7 +104,7 @@ export function rootNonces(rand: RandomBytes): RootNonces {
 }
 
 function rho(i: number, m: Uint8Array, cs: Commit[]): bigint {
-  const parts = [utf8ToBytes('LEASH/rhoN'), new Uint8Array([i]), m];
+  const parts = [utf8ToBytes('KAGI/rhoN'), new Uint8Array([i]), m];
   for (const c of cs) parts.push(hexToBytes(c.D), hexToBytes(c.E));
   return mod(big(sha256(concatBytes(...parts))));
 }
@@ -172,9 +172,9 @@ export interface RootGrant {
 const u256 = (v: bigint) => hexToBytes(v.toString(16).padStart(64, '0'));
 const a20 = (a: string) => hexToBytes(a.toLowerCase().replace(/^0x/, '').padStart(40, '0'));
 
-/** sha256("LEASH/rootgrant" || chainid || account || nonce || agent || cap || expiry) */
+/** sha256("KAGI/rootgrant" || chainid || account || nonce || agent || cap || expiry) */
 export function rootGrantMessage(g: RootGrant): Uint8Array {
-  return sha256(concatBytes(utf8ToBytes('LEASH/rootgrant'), u256(BigInt(g.chainId)), a20(g.account), u256(g.nonce), a20(g.agent), u256(g.cap), u256(g.expiry)));
+  return sha256(concatBytes(utf8ToBytes('KAGI/rootgrant'), u256(BigInt(g.chainId)), a20(g.account), u256(g.nonce), a20(g.agent), u256(g.cap), u256(g.expiry)));
 }
 
 export const hex = bytesToHex;

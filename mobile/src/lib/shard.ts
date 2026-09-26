@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { getRandomBytes } from 'expo-crypto';
 import type { Share } from './frost';
 
-const KEY = 'leash.phone-shard.v1';
+const KEY = 'kagi.phone-shard.v1';
 
 /** Cryptographically secure bytes from the OS. */
 export const rand = (n: number) => getRandomBytes(n);
@@ -29,7 +29,7 @@ export async function deleteShard(): Promise<void> {
   }
 }
 
-const ROOT_KEY = 'leash.root-shard.v1';
+const ROOT_KEY = 'kagi.root-shard.v1';
 
 /** The phone's share of the root key (3-of-3 with wrist and vault once the vault joins). */
 export async function loadRoot(): Promise<import('./root').RootShare | null> {

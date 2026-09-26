@@ -1,6 +1,6 @@
-# Leash contracts
+# Kagi contracts
 
-Foundry project. `LeashAccount` is the agent-facing account (manager, phone and session keys,
+Foundry project. `KagiAccount` is the agent-facing account (manager, phone and session keys,
 ERC-1271, NFT receivers); `RootTreasury` is owned by the 3-of-3 root key. Both verify BIP340
 signatures from the FROST keys through `Bip340.sol`.
 

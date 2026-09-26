@@ -1,8 +1,8 @@
 {
-  "name": "leash-agent-mcp",
+  "name": "kagi-agent-mcp",
   "private": true,
   "type": "module",
-  "description": "A bare-bones MCP server that lets ChatGPT or Claude spend from a Leash session key.",
+  "description": "A bare-bones MCP server that lets ChatGPT or Claude spend from a Kagi session key.",
   "scripts": {
     "start": "node server.mjs",
     "test": "anvil --silent --port 8545 & A=$!; sleep 2; tsx test/e2e.mts; R=$?; kill $A; exit $R"

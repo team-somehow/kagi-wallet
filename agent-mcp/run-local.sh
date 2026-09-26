@@ -1,9 +1,9 @@
 #!/bin/sh
 # Run the agent MCP on this machine behind a public HTTPS tunnel, and print the URL for ChatGPT.
-# usage: SESSION_KEY='leash:<account>:<key>' ./run-local.sh   (what the Leash phone app copies)
+# usage: SESSION_KEY='kagi:<account>:<key>' ./run-local.sh   (what the Kagi phone app copies)
 set -e
 cd "$(dirname "$0")"
-[ -n "$SESSION_KEY" ] || { echo "Set SESSION_KEY to the key copied from the Leash phone app."; exit 1; }
+[ -n "$SESSION_KEY" ] || { echo "Set SESSION_KEY to the key copied from the Kagi phone app."; exit 1; }
 [ -d node_modules ] || npm install --silent
 export MCP_TOKEN="${MCP_TOKEN:-$(openssl rand -hex 12)}" PORT="${PORT:-8790}"
 LOG=$(mktemp)

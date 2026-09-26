@@ -1,4 +1,4 @@
-# Leash site
+# Kagi site
 
 The landing page. Vite + React + TypeScript, static output, no server.
 

@@ -1,4 +1,4 @@
-# Leash wrist firmware (M5StickS3)
+# Kagi wrist firmware (M5StickS3)
 
 Holds the wrist shard of the manager key. Shows what it is asked to sign, decoded
 from the raw calldata, and signs only when you press A. Hold B for 2 seconds to
@@ -8,13 +8,13 @@ Development firmware: no secure boot, no flash encryption, reflashable any time.
 
 ## Flash without building
 
-The website's Get Leash section flashes the release image from Chrome or Edge over
+The website's Get Kagi section flashes the release image from Chrome or Edge over
 Web Serial, and can set a device's vault role over the same cable. The image is also
-attached to each GitHub release as `leash-firmware-<version>.bin`, a merged image
+attached to each GitHub release as `kagi-firmware-<version>.bin`, a merged image
 that goes at offset 0:
 
 ```bash
-esptool.py --chip esp32s3 write_flash 0x0 leash-firmware-0.1.0.bin
+esptool.py --chip esp32s3 write_flash 0x0 kagi-firmware-0.2.0.bin
 ```
 
 Release images are built without `src/secrets.h`; add WiFi networks from the phone.

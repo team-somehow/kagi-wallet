@@ -3,16 +3,16 @@ pragma solidity ^0.8.24;
 
 import {Bip340} from "./Bip340.sol";
 
-/// @title LeashBase
+/// @title KagiBase
 /// @notice An account owned by one x-only threshold Schnorr key. Every call needs a BIP340
 /// signature over
-///   m = sha256("LEASH/evm" || chainid || this || nonce || to || value || data)
+///   m = sha256("KAGI/evm" || chainid || this || nonce || to || value || data)
 /// The wrist rebuilds m itself from what it shows on screen before it signs. Anyone may
 /// submit a signed call and pay its gas (in practice the hub's relayer).
 ///
 /// Storage: slot 0 nonce, slot 1 groupKey. Children append after these; the hub's simulations
 /// and the phone read these slots directly, so don't reorder them.
-abstract contract LeashBase {
+abstract contract KagiBase {
     /// Messages signed by the group key. Bumped by every signed action, so none replays.
     uint256 public nonce;
     /// x coordinate of the group key. Key generation forces it to even y.
@@ -27,7 +27,7 @@ abstract contract LeashBase {
     receive() external payable {}
 
     function digest(address to, uint256 value, bytes calldata data) public view returns (bytes32) {
-        return sha256(abi.encodePacked("LEASH/evm", block.chainid, address(this), nonce, to, value, data));
+        return sha256(abi.encodePacked("KAGI/evm", block.chainid, address(this), nonce, to, value, data));
     }
 
     /// Runs any call the group key signed. A failing call reverts with the callee's reason.

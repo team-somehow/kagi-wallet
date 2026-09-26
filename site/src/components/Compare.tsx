@@ -4,7 +4,7 @@ const ROWS: { name: string; eg: string; marks: Mark[]; ours?: boolean }[] = [
   { name: 'Payment networks', eg: 'Stripe, Visa, Mastercard', marks: ['no', 'no', 'no', 'yes'] },
   { name: 'Vendor wallets', eg: 'Coinbase, Turnkey, Privy', marks: ['no', 'no', 'no', 'yes'] },
   { name: 'Session keys', eg: 'Safe, ZeroDev, MetaMask', marks: ['yes', 'no', 'some', 'yes'] },
-  { name: 'Leash', eg: 'phone + ESP32 devices', marks: ['yes', 'yes', 'yes', 'yes'], ours: true },
+  { name: 'Kagi', eg: 'phone + ESP32 devices', marks: ['yes', 'yes', 'yes', 'yes'], ours: true },
 ];
 const LABEL: Record<Mark, string> = { yes: 'Yes', no: 'No', some: 'If you add a hardware wallet' };
 

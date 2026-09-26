@@ -40,7 +40,7 @@ export function KeyStats() {
               <small>{s.who}</small>
             </a>
           ))}
-          <div className="key-split" aria-label="Leash splits each key across devices">
+          <div className="key-split" aria-label="Kagi splits each key across devices">
             <svg viewBox="0 0 180 180" aria-hidden="true">
               <circle cx="90" cy="90" r="70" className="ring-track" />
               <path d="M90 20 A70 70 0 0 1 90 160" className="split-a" />
@@ -48,7 +48,7 @@ export function KeyStats() {
               <text x="90" y="86" textAnchor="middle" className="split-t">phone</text>
               <text x="90" y="106" textAnchor="middle" className="split-t is-amber">+ wrist</text>
             </svg>
-            <p>Leash splits every key. Each half is useless alone.</p>
+            <p>Kagi splits every key. Each half is useless alone.</p>
             <small>FROST, RFC 9591</small>
           </div>
         </div>

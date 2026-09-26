@@ -1,4 +1,4 @@
-// Leash wrist shard, M5StickS3.
+// Kagi wrist shard, M5StickS3.
 //
 // Talks newline-delimited JSON to the hub on the laptop, which relays to the phone app.
 // Over WiFi the wrist dials out to the hub (it never listens). USB serial still works as
@@ -32,7 +32,7 @@
 #include "secrets.example.h"
 #endif
 
-static const char* FW = "0.1.0";
+static const char* FW = "0.2.0";
 
 // ---- look -----------------------------------------------------------------
 
@@ -82,8 +82,8 @@ static bool warned80 = false;
 static bool onArm = true;
 static uint32_t lastMotion = 0;
 static float lastA[3] = {0, 0, 0};
-// Wear detection: off unless built with LEASH_WEAR_DETECT. On stage "shard asleep" only confuses.
-#ifdef LEASH_WEAR_DETECT
+// Wear detection: off unless built with KAGI_WEAR_DETECT. On stage "shard asleep" only confuses.
+#ifdef KAGI_WEAR_DETECT
 static const uint32_t STILL_MS = 120000;
 #else
 static const uint32_t STILL_MS = 0xFFFFFFFF;
@@ -302,14 +302,14 @@ static void chime() {
 // ---- storage --------------------------------------------------------------
 
 static void loadShare() {
-  prefs.begin("leash", true);
+  prefs.begin("kagi", true);
   paired = prefs.isKey("share") && prefs.isKey("gk") && prefs.getBytes("share", share, 32) == 32 &&
            prefs.getBytes("gk", groupKey, 32) == 32;
   prefs.end();
 }
 
 static void saveShare() {
-  prefs.begin("leash", false);
+  prefs.begin("kagi", false);
   prefs.putBytes("share", share, 32);
   prefs.putBytes("gk", groupKey, 32);
   prefs.end();
@@ -317,7 +317,7 @@ static void saveShare() {
 }
 
 static void wipeShare() {
-  prefs.begin("leash", false);
+  prefs.begin("kagi", false);
   prefs.clear();
   prefs.end();
   memset(share, 0, 32);
@@ -408,7 +408,7 @@ static void drawIdle() {
   canvas.setFont(&fonts::FreeSansBold18pt7b);
   canvas.setTextDatum(middle_left);
   canvas.setTextColor(C_TEXT);
-  canvas.drawString("Leash", 12, 52);
+  canvas.drawString("Kagi", 12, 52);
   canvas.setFont(&fonts::FreeSans9pt7b);
   canvas.setTextColor(C_MUTED);
   canvas.drawString("Open the app and", 12, 92);
@@ -434,7 +434,7 @@ static void drawPairHold() {
   canvas.drawString(paired ? "Replaces this stick's wallet" : "B to cancel", 10, H - 6);
 }
 
-// Phone on the left, stick on the right, a leash of dots running between them.
+// Phone on the left, stick on the right, a chain of dots running between them.
 static void drawKeygen() {
   title("Creating your key", C_TEXT);
   int y = 76;
@@ -714,11 +714,13 @@ static void onPair(JsonDocument& in) {
   uint8_t pn[16], wn[16];
   if (!unhex(in["nonce"] | "", pn, 16)) return;
   esp_fill_random(wn, 16);
-  // Pairing code: sha256("LEASH/pair" || phoneNonce || wristNonce), first 4 bytes.
-  uint8_t buf[10 + 32];
-  memcpy(buf, "LEASH/pair", 10);
-  memcpy(buf + 10, pn, 16);
-  memcpy(buf + 26, wn, 16);
+  // Pairing code: sha256("KAGI/pair" || phoneNonce || wristNonce), first 4 bytes.
+  static const char TAG[] = "KAGI/pair";
+  const size_t T = sizeof TAG - 1;
+  uint8_t buf[sizeof TAG - 1 + 32];
+  memcpy(buf, TAG, T);
+  memcpy(buf + T, pn, 16);
+  memcpy(buf + T + 16, wn, 16);
   uint8_t h[32];
   frost::sha256(buf, sizeof buf, h);
   String c = hex(h, 4);
@@ -733,7 +735,7 @@ static void onPair(JsonDocument& in) {
   d["t"] = "pair";
   d["nonce"] = hex(wn, 16);
   send(d);
-#ifdef LEASH_AUTO_APPROVE
+#ifdef KAGI_AUTO_APPROVE
   autoAt = millis() + 3000;  // show the code, then confirm
 #endif
 }
@@ -834,7 +836,7 @@ static void onSign(JsonDocument& in) {
     p.line2 = "agent key " + shortHex(pubkey, 4, 4);
   } else if (p.kind == "evm_limit") {
     // Raising a session key's total allowance. Rebuild the contract's preimage:
-    // "LEASH/limit" || chainid || account || nonce || agent || oldCap || newCap || expiry
+    // "KAGI/limit" || chainid || account || nonce || agent || oldCap || newCap || expiry
     String chain = String(in["chainId"] | "");
     String account = in["account"] | "";
     String nonceS = in["nonce"] | "";
@@ -842,12 +844,14 @@ static void onSign(JsonDocument& in) {
     String oldS = in["oldCap"] | "";
     String newS = in["newCap"] | "";
     String expS = in["expiry"] | "";
-    uint8_t pre[11 + 32 + 20 + 32 + 20 + 32 + 32 + 32];
-    memcpy(pre, "LEASH/limit", 11);
-    if (!frost::u256FromDecimal(chain.c_str(), pre + 11) || !unhex(account.c_str(), pre + 43, 20) ||
-        !frost::u256FromDecimal(nonceS.c_str(), pre + 63) || !unhex(agentAddr.c_str(), pre + 95, 20) ||
-        !frost::u256FromDecimal(oldS.c_str(), pre + 115) || !frost::u256FromDecimal(newS.c_str(), pre + 147) ||
-        !frost::u256FromDecimal(expS.c_str(), pre + 179))
+    static const char TAG[] = "KAGI/limit";
+    const size_t T = sizeof TAG - 1;
+    uint8_t pre[sizeof TAG - 1 + 32 + 20 + 32 + 20 + 32 + 32 + 32];
+    memcpy(pre, TAG, T);
+    if (!frost::u256FromDecimal(chain.c_str(), pre + T) || !unhex(account.c_str(), pre + T + 32, 20) ||
+        !frost::u256FromDecimal(nonceS.c_str(), pre + T + 52) || !unhex(agentAddr.c_str(), pre + T + 84, 20) ||
+        !frost::u256FromDecimal(oldS.c_str(), pre + T + 104) || !frost::u256FromDecimal(newS.c_str(), pre + T + 136) ||
+        !frost::u256FromDecimal(expS.c_str(), pre + T + 168))
       return reject(id, "bad_request");
     frost::sha256(pre, sizeof pre, p.msg);
     p.title = "Raise " + agent + "'s total";
@@ -861,24 +865,26 @@ static void onSign(JsonDocument& in) {
     dirty = true;
     draw();
     buzz(2);
-#ifdef LEASH_AUTO_APPROVE
+#ifdef KAGI_AUTO_APPROVE
     autoAt = millis() + 3000;  // long enough to read the prompt
 #endif
     return;
   } else if (p.kind == "evm_grant") {
-    // A session key grant on the Leash account. Rebuild the contract's preimage:
-    // "LEASH/grant" || chainid || account || nonce || agent || cap || expiry
+    // A session key grant on the Kagi account. Rebuild the contract's preimage:
+    // "KAGI/grant" || chainid || account || nonce || agent || cap || expiry
     String chain = String(in["chainId"] | "");
     String account = in["account"] | "";
     String nonceS = in["nonce"] | "";
     String agentAddr = in["agentAddress"] | "";
     String capS = in["cap"] | "";
     String expS = in["expiry"] | "";
-    uint8_t pre[11 + 32 + 20 + 32 + 20 + 32 + 32];
-    memcpy(pre, "LEASH/grant", 11);
-    if (!frost::u256FromDecimal(chain.c_str(), pre + 11) || !unhex(account.c_str(), pre + 43, 20) ||
-        !frost::u256FromDecimal(nonceS.c_str(), pre + 63) || !unhex(agentAddr.c_str(), pre + 95, 20) ||
-        !frost::u256FromDecimal(capS.c_str(), pre + 115) || !frost::u256FromDecimal(expS.c_str(), pre + 147))
+    static const char TAG[] = "KAGI/grant";
+    const size_t T = sizeof TAG - 1;
+    uint8_t pre[sizeof TAG - 1 + 32 + 20 + 32 + 20 + 32 + 32];
+    memcpy(pre, TAG, T);
+    if (!frost::u256FromDecimal(chain.c_str(), pre + T) || !unhex(account.c_str(), pre + T + 32, 20) ||
+        !frost::u256FromDecimal(nonceS.c_str(), pre + T + 52) || !unhex(agentAddr.c_str(), pre + T + 84, 20) ||
+        !frost::u256FromDecimal(capS.c_str(), pre + T + 104) || !frost::u256FromDecimal(expS.c_str(), pre + T + 136))
       return reject(id, "bad_request");
     frost::sha256(pre, sizeof pre, p.msg);
     p.title = "New key for " + agent;
@@ -899,13 +905,13 @@ static void onSign(JsonDocument& in) {
     dirty = true;
     draw();
     buzz();
-#ifdef LEASH_AUTO_APPROVE
+#ifdef KAGI_AUTO_APPROVE
     autoAt = millis() + 3000;  // long enough to read the prompt
 #endif
     return;
   } else if (p.kind == "evm") {
-    // A call through the Leash smart account. Rebuild the contract's preimage:
-    // "LEASH/evm" || chainid || account || nonce || to || value || data
+    // A call through the Kagi smart account. Rebuild the contract's preimage:
+    // "KAGI/evm" || chainid || account || nonce || to || value || data
     String chain = String(in["chainId"] | "");
     String account = in["account"] | "";
     String nonceS = in["nonce"] | "";
@@ -919,15 +925,17 @@ static void onSign(JsonDocument& in) {
         !frost::u256FromDecimal(nonceS.c_str(), nonceB) || !unhex(to.c_str(), toB, 20) ||
         !frost::u256FromDecimal(valueS.c_str(), valB) || dataHex.length() % 2 != 0 || dlen > 1024)
       return reject(id, "bad_request");
-    std::vector<uint8_t> pre(9 + 32 + 20 + 32 + 20 + 32 + dlen);
+    static const char TAG[] = "KAGI/evm";
+    const size_t T = sizeof TAG - 1;
+    std::vector<uint8_t> pre(T + 32 + 20 + 32 + 20 + 32 + dlen);
     uint8_t* w = pre.data();
-    memcpy(w, "LEASH/evm", 9);
-    memcpy(w + 9, chainB, 32);
-    memcpy(w + 41, accB, 20);
-    memcpy(w + 61, nonceB, 32);
-    memcpy(w + 93, toB, 20);
-    memcpy(w + 113, valB, 32);
-    if (dlen && !unhex(dataHex.c_str(), w + 145, dlen)) return reject(id, "bad_request");
+    memcpy(w, TAG, T);
+    memcpy(w + T, chainB, 32);
+    memcpy(w + T + 32, accB, 20);
+    memcpy(w + T + 52, nonceB, 32);
+    memcpy(w + T + 84, toB, 20);
+    memcpy(w + T + 104, valB, 32);
+    if (dlen && !unhex(dataHex.c_str(), w + T + 136, dlen)) return reject(id, "bad_request");
     frost::sha256(pre.data(), pre.size(), p.msg);
     String net = chain == "11155111" ? "Sepolia" : chain == "1" ? "MAINNET" : "chain " + chain;
     p.title = net + " tx";
@@ -948,7 +956,7 @@ static void onSign(JsonDocument& in) {
     dirty = true;
     draw();
     buzz();
-#ifdef LEASH_AUTO_APPROVE
+#ifdef KAGI_AUTO_APPROVE
     autoAt = millis() + 3000;  // long enough to read the prompt
 #endif
     return;
@@ -962,7 +970,7 @@ static void onSign(JsonDocument& in) {
   dirty = true;
   draw();
   buzz();
-#ifdef LEASH_AUTO_APPROVE
+#ifdef KAGI_AUTO_APPROVE
   autoAt = millis() + 3000;  // long enough to read the prompt
 #endif
 }
@@ -1060,17 +1068,19 @@ static bool tailOf(const char* dec, uint8_t* out, size_t n) {
 
 static size_t compactLen(char type) { return type == 'E' ? 64 : 72; }
 
-// 'E': sha256("LEASH/evm" || chainid || account || nonce || to || value), the call format the
+// 'E': sha256("KAGI/evm" || chainid || account || nonce || to || value), the call format the
 // root treasury contract checks. Compact: chainId u32 | account 20 | nonce u32 | to 20 | value u128
 static void rootEvmMsg(const uint8_t c[64], uint8_t out[32]) {
-  uint8_t pre[9 + 32 + 20 + 32 + 20 + 32];
+  static const char TAG[] = "KAGI/evm";
+  const size_t T = sizeof TAG - 1;
+  uint8_t pre[sizeof TAG - 1 + 32 + 20 + 32 + 20 + 32];
   memset(pre, 0, sizeof pre);
-  memcpy(pre, "LEASH/evm", 9);
-  memcpy(pre + 9 + 28, c, 4);         // chainid
-  memcpy(pre + 41, c + 4, 20);        // account
-  memcpy(pre + 61 + 28, c + 24, 4);   // nonce
-  memcpy(pre + 93, c + 28, 20);       // to
-  memcpy(pre + 113 + 16, c + 48, 16); // value
+  memcpy(pre, TAG, T);
+  memcpy(pre + T + 28, c, 4);             // chainid
+  memcpy(pre + T + 32, c + 4, 20);        // account
+  memcpy(pre + T + 52 + 28, c + 24, 4);   // nonce
+  memcpy(pre + T + 84, c + 28, 20);       // to
+  memcpy(pre + T + 104 + 16, c + 48, 16); // value
   frost::sha256(pre, sizeof pre, out);
 }
 
@@ -1080,17 +1090,19 @@ static void rootMsg(char type, const uint8_t* c, uint8_t out[32]) {
   else rootMsgGrant(c, out);
 }
 
-// sha256("LEASH/rootgrant" || chainid || account || nonce || agent || cap || expiry), 32-byte fields
+// sha256("KAGI/rootgrant" || chainid || account || nonce || agent || cap || expiry), 32-byte fields
 static void rootMsgGrant(const uint8_t c[72], uint8_t out[32]) {
-  uint8_t pre[15 + 32 + 20 + 32 + 20 + 32 + 32];
+  static const char TAG[] = "KAGI/rootgrant";
+  const size_t T = sizeof TAG - 1;
+  uint8_t pre[sizeof TAG - 1 + 32 + 20 + 32 + 20 + 32 + 32];
   memset(pre, 0, sizeof pre);
-  memcpy(pre, "LEASH/rootgrant", 15);
-  memcpy(pre + 15 + 28, c, 4);          // chainid
-  memcpy(pre + 47, c + 4, 20);          // account
-  memcpy(pre + 67 + 28, c + 24, 4);     // nonce
-  memcpy(pre + 99, c + 28, 20);         // agent
-  memcpy(pre + 119 + 16, c + 48, 16);   // cap
-  memcpy(pre + 151 + 24, c + 64, 8);    // expiry
+  memcpy(pre, TAG, T);
+  memcpy(pre + T + 28, c, 4);             // chainid
+  memcpy(pre + T + 32, c + 4, 20);        // account
+  memcpy(pre + T + 52 + 28, c + 24, 4);   // nonce
+  memcpy(pre + T + 84, c + 28, 20);       // agent
+  memcpy(pre + T + 104 + 16, c + 48, 16); // cap
+  memcpy(pre + T + 136 + 24, c + 64, 8);  // expiry
   frost::sha256(pre, sizeof pre, out);
 }
 
@@ -1122,7 +1134,7 @@ static void showPrompt(Prompt& p) {
   dirty = true;
   draw();
   buzz(2);
-#ifdef LEASH_AUTO_APPROVE
+#ifdef KAGI_AUTO_APPROVE
   autoAt = millis() + 3000;
 #endif
 }
@@ -1635,7 +1647,7 @@ static void handle(const String& line) {
     if (paired) {
       mode = Mode::ConfirmWipe;
       buzz(1);
-#ifdef LEASH_AUTO_APPROVE
+#ifdef KAGI_AUTO_APPROVE
       wipeShare();
       mode = Mode::Unpaired;
       sendHello();
@@ -2017,8 +2029,8 @@ void setup() {
   loadShare();
   loadRoot();
   // The wrist advertises all the time; the vault only while its window is open.
-  ble::begin(String(isVault ? "Leash vault-" : "Leash wrist-") + deviceId.substring(6), !isVault);
-#ifndef LEASH_NO_WIFI
+  ble::begin(String(isVault ? "Kagi vault-" : "Kagi wrist-") + deviceId.substring(6), !isVault);
+#ifndef KAGI_NO_WIFI
   if (!isVault) startWifi();  // the vault keeps its radio off except during the reshare window
 #endif
   mode = restingMode();
@@ -2046,7 +2058,7 @@ void loop() {
     }
   }
 
-#ifndef LEASH_NO_WIFI
+#ifndef KAGI_NO_WIFI
   // WiFi scanning and dialing block the loop for seconds, which makes IR acks late.
   // While a root request is out with the vault, leave WiFi alone.
   // With Bluetooth up the phone is right here: skip WiFi entirely (scans and dials stall the UI).
@@ -2082,7 +2094,7 @@ void loop() {
     pollImu();
   }
 
-#ifdef LEASH_AUTO_APPROVE
+#ifdef KAGI_AUTO_APPROVE
   // Test firmware: press A by itself once the prompt has been on screen for a moment.
   if (autoAt && millis() > autoAt) {
     autoAt = 0;

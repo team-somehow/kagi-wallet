@@ -3,7 +3,7 @@
  *
  * Gas comes from the phone's own gas wallet: an ordinary Sepolia key in the secure store.
  * It pays for deploying, granting, revoking and deciding limit requests. It holds no power
- * over the Leash account: the contract checks the manager or phone signature on everything.
+ * over the Kagi account: the contract checks the manager or phone signature on everything.
  * An agent pays its own gas; the phone tops its key up when it grants it.
  */
 import * as SecureStore from 'expo-secure-store';
@@ -20,7 +20,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
-import { LeashAccountAbi, LeashAccountBytecode, RootTreasuryAbi, RootTreasuryBytecode } from './contracts';
+import { KagiAccountAbi, KagiAccountBytecode, RootTreasuryAbi, RootTreasuryBytecode } from './contracts';
 import { rand } from './shard';
 
 export const CHAIN_ID = sepolia.id;
@@ -34,7 +34,7 @@ type Addr = `0x${string}`;
 
 // ---- the gas wallet -------------------------------------------------------------------
 
-const GAS_KEY = 'leash.gas.v1';
+const GAS_KEY = 'kagi.gas.v1';
 let gasCache: ReturnType<typeof privateKeyToAccount> | null = null;
 
 export async function gasWallet() {
@@ -93,8 +93,8 @@ async function call(address: Addr, abi: Abi, functionName: string, args: readonl
 
 // ---- which account belongs to which key -------------------------------------------------
 
-const acctKey = (gk: string) => `leash.account.${gk.slice(0, 32)}`;
-const rootKeyName = (rk: string) => `leash.root.${rk.slice(0, 32)}`;
+const acctKey = (gk: string) => `kagi.account.${gk.slice(0, 32)}`;
+const rootKeyName = (rk: string) => `kagi.root.${rk.slice(0, 32)}`;
 
 export async function accountOf(gk: string): Promise<Addr | null> {
   try {
@@ -115,7 +115,7 @@ export interface SessionState {
 }
 
 export async function session(account: Addr, agent: Addr): Promise<SessionState> {
-  const [cap, spent, expiry, nonce] = (await pub.readContract({ address: account, abi: LeashAccountAbi, functionName: 'session', args: [agent] })) as readonly [bigint, bigint, bigint, bigint];
+  const [cap, spent, expiry, nonce] = (await pub.readContract({ address: account, abi: KagiAccountAbi, functionName: 'session', args: [agent] })) as readonly [bigint, bigint, bigint, bigint];
   return { cap, spent, expiry, nonce };
 }
 
@@ -123,7 +123,7 @@ export async function overview(gk: string) {
   const [account, gas, block] = await Promise.all([accountOf(gk), gasWallet(), pub.getBlock()]);
   const [balance, nonce, gasBalance] = await Promise.all([
     account ? pub.getBalance({ address: account }) : 0n,
-    account ? (pub.readContract({ address: account, abi: LeashAccountAbi, functionName: 'nonce' }) as Promise<bigint>) : 0n,
+    account ? (pub.readContract({ address: account, abi: KagiAccountAbi, functionName: 'nonce' }) as Promise<bigint>) : 0n,
     pub.getBalance({ address: gas.address }),
   ]);
   return { chainId: CHAIN_ID, now: block.timestamp, block: block.number, account, balance, nonce, gasAddress: gas.address, gasBalance, explorer: EXPLORER };
@@ -131,10 +131,10 @@ export async function overview(gk: string) {
 
 // ---- writes -----------------------------------------------------------------------------
 
-/** Deploy the Leash account for this group key, funded from the gas wallet. */
+/** Deploy the Kagi account for this group key, funded from the gas wallet. */
 export async function deploy(gk: string, phoneKey: string, fund: bigint): Promise<{ account: Addr; hash: Hex }> {
   const w = await walletClient();
-  const data = `${LeashAccountBytecode}${gk.padStart(64, '0')}${phoneKey.replace(/^0x/, '').padStart(64, '0')}` as Hex;
+  const data = `${KagiAccountBytecode}${gk.padStart(64, '0')}${phoneKey.replace(/^0x/, '').padStart(64, '0')}` as Hex;
   let gas: bigint;
   try {
     gas = await pub.estimateGas({ account: w.account, data, value: fund });
@@ -151,7 +151,7 @@ export async function deploy(gk: string, phoneKey: string, fund: bigint): Promis
 const split = (sig: string) => [BigInt(`0x${sig.slice(0, 64)}`), BigInt(`0x${sig.slice(64, 128)}`)] as const;
 
 export async function grant(account: Addr, m: { agent: Addr; cap: bigint; expiry: bigint; sig: string }, onHash?: (h: Hex) => void) {
-  return call(account, LeashAccountAbi as Abi, 'grant', [m.agent, m.cap, m.expiry, ...split(m.sig)], onHash);
+  return call(account, KagiAccountAbi as Abi, 'grant', [m.agent, m.cap, m.expiry, ...split(m.sig)], onHash);
 }
 
 /** Plain ETH from the gas wallet, e.g. gas money for an agent's own key. */
@@ -163,19 +163,19 @@ export async function sendGas(to: Addr, value: bigint): Promise<Sent> {
 }
 
 export async function revoke(account: Addr, agent: Addr, sig: string) {
-  return call(account, LeashAccountAbi as Abi, 'revoke', [agent, ...split(sig)]);
+  return call(account, KagiAccountAbi as Abi, 'revoke', [agent, ...split(sig)]);
 }
 
 export async function raiseLimit(account: Addr, m: { agent: Addr; oldCap: bigint; newCap: bigint; expiry: bigint; sig: string }) {
-  return call(account, LeashAccountAbi as Abi, 'raiseLimit', [m.agent, m.oldCap, m.newCap, m.expiry, ...split(m.sig)]);
+  return call(account, KagiAccountAbi as Abi, 'raiseLimit', [m.agent, m.oldCap, m.newCap, m.expiry, ...split(m.sig)]);
 }
 
 export async function declineLimit(account: Addr, agent: Addr, newCap: bigint, sig: string) {
-  return call(account, LeashAccountAbi as Abi, 'declineLimit', [agent, newCap, ...split(sig)]);
+  return call(account, KagiAccountAbi as Abi, 'declineLimit', [agent, newCap, ...split(sig)]);
 }
 
 export async function execute(account: Addr, m: { to: Addr; value: bigint; data?: Hex; sig: string }) {
-  return call(account, LeashAccountAbi as Abi, 'execute', [m.to, m.value, m.data ?? '0x', ...split(m.sig)]);
+  return call(account, KagiAccountAbi as Abi, 'execute', [m.to, m.value, m.data ?? '0x', ...split(m.sig)]);
 }
 
 // ---- events: what agents did, and what they ask for -------------------------------------
@@ -188,7 +188,7 @@ export type AccountEvent =
   | { kind: 'granted'; agent: Addr; cap: bigint; expiry: bigint; hash: Hex; block: bigint }
   | { kind: 'revoked'; agent: Addr; hash: Hex; block: bigint };
 
-const EVENTS = (LeashAccountAbi as Abi).filter(
+const EVENTS = (KagiAccountAbi as Abi).filter(
   (x) => x.type === 'event' && ['Spent', 'LimitRequested', 'LimitRaised', 'LimitDeclined', 'Granted', 'Revoked'].includes(x.name),
 );
 

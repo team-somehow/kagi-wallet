@@ -19,7 +19,7 @@
 
 #if __has_include(<bootloader_random.h>)
 #include <bootloader_random.h>
-#define LEASH_HAVE_BOOT_RNG 1
+#define KAGI_HAVE_BOOT_RNG 1
 #endif
 
 namespace frost {
@@ -140,7 +140,7 @@ bool add(Pt& out, const Pt& A, const Pt& B) {
 
 void popChallenge(Mpi& c, const uint8_t R[65], const uint8_t X[65]) {
   Sha h;
-  h.add("LEASH/pop");
+  h.add("KAGI/pop");
   h.add(R, 65);
   h.add(X, 65);
   uint8_t d[32];
@@ -169,7 +169,7 @@ void bip340Challenge(Mpi& c, const uint8_t Rx[32], const uint8_t Px[32], const u
 void rho(Mpi& r, uint8_t i, const uint8_t m[32], const uint8_t D1[65], const uint8_t E1[65],
          const uint8_t D2[65], const uint8_t E2[65]) {
   Sha h;
-  h.add("LEASH/rho");
+  h.add("KAGI/rho");
   h.add(&i, 1);
   h.add(m, 32);
   h.add(D1, 65);
@@ -198,7 +198,7 @@ bool popVerify(const uint8_t Xb[65], const uint8_t Rb[65], const uint8_t sb[32])
 
 void init() {
   if (ready) return;
-#ifdef LEASH_HAVE_BOOT_RNG
+#ifdef KAGI_HAVE_BOOT_RNG
   // Radio stays off on this firmware, so feed the RNG from the ADC noise source instead.
   bootloader_random_enable();
 #endif
@@ -332,7 +332,7 @@ bool readCompressed(Pt& p, const uint8_t in[33]) {
 
 void rhoN(Mpi& r, uint8_t i, const uint8_t m[32], int count, const uint8_t (*D)[33], const uint8_t (*E)[33]) {
   Sha h;
-  h.add("LEASH/rhoN");
+  h.add("KAGI/rhoN");
   h.add(&i, 1);
   h.add(m, 32);
   for (int k = 0; k < count; k++) {
@@ -361,7 +361,7 @@ void eciesKey(const Pt& shared, uint8_t key[32]) {
   uint8_t x[32];
   mbedtls_mpi_write_binary(&PX(shared), x, 32);
   Sha h;
-  h.add("LEASH/ecies");
+  h.add("KAGI/ecies");
   h.add(x, 32);
   h.done(key);
   mbedtls_platform_zeroize(x, 32);

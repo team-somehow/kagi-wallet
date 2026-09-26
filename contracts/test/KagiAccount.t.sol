@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {LeashAccount} from "../src/LeashAccount.sol";
+import {KagiAccount} from "../src/KagiAccount.sol";
 import {SchnorrTest} from "./utils/Schnorr.sol";
 import {MockMulti, MockNFT, Reverter, Target} from "./utils/Mocks.sol";
 
-contract LeashAccountTest is SchnorrTest {
+contract KagiAccountTest is SchnorrTest {
     event Executed(uint256 indexed nonce, address indexed to, uint256 value);
     event Granted(address indexed agent, uint256 cap, uint256 expiry);
     event Revoked(address indexed agent);
@@ -16,29 +16,29 @@ contract LeashAccountTest is SchnorrTest {
     uint256 constant AGENT_PK = 0xA6E17;
     uint256 constant CAP = 1 ether;
 
-    LeashAccount acct;
+    KagiAccount acct;
     address agent;
     address payable to = payable(address(0xdEaD));
     uint256 expiry;
 
     function setUp() public {
-        acct = new LeashAccount{value: 10 ether}(xonly(MANAGER), xonly(PHONE));
+        acct = new KagiAccount{value: 10 ether}(xonly(MANAGER), xonly(PHONE));
         agent = vm.addr(AGENT_PK);
         expiry = block.timestamp + 1 days;
     }
 
     // ---- helpers -------------------------------------------------------------------------
 
-    function grantMsg(LeashAccount a, uint256 n, address ag, uint256 cap, uint256 exp) internal view returns (bytes32) {
-        return sha256(abi.encodePacked("LEASH/grant", block.chainid, address(a), n, ag, cap, exp));
+    function grantMsg(KagiAccount a, uint256 n, address ag, uint256 cap, uint256 exp) internal view returns (bytes32) {
+        return sha256(abi.encodePacked("KAGI/grant", block.chainid, address(a), n, ag, cap, exp));
     }
 
     function revokeMsg(uint256 n, address ag) internal view returns (bytes32) {
-        return sha256(abi.encodePacked("LEASH/revoke", block.chainid, address(acct), n, ag));
+        return sha256(abi.encodePacked("KAGI/revoke", block.chainid, address(acct), n, ag));
     }
 
-    function wrap1271(LeashAccount a, bytes32 h) internal view returns (bytes32) {
-        return sha256(abi.encodePacked("LEASH/1271", block.chainid, address(a), h));
+    function wrap1271(KagiAccount a, bytes32 h) internal view returns (bytes32) {
+        return sha256(abi.encodePacked("KAGI/1271", block.chainid, address(a), h));
     }
 
     function doGrant(uint256 cap) internal {
@@ -56,7 +56,7 @@ contract LeashAccountTest is SchnorrTest {
         view
         returns (uint8 v, bytes32 r, bytes32 s)
     {
-        bytes32 h = keccak256(abi.encodePacked("LEASH/spend", block.chainid, address(acct), agent, sn, dst, value));
+        bytes32 h = keccak256(abi.encodePacked("KAGI/spend", block.chainid, address(acct), agent, sn, dst, value));
         return vm.sign(pk, h);
     }
 
@@ -108,13 +108,13 @@ contract LeashAccountTest is SchnorrTest {
     }
 
     function declineSig(uint256 newCap, uint256 key) internal returns (uint256, uint256) {
-        return schnorrSign(key, sha256(abi.encodePacked("LEASH/decline", block.chainid, address(acct), acct.nonce(), agent, newCap)));
+        return schnorrSign(key, sha256(abi.encodePacked("KAGI/decline", block.chainid, address(acct), acct.nonce(), agent, newCap)));
     }
 
     function test_AgentRequestsLimit() public {
         doGrant(CAP);
         vm.expectEmit(true, false, false, true, address(acct));
-        emit LeashAccount.LimitRequested(agent, CAP, CAP * 4, "need more");
+        emit KagiAccount.LimitRequested(agent, CAP, CAP * 4, "need more");
         vm.prank(agent);
         acct.requestLimit(CAP * 4, "need more");
     }
@@ -138,7 +138,7 @@ contract LeashAccountTest is SchnorrTest {
         uint256 n = acct.nonce();
         (uint256 rx, uint256 s) = declineSig(CAP * 4, PHONE);
         vm.expectEmit(true, false, false, true, address(acct));
-        emit LeashAccount.LimitDeclined(agent, CAP * 4);
+        emit KagiAccount.LimitDeclined(agent, CAP * 4);
         acct.declineLimit(agent, CAP * 4, rx, s);
         assertEq(acct.nonce(), n + 1);
         (uint256 cap,,,) = acct.session(agent);
@@ -157,7 +157,7 @@ contract LeashAccountTest is SchnorrTest {
     }
 
     function limitSig(uint256 oldCap, uint256 newCap, uint256 exp, uint256 key) internal returns (uint256, uint256) {
-        return schnorrSign(key, sha256(abi.encodePacked("LEASH/limit", block.chainid, address(acct), acct.nonce(), agent, oldCap, newCap, exp)));
+        return schnorrSign(key, sha256(abi.encodePacked("KAGI/limit", block.chainid, address(acct), acct.nonce(), agent, oldCap, newCap, exp)));
     }
 
     function test_RaisePreservesSpendExpiryAndAgentNonce() public {
@@ -433,7 +433,7 @@ contract LeashAccountTest is SchnorrTest {
     }
 
     function test_1271NotReplayableOnAnotherAccount() public {
-        LeashAccount twin = new LeashAccount(xonly(MANAGER), xonly(PHONE));
+        KagiAccount twin = new KagiAccount(xonly(MANAGER), xonly(PHONE));
         bytes memory sig = schnorrSig(MANAGER, wrap1271(acct, ORDER));
         assertEq(twin.isValidSignature(ORDER, sig), bytes4(0xffffffff));
     }

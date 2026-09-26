@@ -33,7 +33,7 @@ export function Losses() {
                 {g.kind === 'agent' && (
                   <div className="cap-layer" aria-hidden="true">
                     <div className="cap-line" style={{ left: `${pos(CAP_USD)}%` }}>
-                      <span><b>$500 Leash cap</b><i>: each of these stops here</i></span>
+                      <span><b>$500 Kagi cap</b><i>: each of these stops here</i></span>
                     </div>
                   </div>
                 )}

@@ -1,5 +1,5 @@
 /**
- * Two-party threshold Schnorr for the Leash manager key (phone + wrist, 2 of 2).
+ * Two-party threshold Schnorr for the Kagi manager key (phone + wrist, 2 of 2).
  *
  * The output is a plain BIP340 Schnorr signature over the group key, so any
  * standard verifier accepts it. The protocol is FROST specialised to n = t = 2
@@ -10,12 +10,12 @@
  *
  * Key generation
  *   each party i picks x_i, publishes X_i = x_i G and a proof of possession
- *   pop_i = (R, s) with c = H("LEASH/pop" || R || X_i), s = k + c x_i.
+ *   pop_i = (R, s) with c = H("KAGI/pop" || R || X_i), s = k + c x_i.
  *   P = X_1 + X_2. If P has odd y, both negate x_i and X_i, so P is even-y.
  *
  * Signing message m (32 bytes), participant ids 1 (phone) and 2 (wrist)
  *   each party picks nonces d_i, e_i and publishes D_i, E_i.
- *   rho_i = H("LEASH/rho" || i || m || D_1 || E_1 || D_2 || E_2) mod n
+ *   rho_i = H("KAGI/rho" || i || m || D_1 || E_1 || D_2 || E_2) mod n
  *   R_i = D_i + rho_i E_i,  R = R_1 + R_2.  If R has odd y, negate every k_i.
  *   c = BIP340 challenge tagged_hash("BIP0340/challenge", R.x || P.x || m)
  *   z_i = k_i + c x_i where k_i = d_i + rho_i e_i
@@ -66,8 +66,8 @@ export function txCanonical(to: string, calldata: string): string {
 }
 
 /**
- * Bytes the Leash smart account hashes (see contracts/LeashAccount.sol):
- *   "LEASH/evm" || chainid (32) || account (20) || nonce (32) || to (20) || value (32) || data
+ * Bytes the Kagi smart account hashes (see contracts/KagiAccount.sol):
+ *   "KAGI/evm" || chainid (32) || account (20) || nonce (32) || to (20) || value (32) || data
  * The wrist builds the same bytes from the fields it displays.
  */
 export interface EvmCall {
@@ -84,7 +84,7 @@ const addr = (a: string) => hexToBytes(a.toLowerCase().replace(/^0x/, '').padSta
 
 export function evmPreimage(c: EvmCall): Uint8Array {
   return concatBytes(
-    utf8ToBytes('LEASH/evm'),
+    utf8ToBytes('KAGI/evm'),
     u256(BigInt(c.chainId)),
     addr(c.account),
     u256(c.nonce),
@@ -107,10 +107,10 @@ export interface EvmGrant {
   expiry: bigint;
 }
 
-/** sha256("LEASH/grant" || chainid || account || nonce || agent || cap || expiry) */
+/** sha256("KAGI/grant" || chainid || account || nonce || agent || cap || expiry) */
 export function evmGrantMessage(g: EvmGrant): Uint8Array {
   return sha256(
-    concatBytes(utf8ToBytes('LEASH/grant'), u256(BigInt(g.chainId)), addr(g.account), u256(g.nonce), addr(g.agent), u256(g.cap), u256(g.expiry)),
+    concatBytes(utf8ToBytes('KAGI/grant'), u256(BigInt(g.chainId)), addr(g.account), u256(g.nonce), addr(g.agent), u256(g.cap), u256(g.expiry)),
   );
 }
 
@@ -124,11 +124,11 @@ export interface EvmLimit {
   expiry: bigint;
 }
 
-/** sha256("LEASH/limit" || chainid || account || nonce || agent || oldCap || newCap || expiry) */
+/** sha256("KAGI/limit" || chainid || account || nonce || agent || oldCap || newCap || expiry) */
 export function evmLimitMessage(l: EvmLimit): Uint8Array {
   return sha256(
     concatBytes(
-      utf8ToBytes('LEASH/limit'),
+      utf8ToBytes('KAGI/limit'),
       u256(BigInt(l.chainId)),
       addr(l.account),
       u256(l.nonce),
@@ -140,19 +140,19 @@ export function evmLimitMessage(l: EvmLimit): Uint8Array {
   );
 }
 
-/** sha256("LEASH/revoke" || chainid || account || nonce || agent). The phone signs this alone. */
+/** sha256("KAGI/revoke" || chainid || account || nonce || agent). The phone signs this alone. */
 export function evmRevokeMessage(chainId: number, account: string, nonce: bigint, agent: string): Uint8Array {
-  return sha256(concatBytes(utf8ToBytes('LEASH/revoke'), u256(BigInt(chainId)), addr(account), u256(nonce), addr(agent)));
+  return sha256(concatBytes(utf8ToBytes('KAGI/revoke'), u256(BigInt(chainId)), addr(account), u256(nonce), addr(agent)));
 }
 
-/** sha256("LEASH/decline" || chainid || account || nonce || agent || newCap). The phone signs this alone. */
+/** sha256("KAGI/decline" || chainid || account || nonce || agent || newCap). The phone signs this alone. */
 export function evmDeclineMessage(chainId: number, account: string, nonce: bigint, agent: string, newCap: bigint): Uint8Array {
-  return sha256(concatBytes(utf8ToBytes('LEASH/decline'), u256(BigInt(chainId)), addr(account), u256(nonce), addr(agent), u256(newCap)));
+  return sha256(concatBytes(utf8ToBytes('KAGI/decline'), u256(BigInt(chainId)), addr(account), u256(nonce), addr(agent), u256(newCap)));
 }
 
-/** sha256("LEASH/1271" || chainid || account || hash). What the manager signs for ERC-1271. */
+/** sha256("KAGI/1271" || chainid || account || hash). What the manager signs for ERC-1271. */
 export function evm1271Message(chainId: number, account: string, hash: Hex): Uint8Array {
-  return sha256(concatBytes(utf8ToBytes('LEASH/1271'), u256(BigInt(chainId)), addr(account), hexToBytes(hash.replace(/^0x/, ''))));
+  return sha256(concatBytes(utf8ToBytes('KAGI/1271'), u256(BigInt(chainId)), addr(account), hexToBytes(hash.replace(/^0x/, ''))));
 }
 
 /** A plain BIP340 signature by the phone's shard alone. The contract accepts it for revoking only. */
@@ -167,7 +167,7 @@ export function phoneKey(s: Share): Hex {
 
 /** Pairing code both screens show. Pure display check, no secrets. */
 export function pairingCode(phoneNonce: Hex, wristNonce: Hex): string {
-  const h = bytesToHex(sha256(concatBytes(utf8ToBytes('LEASH/pair'), hexToBytes(phoneNonce), hexToBytes(wristNonce))));
+  const h = bytesToHex(sha256(concatBytes(utf8ToBytes('KAGI/pair'), hexToBytes(phoneNonce), hexToBytes(wristNonce))));
   return `${h.slice(0, 4)} ${h.slice(4, 8)}`.toUpperCase();
 }
 
@@ -179,7 +179,7 @@ export interface Pop {
 }
 
 function popChallenge(R: InstanceType<typeof Point>, X: InstanceType<typeof Point>): bigint {
-  return hashToScalar(utf8ToBytes('LEASH/pop'), R.toBytes(false), X.toBytes(false));
+  return hashToScalar(utf8ToBytes('KAGI/pop'), R.toBytes(false), X.toBytes(false));
 }
 
 export function popVerify(Xh: Hex, pop: Pop): boolean {
@@ -252,7 +252,7 @@ export function nonces(rand: RandomBytes): Nonces {
 
 function rho(i: number, m: Uint8Array, D1: Hex, E1: Hex, D2: Hex, E2: Hex): bigint {
   return hashToScalar(
-    utf8ToBytes('LEASH/rho'),
+    utf8ToBytes('KAGI/rho'),
     new Uint8Array([i]),
     m,
     hexToBytes(D1),

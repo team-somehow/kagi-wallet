@@ -8,7 +8,7 @@ import { Button } from '../../components/Button';
 import { TopBar } from '../../components/TopBar';
 import { Radar } from '../../components/Radar';
 import { StickArt } from '../../components/StickArt';
-import { LeashFlow } from '../../components/Leash';
+import { TetherFlow } from '../../components/Tether';
 import { useStore } from '../../store/store';
 import { dkgFinish, dkgStart, phoneKey, type Pop, type Share } from '../../lib/frost';
 import { link, type Msg } from '../../lib/link';
@@ -204,9 +204,9 @@ export default function Connect() {
       <View style={styles.art}>
         {phase === 'search' ? <Radar /> : null}
         {phase === 'hold' ? <StickArt pointToA screen="Pair with this phone?" /> : null}
-        {phase === 'keygen' ? <LeashFlow /> : null}
+        {phase === 'keygen' ? <TetherFlow /> : null}
         {phase === 'lock' || phase === 'accountError' ? <StickArt screen="Wallet ready" /> : null}
-        {phase === 'account' ? <LeashFlow /> : null}
+        {phase === 'account' ? <TetherFlow /> : null}
         {phase === 'fund' && gas ? (
           <View style={styles.fund}>
             <Txt mono size={15} selectable align="center">
@@ -228,7 +228,7 @@ export default function Connect() {
       </View>
       {phase === 'search' ? (
         <Txt size={14} color={colors.faint} align="center">
-          {state.wrist.connected ? 'Found it. Connecting…' : 'Looking for your Leash stick'}
+          {state.wrist.connected ? 'Found it. Connecting…' : 'Looking for your Kagi stick'}
         </Txt>
       ) : null}
     </Screen>

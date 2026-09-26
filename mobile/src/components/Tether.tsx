@@ -30,8 +30,8 @@ function Bead({ delay, back }: { delay: number; back?: boolean }) {
   return <Animated.View style={[styles.bead, back && styles.beadBack, style]} />;
 }
 
-/** Phone and stick with a leash of beads running between them while the key is made. */
-export function LeashFlow() {
+/** Phone and stick with a chain of beads running between them while the key is made. */
+export function TetherFlow() {
   return (
     <View style={styles.row}>
       <View style={styles.phone}>

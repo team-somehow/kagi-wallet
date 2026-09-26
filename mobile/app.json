@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Leash",
-    "slug": "leash-wallet",
+    "name": "Kagi Wallet",
+    "slug": "kagi-wallet",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.leash.wallet"
+      "bundleIdentifier": "com.kagi.wallet"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": true,
-      "package": "com.leash.wallet"
+      "package": "com.kagi.wallet"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -37,7 +37,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Leash uses Face ID to unlock your phone shard."
+          "faceIDPermission": "Kagi uses Face ID to unlock your phone shard."
         }
       ],
       "expo-secure-store",
@@ -47,11 +47,11 @@
           "isBackgroundEnabled": false,
           "neverForLocation": true,
           "modes": [],
-          "bluetoothAlwaysPermission": "Leash talks to your wrist and vault over Bluetooth."
+          "bluetoothAlwaysPermission": "Kagi talks to your wrist and vault over Bluetooth."
         }
       ]
     ],
-    "scheme": "leash",
+    "scheme": "kagi",
     "newArchEnabled": true
   }
 }

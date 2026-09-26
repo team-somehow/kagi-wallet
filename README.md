@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🦮 Leash
+# 🔑 Kagi Wallet
 
-**A threshold wallet that gives AI agents a leash, not the keys.**
+**A threshold wallet that gives AI agents a spending key, not yours.**
 
 Agents get a capped, expiring key they can spend freely under.
 Everything above the cap climbs a ladder of physical devices: your wrist, then a vault you can only reach by light.
@@ -21,7 +21,7 @@ Everything above the cap climbs a ladder of physical devices: your wrist, then a
 
 Agents need money to be useful. Today you either hand them a hot key, and they can drain you, or you approve every transaction, and they're useless. Session keys help, but the root that issues them is still a hot wallet on a server or a phone.
 
-Leash splits the wallet's authority across devices with **FROST threshold Schnorr (secp256k1)**. No device ever holds a full key, and the smart account enforces the agent's limits on-chain.
+Kagi splits the wallet's authority across devices with **FROST threshold Schnorr (secp256k1)**. No device ever holds a full key, and the smart account enforces the agent's limits on-chain.
 
 ## How it works
 
@@ -42,7 +42,7 @@ flowchart LR
     P -- "phone shard alone<br/>revoke · decline" --> LA
     P & W & V -- "root key 3-of-3" --> RT
 
-    LA[["LeashAccount"]]
+    LA[["KagiAccount"]]
     RT[["RootTreasury"]]
 ```
 
@@ -59,7 +59,7 @@ flowchart LR
 
 | Key | Type | Held by | Can do |
 |---|---|---|---|
-| **Manager** | FROST 2-of-2 | phone + wrist ESP32 device | anything on `LeashAccount`: grant, execute, sign ERC-1271 |
+| **Manager** | FROST 2-of-2 | phone + wrist ESP32 device | anything on `KagiAccount`: grant, execute, sign ERC-1271 |
 | **Root** | FROST 3-of-3 (reshared from 2-of-2) | phone + wrist + vault ESP32 device | anything on `RootTreasury` |
 | **Phone** | the phone's shard on its own | phone | revoke only |
 | **Session** | ECDSA, made by the agent | the agent, never leaves it | plain ETH transfers under its cap until it expires |
@@ -69,7 +69,7 @@ One FROST key has one threshold, and its signature doesn't say who signed. That'
 ## Repository
 
 ```
-contracts/   Solidity + Foundry. LeashAccount, RootTreasury, BIP340 verifier, forge tests
+contracts/   Solidity + Foundry. KagiAccount, RootTreasury, BIP340 verifier, forge tests
 firmware/    ESP32-S3 firmware (PlatformIO). One build runs as wrist or vault
   wrist/       the shard firmware: FROST, display, buttons, BLE, WiFi, IR
   irprobe/     bench tool for the IR link
@@ -96,7 +96,7 @@ IDEA.md      the full design, threat model and demo script
 
 **Standards supported**
 
-- **ERC-1271:** passes only for the manager key, over `sha256("LEASH/1271" ‖ chainid ‖ account ‖ hash)`. This enables SIWE, Permit2, and CoW, UniswapX or Seaport orders. Agent keys are excluded on purpose: a signed permit moves money without going through `spend`, so it would get around the cap.
+- **ERC-1271:** passes only for the manager key, over `sha256("KAGI/1271" ‖ chainid ‖ account ‖ hash)`. This enables SIWE, Permit2, and CoW, UniswapX or Seaport orders. Agent keys are excluded on purpose: a signed permit moves money without going through `spend`, so it would get around the cap.
 - **ERC-721 / ERC-1155 receivers:** `safeTransferFrom` and `safeMint` into the account succeed.
 - **ERC-165:** advertises all of the above.
 - **Not ERC-4337 (yet):** there is no relayer. The phone pays for its own transactions from a gas wallet, and an agent pays for its own from its session key, which the phone tops up when it grants it.
@@ -105,7 +105,7 @@ IDEA.md      the full design, threat model and demo script
 
 | Call | Gas |
 |---|---|
-| deploy `LeashAccount` | ~951k |
+| deploy `KagiAccount` | ~951k |
 | `grant` | ~106k |
 | `spend`, first / later | ~90k / ~55k |
 | `execute` (ETH transfer) | ~54k |

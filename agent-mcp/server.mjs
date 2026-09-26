@@ -1,12 +1,12 @@
-// Leash agent MCP: an agent's wallet, as tools for ChatGPT, Claude or any MCP client.
+// Kagi agent MCP: an agent's wallet, as tools for ChatGPT, Claude or any MCP client.
 //
-// This server holds ONE Leash session key and talks to Sepolia directly. It signs spends with
+// This server holds ONE Kagi session key and talks to Sepolia directly. It signs spends with
 // the key and sends them itself, paying gas from the key's own address (the phone tops it up
 // when it grants the key). The key can only spend its on-chain allowance. For more, it files a
 // limit request on-chain; the owner's phone sees it and the owner approves on their stick.
 //
-//   SESSION_KEY  what the Leash phone app copies: leash:<account>:<0x key>          (required)
-//                (a bare 0x key works too, with LEASH_ACCOUNT set)
+//   SESSION_KEY  what the Kagi phone app copies: kagi:<account>:<0x key>          (required)
+//                (a bare 0x key works too, with KAGI_ACCOUNT set)
 //   MCP_TOKEN    secret path segment: the endpoint becomes /mcp/<MCP_TOKEN>        (recommended)
 //   RPC_URL      default https://ethereum-sepolia-rpc.publicnode.com
 //   EXPLORER     default https://sepolia.etherscan.io
@@ -41,12 +41,12 @@ const TOKEN = process.env.MCP_TOKEN?.trim() || null;
 const PORT = Number(process.env.PORT ?? 8790);
 const PATH = TOKEN ? `/mcp/${TOKEN}` : '/mcp';
 
-// "leash:<account>:<key>", or a bare key with LEASH_ACCOUNT.
+// "kagi:<account>:<key>", or a bare key with KAGI_ACCOUNT.
 function parseKey(raw) {
   const v = String(raw ?? '').trim();
-  const m = /^leash:(0x[0-9a-fA-F]{40}):(0x[0-9a-fA-F]{64})$/.exec(v);
+  const m = /^kagi:(0x[0-9a-fA-F]{40}):(0x[0-9a-fA-F]{64})$/.exec(v);
   if (m) return { account: getAddress(m[1]), key: m[2] };
-  const acct = process.env.LEASH_ACCOUNT?.trim();
+  const acct = process.env.KAGI_ACCOUNT?.trim();
   if (/^0x[0-9a-fA-F]{64}$/.test(v) && acct && isAddress(acct)) return { account: getAddress(acct), key: v };
   return null;
 }
@@ -54,7 +54,7 @@ const parsed = parseKey(process.env.SESSION_KEY);
 // Without a key the server still runs, and every tool says how to add one.
 const KEY = parsed?.key ?? null;
 const ACCOUNT = parsed?.account ?? null;
-if (!KEY) console.error('No valid SESSION_KEY set (leash:<account>:<key>). Tools will ask for one until it is.');
+if (!KEY) console.error('No valid SESSION_KEY set (kagi:<account>:<key>). Tools will ask for one until it is.');
 const AGENT = KEY ? privateKeyToAccount(KEY) : null;
 
 const pub = createPublicClient({ transport: httpTransport(RPC) });
@@ -87,7 +87,7 @@ let isAccount = false;
 async function state() {
   if (!isAccount) {
     const code = await pub.getCode({ address: ACCOUNT });
-    if (!code || code === '0x') throw new Error(`There is no Leash account at ${ACCOUNT} on this network. Copy the key again from the Leash phone app.`);
+    if (!code || code === '0x') throw new Error(`There is no Kagi account at ${ACCOUNT} on this network. Copy the key again from the Kagi phone app.`);
     isAccount = true;
   }
   const [[cap, spent, expiry, nonce], balance, gas, block] = await Promise.all([
@@ -120,7 +120,7 @@ function resolveRecipient(to) {
 
 async function walletInfo() {
   const s = await state();
-  if (s.status === 'unknown') return { ok: false, error: 'This session key has no session on that Leash account. Create the key from the Leash phone app.' };
+  if (s.status === 'unknown') return { ok: false, error: 'This session key has no session on that Kagi account. Create the key from the Kagi phone app.' };
   return {
     ok: true,
     session_key_address: AGENT.address,
@@ -142,7 +142,7 @@ const EXPLAIN = {
   bad_amount: 'The amount must be a positive number of ETH, like 0.000002.',
   expired: 'The session key has expired. The owner must issue a new one.',
   revoked: 'The owner revoked this session key.',
-  unknown: 'This session key has no session on that Leash account.',
+  unknown: 'This session key has no session on that Kagi account.',
   insufficient_funds: 'The wallet itself does not hold enough ETH.',
   no_gas: `The agent key has no Sepolia ETH left for gas. Send a little to ${'${agent}'}.`,
 };
@@ -168,7 +168,7 @@ async function transfer(to, amount_eth) {
   const digest = keccak256(
     encodePacked(
       ['string', 'uint256', 'address', 'address', 'uint256', 'address', 'uint256'],
-      ['LEASH/spend', BigInt(await getChainId()), ACCOUNT, AGENT.address, s.nonce, rcpt.address, value],
+      ['KAGI/spend', BigInt(await getChainId()), ACCOUNT, AGENT.address, s.nonce, rcpt.address, value],
     ),
   );
   const sig = await sign({ hash: digest, privateKey: KEY });
@@ -255,7 +255,7 @@ const reply = (data) => {
 const NO_KEY = {
   ok: false,
   status: 'not_configured',
-  error: 'This server has no Leash session key yet. The owner copies one from the Leash phone app and sets SESSION_KEY on the server.',
+  error: 'This server has no Kagi session key yet. The owner copies one from the Kagi phone app and sets SESSION_KEY on the server.',
 };
 // Every tool goes through this, so a server without a key fails the same clear way.
 const guarded = (fn) => async (args) => {
@@ -271,10 +271,10 @@ const guarded = (fn) => async (args) => {
 
 function createServer() {
   const server = new McpServer(
-    { name: 'leash-agent', version: '0.1.0' },
+    { name: 'kagi-agent', version: '0.1.0' },
     {
       instructions:
-        'You control a Leash agent wallet on the Sepolia testnet. It holds a session key with a total ETH allowance ' +
+        'You control a Kagi agent wallet on the Sepolia testnet. It holds a session key with a total ETH allowance ' +
         'and an expiry set by its owner. Call get_wallet first. Use send_eth for payments. If a payment is over the ' +
         'allowance, send_eth asks the owner for a higher limit automatically; then call wait_for_approval with the ' +
         'request_id, which sends the payment once the owner approves. Never claim a payment was sent unless a tool ' +
@@ -316,7 +316,7 @@ function createServer() {
         ...ask,
         payment: `${amount_eth} ETH to ${to} (not sent yet)`,
         allowance_left: eth(r.remaining),
-        next: 'The owner was asked on their Leash phone and stick. Call wait_for_approval with this request_id.',
+        next: 'The owner was asked on their Kagi phone and stick. Call wait_for_approval with this request_id.',
       });
     }),
   );
@@ -325,7 +325,7 @@ function createServer() {
     'request_higher_limit',
     {
       title: 'Request a higher limit',
-      description: "Ask the owner to raise this agent's total allowance, without a payment attached. The owner approves on their Leash stick.",
+      description: "Ask the owner to raise this agent's total allowance, without a payment attached. The owner approves on their Kagi stick.",
       inputSchema: {
         new_total_eth: z.string().describe('The new TOTAL allowance in ETH (not the extra amount)'),
         reason: z.string().describe('One sentence the owner will read'),
@@ -383,7 +383,7 @@ http
   .createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://x');
     if (url.pathname === '/' || url.pathname === '/health') {
-      res.writeHead(200, { 'content-type': 'text/plain' }).end(`leash agent mcp for ${AGENT?.address ?? 'no session key yet'}\n`);
+      res.writeHead(200, { 'content-type': 'text/plain' }).end(`kagi agent mcp for ${AGENT?.address ?? 'no session key yet'}\n`);
       return;
     }
     if (url.pathname !== PATH) {
@@ -411,7 +411,7 @@ http
     }
   })
   .listen(PORT, '0.0.0.0', () => {
-    log(`leash agent mcp for ${AGENT?.address ?? 'no session key yet'} on ${ACCOUNT ?? '-'}`);
+    log(`kagi agent mcp for ${AGENT?.address ?? 'no session key yet'} on ${ACCOUNT ?? '-'}`);
     log(`endpoint http://localhost:${PORT}${PATH}  rpc ${RPC}`);
     if (!TOKEN) log('warning: no MCP_TOKEN set, so anyone with the URL can spend this allowance');
   });

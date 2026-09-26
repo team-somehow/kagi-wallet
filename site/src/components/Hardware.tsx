@@ -66,7 +66,7 @@ export function Hardware() {
               <div>{[0, 50, 100, 150, 200, 250].map((v) => <span key={v} style={{ left: `${(v / MAX) * 100}%` }}>${v}</span>)}</div>
             </div>
             <p className="fine">
-              Leash buys both signers for less than one hardware wallet. Prices: <a href={DEVICE_URL} target="_blank" rel="noreferrer">device store</a>, <a href={PRICES_URL} target="_blank" rel="noreferrer">Coin Bureau, Jun 2026</a>. No secure element, so no device is ever trusted alone.
+              Kagi buys both signers for less than one hardware wallet. Prices: <a href={DEVICE_URL} target="_blank" rel="noreferrer">device store</a>, <a href={PRICES_URL} target="_blank" rel="noreferrer">Coin Bureau, Jun 2026</a>. No secure element, so no device is ever trusted alone.
             </p>
           </figure>
         </div>

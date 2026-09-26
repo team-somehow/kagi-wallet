@@ -4,7 +4,7 @@ import { listSessionAddresses } from './session';
 import { loadShard, rand } from './shard';
 
 /**
- * Revoke every live session key on the Leash account, signed by the phone's shard alone and
+ * Revoke every live session key on the Kagi account, signed by the phone's shard alone and
  * sent from the phone's gas wallet. Used by hold-to-revoke on Home and by holding B on the
  * wrist. Resolves with how many keys were revoked on-chain; never throws, since revoking
  * must not get in the way.

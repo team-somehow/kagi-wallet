@@ -27,7 +27,7 @@ async function makeVault(): Promise<void> {
   }
 }
 
-export function GetLeash() {
+export function GetKagi() {
   const [webSerial, setWebSerial] = useState(true);
   const [role, setRole] = useState<RoleState>('idle');
   const loaded = useRef(false);
@@ -55,7 +55,7 @@ export function GetLeash() {
     <section className="section" id="get">
       <div className="wrap">
         <div className="section-head">
-          <h2>Get Leash</h2>
+          <h2>Get Kagi Wallet</h2>
           <p>The Android app, the open firmware, and a flasher that runs in your browser.</p>
         </div>
 
@@ -105,7 +105,7 @@ export function GetLeash() {
             </li>
             <li>
               <b>First time only: download mode</b>
-              <span>Hold the side button until the green LED flashes. After Leash is on it, updates reset the device by themselves.</span>
+              <span>Hold the side button until the green LED flashes. After Kagi Wallet is on it, updates reset the device by themselves.</span>
             </li>
             <li>
               <b>Flash</b>
@@ -113,7 +113,7 @@ export function GetLeash() {
             </li>
             <li>
               <b>Boot</b>
-              <span>Click the side button once. The screen shows Leash and a pairing code.</span>
+              <span>Click the side button once. The screen shows Kagi and a pairing code.</span>
             </li>
             <li>
               <b>Make the second one the vault</b>
@@ -131,11 +131,11 @@ export function GetLeash() {
             <summary>Prefer the command line?</summary>
             <pre><code>{`# build and flash from source (PlatformIO)
 git clone ${REPO_URL}.git
-cd leash-wallet/firmware/wrist
+cd kagi-wallet/firmware/wrist
 pio run -e sticks3 -t upload
 
 # or flash the release image with esptool
-esptool.py --chip esp32s3 write_flash 0x0 leash-firmware-${FIRMWARE.version}.bin`}</code></pre>
+esptool.py --chip esp32s3 write_flash 0x0 kagi-firmware-${FIRMWARE.version}.bin`}</code></pre>
           </details>
         </div>
       </div>

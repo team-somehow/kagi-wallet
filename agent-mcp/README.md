@@ -1,10 +1,10 @@
-# Leash agent MCP
+# Kagi agent MCP
 
 A bare-bones MCP server that gives ChatGPT, Claude or any MCP client an agent wallet on Sepolia.
-It holds one Leash session key and talks to Sepolia directly: it signs spends, sends them, and
+It holds one Kagi session key and talks to Sepolia directly: it signs spends, sends them, and
 pays its gas from the key's own address (the phone tops it up at grant). The key can only spend
 its on-chain allowance. For more, it files a limit request on-chain; the owner's phone sees it,
-and the owner approves on their Leash stick or declines.
+and the owner approves on their Kagi stick or declines.
 
 ## Tools
 
@@ -17,12 +17,12 @@ and the owner approves on their Leash stick or declines.
 
 ## Run it
 
-1. In the Leash phone app, create an agent key and tap **Copy session key**. It copies
-   `leash:<account>:<key>`, which carries the wallet address with the key.
+1. In the Kagi phone app, create an agent key and tap **Copy session key**. It copies
+   `kagi:<account>:<key>`, which carries the wallet address with the key.
 2. Run:
 
    ```sh
-   SESSION_KEY='leash:0x…:0x…' ./run-local.sh
+   SESSION_KEY='kagi:0x…:0x…' ./run-local.sh
    ```
 
    It prints a public `https://…trycloudflare.com/mcp/<token>` URL.
@@ -41,7 +41,7 @@ It's one Node file with a Dockerfile, so Render, Railway, Fly or any container h
 
 | Variable | Value |
 | --- | --- |
-| `SESSION_KEY` | What the phone copies, `leash:<account>:<key>` |
+| `SESSION_KEY` | What the phone copies, `kagi:<account>:<key>` |
 | `MCP_TOKEN` | A random string. The endpoint becomes `/mcp/<MCP_TOKEN>` |
 | `RPC_URL` | Optional. Defaults to a public Sepolia RPC |
 | `CONTACTS` | Optional JSON of names to addresses. Defaults to `contacts.json` |
@@ -50,11 +50,11 @@ Nothing else needs to run: no hub, no laptop.
 
 ## On the Lightsail server
 
-It runs as the `leash-agent-mcp` systemd service behind Caddy at `https://13-235-16-182.sslip.io`.
-Settings live in `/etc/leash-agent-mcp.env`, and the endpoint is `/mcp/<MCP_TOKEN>` from that file.
+It runs as the `kagi-agent-mcp` systemd service behind Caddy at `https://13-235-16-182.sslip.io`.
+Settings live in `/etc/kagi-agent-mcp.env`, and the endpoint is `/mcp/<MCP_TOKEN>` from that file.
 
-- **Set the session key:** `ssh -i ~/Downloads/VorfluxLaptop.pem ubuntu@13.235.16.182 leash-set-key`, then paste what the phone copied.
-- **Logs:** `journalctl -u leash-agent-mcp -f`
+- **Set the session key:** `ssh -i ~/Downloads/VorfluxLaptop.pem ubuntu@13.235.16.182 kagi-set-key`, then paste what the phone copied.
+- **Logs:** `journalctl -u kagi-agent-mcp -f`
 
 ## Security
 

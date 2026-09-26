@@ -1,6 +1,6 @@
-# Leash mobile
+# Kagi mobile
 
-The phone half of Leash: one shard of the 2-of-2 manager key, the place you issue
+The phone half of Kagi: one shard of the 2-of-2 manager key, the place you issue
 capped keys to agents, and the screen that lights up when an agent goes over.
 
 Expo SDK 57, Expo Router, TypeScript. The sticks are real (see `../firmware/wrist`) and

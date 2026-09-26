@@ -69,7 +69,7 @@ export default function Home() {
     >
       <View style={styles.bar}>
         <Txt size={20} weight="bold" style={styles.mark}>
-          Leash
+          Kagi
         </Txt>
         <View style={styles.barRight}>
           <WristChip wrist={state.wrist} address={state.address} onPress={() => router.push('/wrist')} />

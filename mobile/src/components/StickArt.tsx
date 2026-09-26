@@ -42,7 +42,7 @@ export function StickArt({ pointToA = false, pressing = false, screen }: { point
       <View style={styles.body}>
         <View style={styles.screen}>
           <Txt size={13} weight="medium" color={colors.text} align="center">
-            {screen ?? 'Leash'}
+            {screen ?? 'Kagi'}
           </Txt>
         </View>
       </View>

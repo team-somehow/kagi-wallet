@@ -12,9 +12,9 @@
 namespace ble {
 
 // UUIDs shared with mobile/src/lib/ble.ts.
-constexpr const char* SERVICE = "6c656173-6800-4000-8000-00000000c0de";
-constexpr const char* RX = "6c656173-6801-4000-8000-00000000c0de";
-constexpr const char* TX = "6c656173-6802-4000-8000-00000000c0de";
+constexpr const char* SERVICE = "6b616769-0000-4000-8000-00000000c0de";
+constexpr const char* RX = "6b616769-0001-4000-8000-00000000c0de";
+constexpr const char* TX = "6b616769-0002-4000-8000-00000000c0de";
 
 void begin(const String& name, bool advertise);
 void setAdvertising(bool on);

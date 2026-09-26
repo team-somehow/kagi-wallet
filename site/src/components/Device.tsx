@@ -14,8 +14,8 @@ function Lcd({ screen }: { screen: Screen }) {
   if (screen.kind === 'logo') {
     return (
       <>
-        <circle cx="96" cy="72" r="13" fill="none" stroke={C.text} strokeWidth="5" />
-        <path d="M106 63 C 118 50, 124 44, 146 34" fill="none" stroke={C.amber} strokeWidth="5" strokeLinecap="round" />
+        <circle cx="92" cy="68" r="14" fill="none" stroke={C.text} strokeWidth="5" />
+        <path d="M106 68h44M136 68v14M148 68v10" fill="none" stroke={C.amber} strokeWidth="5" strokeLinecap="round" />
       </>
     );
   }
@@ -85,5 +85,5 @@ export function Device({
 function describe(s: Screen) {
   if (s.kind === 'prompt') return `${s.title}: ${s.amount}, ${s.line1}. Hold A to approve, B to decline.`;
   if (s.kind === 'status') return `${s.top}: ${s.big}. ${s.sub}`;
-  return 'Leash';
+  return 'Kagi';
 }

@@ -110,7 +110,7 @@ export default function Issue() {
       <Txt size={17} color={colors.muted} style={styles.lead}>
         {phase === 'issued' && agent && chosenCap !== null
           ? `${agent} can spend up to ${usdc(chosenCap)} for the next ${hours(life)} without asking. Over that, the wrist buzzes.`
-          : 'Decide how much an agent may spend before you hear about it. The agent makes its own key. You only ever sign the leash.'}
+          : 'Decide how much an agent may spend before you hear about it. The agent makes its own key. You only ever sign the limit.'}
       </Txt>
 
       {phase === 'form' ? (

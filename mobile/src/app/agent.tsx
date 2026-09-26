@@ -229,7 +229,7 @@ export default function NewAgentKey() {
             </Txt>
           ) : null}
           <Txt size={15} color={colors.muted} lineHeight={22}>
-            Copy the session key and paste it into your agent, for example the Leash MCP server. It can only spend its allowance. It is not your wallet key.
+            Copy the session key and paste it into your agent, for example the Kagi MCP server. It can only spend its allowance. It is not your wallet key.
           </Txt>
           <Button label={copied ? 'Copied' : 'Copy session key'} variant="amber" onPress={() => void copy()} />
         </View>

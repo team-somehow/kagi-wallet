@@ -100,7 +100,7 @@ export const keyStats = [
 ];
 
 export const prices = [
-  { name: 'Leash', note: 'wrist + vault', usd: 43, ours: true },
+  { name: 'Kagi', note: 'wrist + vault', usd: 43, ours: true },
   { name: 'Trezor Safe 3', note: 'one device', usd: 59 },
   { name: 'Trezor Safe 5', note: 'one device', usd: 129 },
   { name: 'Trezor Safe 7', note: 'one device', usd: 249 },
@@ -108,16 +108,16 @@ export const prices = [
 
 export const DEVICE_URL = 'https://shop.m5stack.com/products/m5sticks3-esp32s3-mini-iot-dev-kit';
 export const PRICES_URL = 'https://coinbureau.com/analysis/trezor-vs-ledger';
-export const REPO_URL = 'https://github.com/team-somehow/leash-wallet';
-export const RELEASE_URL = `${REPO_URL}/releases/tag/v0.1.0`;
-export const APK_URL = `${REPO_URL}/releases/download/v0.1.0/leash-1.0.0.apk`;
+export const REPO_URL = 'https://github.com/team-somehow/kagi-wallet';
+export const RELEASE_URL = `${REPO_URL}/releases/tag/v0.2.0`;
+export const APK_URL = `${REPO_URL}/releases/download/v0.2.0/kagi-1.0.0.apk`;
 export const FIRMWARE_SRC_URL = `${REPO_URL}/tree/main/firmware/wrist`;
 export const MCP_SRC_URL = `${REPO_URL}/tree/main/agent-mcp`;
 export const FIRMWARE = {
-  version: '0.1.0',
+  version: '0.2.0',
   manifest: './firmware/manifest.json',
-  bin: './firmware/leash-firmware-0.1.0.bin',
-  sha256: '2b4a39340fa94ae3a274112458f62ffa5a899e5b2c6a8fae07608a43e3a0783a',
+  bin: './firmware/kagi-firmware-0.2.0.bin',
+  sha256: '4b91196a4ccc858e206e37849e1a51a0b194b45f93b5ac785600ee2f2c07fb9d',
 };
 
 export const sources: { title: string; outlet: string; url: string }[] = [

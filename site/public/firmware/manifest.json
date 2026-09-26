@@ -1,13 +1,13 @@
 {
-  "name": "Leash firmware",
-  "version": "0.1.0",
+  "name": "Kagi Wallet firmware",
+  "version": "0.2.0",
   "new_install_prompt_erase": true,
   "builds": [
     {
       "chipFamily": "ESP32-S3",
       "parts": [
         {
-          "path": "leash-firmware-0.1.0.bin",
+          "path": "kagi-firmware-0.2.0.bin",
           "offset": 0
         }
       ]

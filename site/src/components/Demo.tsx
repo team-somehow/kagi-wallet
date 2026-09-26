@@ -198,7 +198,7 @@ export function Demo() {
     <section className="section" id="demo">
       <div className="wrap">
         <div className="section-head">
-          <h2>Watch the leash</h2>
+          <h2>Watch the limit</h2>
           <p>The agent spends alone until it hits the cap. Then it's your call.</p>
         </div>
 

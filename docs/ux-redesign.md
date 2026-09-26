@@ -1,4 +1,4 @@
-# Leash UX direction — first demo
+# Kagi UX direction — first demo
 
 Design draft, 26 September 2026. This describes the proposed experience; it does
 not claim the new handoff, chat, or limit-update flow is implemented.
@@ -68,7 +68,7 @@ receipts and explorer links.
   explicit decision when access changes. The new cap is a total session cap,
   not a per-transfer amount. Rejection leaves the original access intact.
 
-The initial visual direction keeps Leash's amber approval cue, restrained
+The initial visual direction keeps Kagi's amber approval cue, restrained
 surfaces, and monospaced amounts, with shorter copy and clearer primary actions.
 
 ## Hardware reference and motion
@@ -130,7 +130,7 @@ line-of-sight prompt and progress feedback while the radio path is unavailable.
   transcript, model prompt, analytics, URL, or logs. The copied key grants only
   its on-chain session allowance; it is not a phone or manager signing share.
 - Session discovery needs an explicit mechanism: a raw private key alone does
-  not encode the Leash smart-account address. A local registry or companion
+  not encode the Kagi smart-account address. A local registry or companion
   public connection metadata can resolve it without changing the paste-key UX.
 
 ## Findings in the current build
@@ -139,7 +139,7 @@ line-of-sight prompt and progress feedback while the radio path is unavailable.
   dollar-denominated store. Real Sepolia actions are isolated in `chain.tsx`.
 - `hub/agent.mjs` currently generates and retains session keys in the hub.
   Phone generation/export and web import are new work for this design.
-- `contracts/src/LeashAccount.sol::grant` resets `spent` when re-granting the same
+- `contracts/src/KagiAccount.sol::grant` resets `spent` when re-granting the same
   key. A total-limit increase needs an explicit signed update that preserves
   spent amount and expiry. Reusing grant with a “raise limit” label would give
   the agent more access than the proposed screen communicates.
@@ -156,7 +156,7 @@ line-of-sight prompt and progress feedback while the radio path is unavailable.
 
 ## Still open
 
-- Build a Leash MCP around the hub, or use a supplied existing MCP endpoint?
+- Build a Kagi MCP around the hub, or use a supplied existing MCP endpoint?
 - Keep the first chat to deterministic transfer commands, or use an LLM provider?
 - Before implementing the closing act: does “IR key refresh” mean adding the
   third signer, refreshing existing shares, or demonstrating an IR signature?

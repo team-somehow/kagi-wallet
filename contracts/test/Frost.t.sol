@@ -2,24 +2,24 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {LeashAccount} from "../src/LeashAccount.sol";
+import {KagiAccount} from "../src/KagiAccount.sol";
 
 /// Signatures from the real phone + wrist FROST code (hub/gen-fixtures.ts), checked on the
 /// contract. Fails if the TypeScript message builders and the Solidity digests drift apart.
 contract FrostFixtureTest is Test {
     string json;
-    LeashAccount acct;
+    KagiAccount acct;
 
     function setUp() public {
         json = vm.readFile("test/fixtures/frost.json");
         vm.chainId(vm.parseJsonUint(json, ".chainId"));
         address at = vm.parseJsonAddress(json, ".account");
         deployCodeTo(
-            "LeashAccount.sol:LeashAccount",
+            "KagiAccount.sol:KagiAccount",
             abi.encode(vm.parseJsonUint(json, ".groupKey"), vm.parseJsonUint(json, ".phoneKey")),
             at
         );
-        acct = LeashAccount(payable(at));
+        acct = KagiAccount(payable(at));
         vm.deal(at, 1 ether);
         vm.warp(1_900_000_000);
     }

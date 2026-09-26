@@ -17,10 +17,10 @@ export default function Welcome() {
     <Screen footer={<Button label="Create wallet" onPress={() => router.push('/onboarding/connect')} />}>
       <View style={styles.hero}>
         <Txt size={64} weight="bold" lineHeight={64} style={styles.mark}>
-          Leash
+          Kagi
         </Txt>
         <Txt size={18} color={colors.muted} style={styles.tag}>
-          A wallet your agents can spend from, on a leash you hold.
+          A wallet your agents can spend from, within limits you hold.
         </Txt>
       </View>
       <View style={styles.ladder}>

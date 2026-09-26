@@ -9,9 +9,9 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import { BleManager, type Device, type Subscription } from 'react-native-ble-plx';
 
-export const SERVICE = '6c656173-6800-4000-8000-00000000c0de';
-const RX = '6c656173-6801-4000-8000-00000000c0de';
-const TX = '6c656173-6802-4000-8000-00000000c0de';
+export const SERVICE = '6b616769-0000-4000-8000-00000000c0de';
+const RX = '6b616769-0001-4000-8000-00000000c0de';
+const TX = '6b616769-0002-4000-8000-00000000c0de';
 
 export type Role = 'wrist' | 'vault';
 type LineListener = (role: Role, line: string) => void;

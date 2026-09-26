@@ -1,4 +1,4 @@
-// Leash design tokens. True black ground (OLED, hardware), warm phosphor white
+// Kagi design tokens. True black ground (OLED, hardware), warm phosphor white
 // for everything that is fine, amber for anything that needs a human, red for
 // revoke. No green: quiet is the absence of colour.
 export const colors = {

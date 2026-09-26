@@ -146,7 +146,7 @@ export default function SessionDetail() {
           <View style={styles.gap}>
             <Button label={copied ? 'Copied' : 'Copy session key'} variant="secondary" onPress={() => void copy()} />
             <Txt size={13} color={colors.faint}>
-              Paste it into your agent, for example the Leash MCP server. It spends only this allowance.
+              Paste it into your agent, for example the Kagi MCP server. It spends only this allowance.
             </Txt>
           </View>
         ) : null}

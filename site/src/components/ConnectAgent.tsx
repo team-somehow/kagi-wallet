@@ -11,15 +11,15 @@ const CLIENTS: Record<Client, { name: string; steps: string[] }> = {
     steps: [
       'Open Settings, then Apps and Connectors, then Advanced, and turn on Developer mode.',
       'Create a connector. Paste your server URL and choose No authentication.',
-      'In a new chat, open the tools menu and pick the Leash connector.',
+      'In a new chat, open the tools menu and pick the Kagi connector.',
     ],
   },
   claude: {
     name: 'Claude',
     steps: [
       'Open Settings, then Connectors, and choose Add custom connector.',
-      'Name it Leash and paste your server URL.',
-      'In a new chat, turn the Leash connector on from the tools menu.',
+      'Name it Kagi and paste your server URL.',
+      'In a new chat, turn the Kagi connector on from the tools menu.',
     ],
   },
 };
@@ -69,17 +69,17 @@ export function ConnectAgent() {
         <ol className="steps steps-4">
           <li>
             <b>Make an agent key</b>
-            <span>In the Leash app, tap New agent key. Pick a total allowance and an expiry, then hold A on the stick.</span>
+            <span>In the Kagi app, tap New agent key. Pick a total allowance and an expiry, then hold A on the stick.</span>
           </li>
           <li>
             <b>Copy it</b>
             <span>
-              Tap Copy session key. It copies <code>leash:0x…:0x…</code>, the wallet address and the key together.
+              Tap Copy session key. It copies <code>kagi:0x…:0x…</code>, the wallet address and the key together.
             </span>
           </li>
           <li>
             <b>Start the server</b>
-            <span>Run the Leash MCP server with that key. It prints a private HTTPS address ending in <code>/mcp/…</code>.</span>
+            <span>Run the Kagi MCP server with that key. It prints a private HTTPS address ending in <code>/mcp/…</code>.</span>
           </li>
           <li>
             <b>Add it to your AI</b>
@@ -125,12 +125,12 @@ export function ConnectAgent() {
           <summary>Run the server</summary>
           <pre><code>{`# on your computer, with a public HTTPS tunnel (needs cloudflared)
 git clone ${REPO_URL}.git
-cd leash-wallet/agent-mcp && npm install
-SESSION_KEY='leash:0x…:0x…' ./run-local.sh
+cd kagi-wallet/agent-mcp && npm install
+SESSION_KEY='kagi:0x…:0x…' ./run-local.sh
 
 # or on any container host: Render, Railway, Fly, a VPS
-docker build -t leash-agent-mcp .
-docker run -p 8790:8790 -e SESSION_KEY='leash:0x…:0x…' -e MCP_TOKEN=$(openssl rand -hex 16) leash-agent-mcp`}</code></pre>
+docker build -t kagi-agent-mcp .
+docker run -p 8790:8790 -e SESSION_KEY='kagi:0x…:0x…' -e MCP_TOKEN=$(openssl rand -hex 16) kagi-agent-mcp`}</code></pre>
           <p className="connect-src">
             Four tools: get_wallet, send_eth, wait_for_approval and request_higher_limit. Source and details on{' '}
             <a href={MCP_SRC_URL} target="_blank" rel="noreferrer">GitHub</a>.
