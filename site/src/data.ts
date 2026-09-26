@@ -106,7 +106,6 @@ export const prices = [
   { name: 'Trezor Safe 7', note: 'one device', usd: 249 },
 ];
 
-export const DEVICE_URL = 'https://shop.m5stack.com/products/m5sticks3-esp32s3-mini-iot-dev-kit';
 export const PRICES_URL = 'https://coinbureau.com/analysis/trezor-vs-ledger';
 export const REPO_URL = 'https://github.com/team-somehow/kagi-wallet';
 export const RELEASE_URL = `${REPO_URL}/releases/tag/v0.2.0`;
@@ -141,6 +140,5 @@ export const sources: { title: string; outlet: string; url: string }[] = [
   { title: 'WazirX and Liminal after the $230M exploit', outlet: 'CoinDesk, Jul 2024', url: losses[1].source },
   { title: 'BitForge: flaws in 15+ threshold-ECDSA wallets', outlet: 'Fireblocks, 2023', url: 'https://www.fireblocks.com/blog/bitforge-fireblocks-researchers-uncover-vulnerabilities-in-over-15-major-wallet-providers' },
   { title: 'RFC 9591: FROST threshold signatures', outlet: 'IETF, Jun 2024', url: 'https://www.rfc-editor.org/rfc/rfc9591.html' },
-  { title: 'ESP32-S3 device, $21.50', outlet: "Manufacturer's store", url: DEVICE_URL },
   { title: 'Hardware wallet prices', outlet: 'Coin Bureau, Jun 2026', url: PRICES_URL },
 ];

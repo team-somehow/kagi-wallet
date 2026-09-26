@@ -133,7 +133,7 @@ export function GetKagi() {
             <pre><code>{`# build and flash from source (PlatformIO)
 git clone ${REPO_URL}.git
 cd kagi-wallet/firmware/wrist
-pio run -e sticks3 -t upload
+pio run -e esp32s3 -t upload
 
 # or flash the release image with esptool
 esptool.py --chip esp32s3 write_flash 0x0 kagi-firmware-${FIRMWARE.version}.bin`}</code></pre>

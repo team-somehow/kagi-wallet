@@ -1,4 +1,4 @@
-// Kagi Wallet: the ESP32 (M5StickS3) that holds one share of the wallet key. One build runs as
+// Kagi Wallet: the ESP32 S3 board that holds one share of the wallet key. One build runs as
 // the Kagi Wallet or as the second stick (the vault role, saved in NVS).
 //
 // Talks newline-delimited JSON to the phone app over Bluetooth LE (USB serial works too, for
@@ -347,7 +347,7 @@ static void beep(int freq, int ms) {
   M5.Speaker.end();
 }
 
-// The StickS3's small speaker only carries well around 1.5-3 kHz. Below 1 kHz a buzz you
+// The ESP32 S3 board's small speaker only carries well around 1.5-3 kHz. Below 1 kHz a buzz you
 // need to notice (an approval waiting) is close to silent, so keep these high.
 static void buzz(int times = 3) {
   for (int i = 0; i < times; i++) {

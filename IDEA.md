@@ -9,8 +9,8 @@ Agents need money to be useful. Today you either hand them a hot key (they can d
 ## Architecture
 - Root wallet: MPC (FROST, secp256k1), no full key anywhere. Owns a smart account: a plain Solidity contract that verifies BIP340 with the ecrecover trick, submitted by our relayer. Speaks ERC-1271, ERC-721/1155 receiver and ERC-165. Not 4337 yet
 - Shard 1: Android app, Android Keystore / StrongBox, biometric gated
-- Shard 2: M5StickS3 on the Kagi Wallet. Secure boot v2, flash encryption, eFuses burned, JTAG and USB download off. WiFi to phone and agent
-- Shard 3: second M5StickS3, the vault. Lives at home. IR only after a one-time reshare
+- Shard 2: ESP32 S3 board on the Kagi Wallet. Secure boot v2, flash encryption, eFuses burned, JTAG and USB download off. WiFi to phone and agent
+- Shard 3: second ESP32 S3 board, the vault. Lives at home. IR only after a one-time reshare
 - Agent: holds an ephemeral key it generated itself. Private key never leaves the agent
 
 ## Two MPC keys, two thresholds

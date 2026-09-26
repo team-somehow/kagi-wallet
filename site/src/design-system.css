@@ -199,3 +199,21 @@ body { background: var(--ground); }
   .incident > p { min-height: 0; }
   .incident-takeaway { grid-template-columns: 1fr; gap: 12px; padding: 20px; }
 }
+/* Flash instructions need room for their actions, including longer status labels. */
+.flash, .get-card, .cli, .step-action { min-width: 0; }
+.flash .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.flash .steps li { min-width: 0; padding: 20px 20px 20px 48px; }
+.flash .steps li::before { top: 23px; left: 18px; }
+.flash .steps li:last-child { grid-column: 1 / -1; }
+.flash .steps span { max-width: 70ch; }
+.step-action .btn { white-space: normal; height: auto; min-height: 38px; max-width: 100%; padding-block: 9px; text-align: center; }
+.flash-head > *, .get-actions, .get-card > * { min-width: 0; max-width: 100%; }
+.flash-head esp-web-install-button { display: block; }
+.flash-head .btn { white-space: normal; height: auto; min-height: 48px; padding-block: 12px; max-width: 100%; }
+.flash-warn, .get-card small { overflow-wrap: anywhere; }
+.cli pre { max-width: 100%; }
+@media (max-width: 640px) {
+  .flash .steps { grid-template-columns: minmax(0, 1fr); }
+  .flash .steps li { padding: 18px 16px 18px 42px; }
+  .flash .steps li::before { left: 14px; top: 21px; }
+}

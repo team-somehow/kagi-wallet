@@ -6,7 +6,7 @@ not claim the new handoff, chat, or limit-update flow is implemented.
 ## Agreed scope
 
 - One owner uses the phone and makes decisions on the approval stick.
-- Start with one phone and one M5StickS3. Introduce the second stick at the end.
+- Start with one phone and one ESP32 S3 board. Introduce the second stick at the end.
 - Create a wallet and a temporary session key from the phone.
 - Copy the actual session private key and paste it into a small web chat.
 - The chat connects to an MCP and performs simple ETH transfers on-chain.
@@ -16,8 +16,7 @@ not claim the new handoff, chat, or limit-update flow is implemented.
   confirmation, the agent automatically retries the same transfer.
 - IR is a closing extension, outside the initial onboarding flow.
 
-M5StickS3 / ESP32 are the hardware names found in this repository; interpreted
-from the initial spoken hardware names.
+The hardware is referred to as an ESP32 S3 board throughout the product documentation.
 
 ## Primary journey
 
@@ -77,7 +76,7 @@ Use the owner's reference photo for the device silhouette: a dark charcoal
 landscape case, LCD on the left, and a narrow blue front button on the right.
 Do not use the earlier orange portrait mockup or invent two front buttons.
 
-The [official StickS3 documentation](https://docs.m5stack.com/ja/core/StickS3)
+The ESP32 S3 board hardware notes
 specifies a 135×240 LCD (240×135 in this orientation), a 48×24×15 mm body, and
 two programmable button inputs. Keep the amount, action, and expiry readable
 inside that display. The prototype renders the alternate decline control
@@ -108,7 +107,7 @@ a short descending cue. Transfers within the cap stay silent. A visible sound
 toggle immediately mutes playback, and hidden previews stop sounding.
 
 The browser sound treatment is a prototype, not flashed device firmware. Port
-and tune it on the StickS3 speaker when implementing the hardware experience.
+and tune it on the ESP32 S3 board speaker when implementing the hardware experience.
 
 For the later IR act, the official docs require the speaker amplifier to be off
 during IR reception and recommend facing devices at least 30 cm apart. Finish

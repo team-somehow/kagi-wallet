@@ -1,13 +1,13 @@
 import { lazy, Suspense } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { DEVICE_URL, PRICES_URL, prices } from '../data';
+import { PRICES_URL, prices } from '../data';
 import { Device } from './Device';
 
 const WalletModel = lazy(() => import('./WalletModel'));
 
 const MAX = 260;
 const SPECS = [
-  ['ESP32-S3', 'dual core, 240 MHz'],
+  ['ESP32 S3 board', 'dual core, 240 MHz'],
   ['1.14" screen', 'shows every request decoded'],
   ['Infrared', 'between the two Kagi Wallets'],
   ['Motion sensor', 'wear detection'],
@@ -74,7 +74,7 @@ export function Hardware() {
               <div>{[0, 50, 100, 150, 200, 250].map((v) => <span key={v} style={{ left: `${(v / MAX) * 100}%` }}>${v}</span>)}</div>
             </div>
             <p className="fine">
-              Two Kagi Wallets cost less than one hardware wallet. Prices: <a href={DEVICE_URL} target="_blank" rel="noreferrer">device store</a>, <a href={PRICES_URL} target="_blank" rel="noreferrer">Coin Bureau, Jun 2026</a>. No secure element, so no device is ever trusted alone.
+              Two Kagi Wallets cost less than one hardware wallet. Comparison prices: <a href={PRICES_URL} target="_blank" rel="noreferrer">Coin Bureau, Jun 2026</a>. No secure element, so no device is ever trusted alone.
             </p>
           </figure>
         </div>

@@ -1,5 +1,5 @@
-// M5Stack's StickS3 IR NEC example, trimmed: role TX sends a frame every 500 ms,
-// role RX prints the raw symbols it receives. Straight from docs.m5stack.com.
+// ESP32 S3 board IR NEC probe: role TX sends a frame every 500 ms,
+// role RX prints the raw symbols it receives.
 #include <M5Unified.h>
 #include "driver/rmt_rx.h"
 #include "driver/rmt_tx.h"
