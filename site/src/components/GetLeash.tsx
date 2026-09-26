@@ -67,7 +67,7 @@ export function GetLeash() {
             <h3>Android app</h3>
             <p>Holds the phone's half of each key, behind your fingerprint.</p>
             <a className="btn btn-primary" href={APK_URL}>Download APK</a>
-            <small>Version 1.0.0, 45 MB, Android 7+ on 64-bit phones. Allow installs from your browser when Android asks.</small>
+            <small>Version 1.0.0, 43 MB, Android 7+ on 64-bit phones. Allow installs from your browser when Android asks.</small>
           </article>
 
           <article className="get-card panel">
