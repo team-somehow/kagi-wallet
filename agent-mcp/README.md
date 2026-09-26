@@ -14,6 +14,7 @@ and the owner approves on their Kagi stick or declines.
 | `send_eth` | Sends ETH to a `0x` address or a contact such as `ABC`. Over the allowance, it asks the owner for a higher limit and returns a `request_id` |
 | `wait_for_approval` | Waits up to 45 s for the owner. Once the new limit confirms, it sends the waiting payment |
 | `request_higher_limit` | Asks for a higher total without a payment attached |
+| `use_my_key` | On the `/demo` link only: switches this connection to the user's own key, `kagi:0x…:0x…`. It lasts for the connection |
 
 ## Use the shared server
 
@@ -29,6 +30,8 @@ their own key: `https://13-235-16-182.sslip.io/k/<account><key>`.
 3. Try: "Send 0.000002 ETH to 0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E, then send 0.000008 ETH to the same address."
 
 The server only holds a key for the length of each request and never logs paths.
+
+**Without a link:** add `https://13-235-16-182.sslip.io/demo`, then give the AI your session key (Copy session key only in the app). It calls `use_my_key` and spends from your wallet for that connection. The key then sits in your chat history, so the connector link is the better habit.
 
 `npm test` runs the whole loop on a local anvil chain: spend, ask for more, approve, decline.
 

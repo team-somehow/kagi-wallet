@@ -9,14 +9,17 @@
 //   /k/<account><key>      104 hex characters, what the Kagi app's "Copy connector link" gives
 //   /k/kagi:0x…:0x…        the same, as the app's session key string
 // The key only exists for the length of each request. Paths are never logged.
-// A single-key endpoint also exists for one owner's own deployment:
+// A public demo wallet, for trying it without the app:
+//   /demo                 spends from SESSION_KEY, the owner's demo key
 //   SESSION_KEY  kagi:<account>:<0x key> (a bare 0x key works too, with KAGI_ACCOUNT set)
-//   MCP_TOKEN    the endpoint becomes /mcp/<MCP_TOKEN>
+//   MCP_TOKEN    also serves SESSION_KEY at /mcp/<MCP_TOKEN>, the older private form
 //   RPC_URL      default https://ethereum-sepolia-rpc.publicnode.com
 //   EXPLORER     default https://sepolia.etherscan.io
 //   CONTACTS     JSON name -> address; default contacts.json next to this file
 //   PORT         default 8790
+//   HOST         default 0.0.0.0; 127.0.0.1 behind a reverse proxy
 import http from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -43,6 +46,8 @@ const RPC = process.env.RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com'
 const EXPLORER = (process.env.EXPLORER ?? 'https://sepolia.etherscan.io').replace(/\/+$/, '');
 const TOKEN = process.env.MCP_TOKEN?.trim() || null;
 const PORT = Number(process.env.PORT ?? 8790);
+// Behind a reverse proxy, set HOST=127.0.0.1 so only the proxy can reach it.
+const HOST = process.env.HOST ?? '0.0.0.0';
 const PATH = TOKEN ? `/mcp/${TOKEN}` : '/mcp';
 
 // "kagi:<account>:<key>", or a bare key with KAGI_ACCOUNT.
@@ -91,7 +96,7 @@ const reply = (data) => {
   const clean = JSON.parse(JSON.stringify(data, (_, v) => (typeof v === 'bigint' ? v.toString() : v)));
   return { content: [{ type: 'text', text: JSON.stringify(clean, null, 2) }], structuredContent: clean };
 };
-/** Everything one session key can do, as an MCP server. */
+/** Everything one session key can do. The MCP tools call into this. */
 function forKey(parsed) {
   const KEY = parsed.key;
   const ACCOUNT = parsed.account;
@@ -263,165 +268,251 @@ function forKey(parsed) {
     }
   }
 
-  // ---- tools --------------------------------------------------------------------------------
+  return { AGENT, ACCOUNT, walletInfo, transfer, askForMore, waitForOwner, requestsKey: (id) => `${AGENT.address}:${id}` };
+}
 
-  function createServer() {
-    // Every tool goes through this, so a failure comes back as a clear reply, not a crash.
-    const guarded = (fn) => async (args) => {
-      try {
-        return await fn(args);
-      } catch (e) {
-        return reply({ ok: false, status: 'error', error: why(e) });
-      }
-    };
+// ---- tools --------------------------------------------------------------------------------
 
-    const server = new McpServer(
-      { name: 'kagi-agent', version: '0.1.0' },
-      {
-        instructions:
-          'You control a Kagi agent wallet on the Sepolia testnet. It holds a session key with a total ETH allowance ' +
-          'and an expiry set by its owner. Call get_wallet first. Use send_eth for payments. If a payment is over the ' +
-          'allowance, send_eth asks the owner for a higher limit automatically; then call wait_for_approval with the ' +
-          'request_id, which sends the payment once the owner approves. Never claim a payment was sent unless a tool ' +
-          'returned status "confirmed" with a tx link.',
-      },
-    );
+const NO_KEY = {
+  ok: false,
+  status: 'not_configured',
+  error:
+    'No wallet is connected yet. Ask the user for the session key from the Kagi phone app (Copy session key only, ' +
+    'it starts with kagi:) and call use_my_key with it, or have them add their own connector link instead.',
+};
 
+/**
+ * The MCP server for one connection. current() gives the agent it acts for (null: none yet).
+ * With setKey, the connection can switch to the user's own key through use_my_key.
+ */
+function buildServer(current, setKey) {
+  // Every tool goes through this, so a failure comes back as a clear reply, not a crash.
+  const guarded = (fn) => async (args) => {
+    const a = current();
+    if (!a) return reply(NO_KEY);
+    try {
+      return await fn(a, args);
+    } catch (e) {
+      return reply({ ok: false, status: 'error', error: why(e) });
+    }
+  };
+
+  const server = new McpServer(
+    { name: 'kagi-agent', version: '0.2.0' },
+    {
+      instructions:
+        'You control a Kagi agent wallet on the Sepolia testnet. It holds a session key with a total ETH allowance ' +
+        'and an expiry set by its owner. Call get_wallet first. Use send_eth for payments. If a payment is over the ' +
+        'allowance, send_eth asks the owner for a higher limit automatically; then call wait_for_approval with the ' +
+        'request_id, which sends the payment once the owner approves. Never claim a payment was sent unless a tool ' +
+        'returned status "confirmed" with a tx link.' +
+        (setKey ? ' If the user gives you a Kagi session key (kagi:0x…:0x…), call use_my_key with it to spend from their own wallet.' : ''),
+    },
+  );
+
+  if (setKey) {
     server.registerTool(
-      'get_wallet',
+      'use_my_key',
       {
-        title: 'Get wallet',
-        description: 'The wallet this agent spends from: allowance left, total allowance, expiry, balance, and named contacts.',
-        inputSchema: {},
-        annotations: { readOnlyHint: true, openWorldHint: false },
-      },
-      guarded(async () => reply(await walletInfo())),
-    );
-
-    server.registerTool(
-      'send_eth',
-      {
-        title: 'Send ETH',
+        title: 'Use my Kagi key',
         description:
-          'Send Sepolia ETH from the agent wallet, within its allowance. "to" is a 0x address or a contact name from get_wallet. ' +
-          'Returns status "confirmed" with a tx link, or "waiting_for_owner" with a request_id when the owner must approve a higher limit.',
-        inputSchema: {
-          to: z.string().describe('0x address or contact name, e.g. ABC'),
-          amount_eth: z.string().describe('Amount in ETH, e.g. "0.000002"'),
-        },
-        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+          "Switch this connection to the user's own Kagi wallet. Pass the session key they copied from the Kagi phone app " +
+          '(Copy session key only), which looks like kagi:0x…:0x…. It lasts for this connection.',
+        inputSchema: { session_key: z.string().describe('kagi:<account>:<key>, exactly as the Kagi app copies it') },
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
       },
-      guarded(async ({ to, amount_eth }) => {
-        const r = await transfer(to, amount_eth);
-        if (r.status !== 'over_allowance') return reply(r);
-        // Over the allowance: ask the owner for more on-chain, and remember the payment to send after.
-        const ask = await askForMore(r.proposedCap, `Send ${amount_eth} ETH to ${to}. Only ${eth(r.remaining)} left.`, { to, amount_eth });
-        if (ask.status !== 'waiting_for_owner') return reply(ask);
-        return reply({
-          ...ask,
-          payment: `${amount_eth} ETH to ${to} (not sent yet)`,
-          allowance_left: eth(r.remaining),
-          next: 'The owner was asked on their Kagi phone and stick. Call wait_for_approval with this request_id.',
-        });
-      }),
-    );
-
-    server.registerTool(
-      'request_higher_limit',
-      {
-        title: 'Request a higher limit',
-        description: "Ask the owner to raise this agent's total allowance, without a payment attached. The owner approves on their Kagi stick.",
-        inputSchema: {
-          new_total_eth: z.string().describe('The new TOTAL allowance in ETH (not the extra amount)'),
-          reason: z.string().describe('One sentence the owner will read'),
-        },
-        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-      },
-      guarded(async ({ new_total_eth, reason }) => {
-        let wei;
+      async ({ session_key }) => {
+        const parsed = parseKey(session_key);
+        if (!parsed) return reply({ ok: false, status: 'bad_key', error: 'That is not a Kagi session key. It looks like kagi:0x…:0x…, copied from the Kagi app.' });
+        const a = forKey(parsed);
+        let w;
         try {
-          wei = parseEther(String(new_total_eth));
-        } catch {
-          return reply({ status: 'bad_amount' });
+          w = await a.walletInfo();
+        } catch (e) {
+          return reply({ ok: false, status: 'error', error: why(e) });
         }
-        return reply(await askForMore(wei, reason, null));
-      }),
-    );
-
-    server.registerTool(
-      'wait_for_approval',
-      {
-        title: 'Wait for the owner',
-        description:
-          'Wait up to 45 seconds for the owner to decide a limit request. When it is approved and confirmed on-chain, ' +
-          'any payment that was waiting on it is sent and its result returned. Call again if status is still "waiting".',
-        inputSchema: { request_id: z.string() },
-        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+        if (!w.ok) return reply(w);
+        setKey(a);
+        log('a connection switched to its own key');
+        return reply({ ...w, connected: true, note: 'Connected to your wallet for this connection. Next time, add your connector link from the Kagi app so the key stays out of the chat.' });
       },
-      guarded(async ({ request_id }) => {
-        const w = await waitForOwner(request_id, 45);
-        if (w.status === 'waiting') return reply({ status: 'waiting', message: 'Still waiting for the owner. Call wait_for_approval again.' });
-        const req = requests.get(`${AGENT.address}:${request_id}`);
-        if (w.status !== 'confirmed') {
-          if (req) req.payment = null;
-          const msg = {
-            rejected: 'The owner declined. The allowance is unchanged and the payment was not sent.',
-            expired: 'Nobody answered in time. Nothing changed and the payment was not sent.',
-            unknown_request: 'No such request.',
-          };
-          return reply({ status: w.status, message: msg[w.status] ?? w.status, tx: w.hash ? txLink(w.hash) : null });
-        }
-        const result = { status: 'approved', new_total: eth(w.newCap), limit_tx: w.hash ? txLink(w.hash) : null };
-        const pending = req?.payment;
-        if (!pending) return reply(result);
-        req.payment = null;
-        return reply({ ...result, payment: await transfer(pending.to, pending.amount_eth) });
-      }),
     );
-
-    return server;
   }
-  return createServer();
+
+  server.registerTool(
+    'get_wallet',
+    {
+      title: 'Get wallet',
+      description: 'The wallet this agent spends from: allowance left, total allowance, expiry, balance, and named contacts.',
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    guarded(async (a) => reply(await a.walletInfo())),
+  );
+
+  server.registerTool(
+    'send_eth',
+    {
+      title: 'Send ETH',
+      description:
+        'Send Sepolia ETH from the agent wallet, within its allowance. "to" is a 0x address or a contact name from get_wallet. ' +
+        'Returns status "confirmed" with a tx link, or "waiting_for_owner" with a request_id when the owner must approve a higher limit.',
+      inputSchema: {
+        to: z.string().describe('0x address or contact name, e.g. ABC'),
+        amount_eth: z.string().describe('Amount in ETH, e.g. "0.000002"'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+    guarded(async (a, { to, amount_eth }) => {
+      const r = await a.transfer(to, amount_eth);
+      if (r.status !== 'over_allowance') return reply(r);
+      // Over the allowance: ask the owner for more on-chain, and remember the payment to send after.
+      const ask = await a.askForMore(r.proposedCap, `Send ${amount_eth} ETH to ${to}. Only ${eth(r.remaining)} left.`, { to, amount_eth });
+      if (ask.status !== 'waiting_for_owner') return reply(ask);
+      return reply({
+        ...ask,
+        payment: `${amount_eth} ETH to ${to} (not sent yet)`,
+        allowance_left: eth(r.remaining),
+        next: 'The owner was asked on their Kagi phone and stick. Call wait_for_approval with this request_id.',
+      });
+    }),
+  );
+
+  server.registerTool(
+    'request_higher_limit',
+    {
+      title: 'Request a higher limit',
+      description: "Ask the owner to raise this agent's total allowance, without a payment attached. The owner approves on their Kagi stick.",
+      inputSchema: {
+        new_total_eth: z.string().describe('The new TOTAL allowance in ETH (not the extra amount)'),
+        reason: z.string().describe('One sentence the owner will read'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    guarded(async (a, { new_total_eth, reason }) => {
+      let wei;
+      try {
+        wei = parseEther(String(new_total_eth));
+      } catch {
+        return reply({ status: 'bad_amount' });
+      }
+      return reply(await a.askForMore(wei, reason, null));
+    }),
+  );
+
+  server.registerTool(
+    'wait_for_approval',
+    {
+      title: 'Wait for the owner',
+      description:
+        'Wait up to 45 seconds for the owner to decide a limit request. When it is approved and confirmed on-chain, ' +
+        'any payment that was waiting on it is sent and its result returned. Call again if status is still "waiting".',
+      inputSchema: { request_id: z.string() },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+    guarded(async (a, { request_id }) => {
+      const w = await a.waitForOwner(request_id, 45);
+      if (w.status === 'waiting') return reply({ status: 'waiting', message: 'Still waiting for the owner. Call wait_for_approval again.' });
+      const req = requests.get(a.requestsKey(request_id));
+      if (w.status !== 'confirmed') {
+        if (req) req.payment = null;
+        const msg = {
+          rejected: 'The owner declined. The allowance is unchanged and the payment was not sent.',
+          expired: 'Nobody answered in time. Nothing changed and the payment was not sent.',
+          unknown_request: 'No such request.',
+        };
+        return reply({ status: w.status, message: msg[w.status] ?? w.status, tx: w.hash ? txLink(w.hash) : null });
+      }
+      const result = { status: 'approved', new_total: eth(w.newCap), limit_tx: w.hash ? txLink(w.hash) : null };
+      const pending = req?.payment;
+      if (!pending) return reply(result);
+      req.payment = null;
+      return reply({ ...result, payment: await a.transfer(pending.to, pending.amount_eth) });
+    }),
+  );
+
+  return server;
 }
 
 // ---- HTTP ---------------------------------------------------------------------------------
 
+async function readBody(req) {
+  if (req.method !== 'POST') return undefined;
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  return chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined;
+}
+
+// /demo keeps a session per connection, so use_my_key can switch it to the user's key.
+// In memory only: a restart forgets them, and the client simply starts a new session.
+const sessions = new Map(); // mcp-session-id -> { transport, agent, seen }
+const SESSION_IDLE_MS = 2 * 60 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, x] of sessions) if (now - x.seen > SESSION_IDLE_MS) void x.transport.close();
+}, 60_000).unref();
+
+async function demo(req, res) {
+  const body = await readBody(req);
+  const sid = req.headers['mcp-session-id'];
+  const known = typeof sid === 'string' ? sessions.get(sid) : null;
+  if (known) {
+    known.seen = Date.now();
+    return known.transport.handleRequest(req, res, body);
+  }
+  if (sid) {
+    res.writeHead(404, { 'content-type': 'application/json' }).end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Session expired. Reconnect.' }, id: null }));
+    return;
+  }
+  const entry = { transport: null, agent: OWN ? forKey(OWN) : null, seen: Date.now() };
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => randomUUID(),
+    enableJsonResponse: true,
+    onsessioninitialized: (id) => sessions.set(id, entry),
+  });
+  entry.transport = transport;
+  transport.onclose = () => {
+    if (transport.sessionId) sessions.delete(transport.sessionId);
+  };
+  const server = buildServer(() => entry.agent, (a) => (entry.agent = a));
+  await server.connect(transport);
+  await transport.handleRequest(req, res, body);
+}
+
+// /k/<token>: the key is in the link, so every request stands alone.
+async function stateless(req, res, agent) {
+  const server = buildServer(() => agent, null);
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+  res.on('close', () => {
+    void transport.close();
+    void server.close();
+  });
+  await server.connect(transport);
+  await transport.handleRequest(req, res, await readBody(req));
+}
+
 http
   .createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://x');
-    if (url.pathname === '/' || url.pathname === '/health') {
-      res.writeHead(200, { 'content-type': 'text/plain' }).end('kagi agent mcp: connect at /k/<your connector token>\n');
-      return;
-    }
-    let parsed = null;
-    if (url.pathname.startsWith('/k/')) parsed = parseKey(decodeURIComponent(url.pathname.slice(3)));
-    else if (url.pathname === PATH && OWN) parsed = OWN;
-    if (!parsed) {
-      res.writeHead(404, { 'content-type': 'text/plain' }).end('Not a Kagi connector link. Copy it again from the Kagi app.\n');
-      return;
-    }
-    const mcp = forKey(parsed);
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-    res.on('close', () => {
-      void transport.close();
-      void mcp.close();
-    });
     try {
-      await mcp.connect(transport);
-      let body;
-      if (req.method === 'POST') {
-        const chunks = [];
-        for await (const c of req) chunks.push(c);
-        body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined;
+      if (url.pathname === '/' || url.pathname === '/health') {
+        res.writeHead(200, { 'content-type': 'text/plain' }).end('kagi agent mcp: connect at /demo, or /k/<your connector token>\n');
+        return;
       }
-      await transport.handleRequest(req, res, body);
+      if (url.pathname.startsWith('/k/')) {
+        const parsed = parseKey(decodeURIComponent(url.pathname.slice(3)));
+        if (parsed) return await stateless(req, res, forKey(parsed));
+      } else if (url.pathname === '/demo' || (TOKEN && url.pathname === PATH)) {
+        return await demo(req, res);
+      }
+      res.writeHead(404, { 'content-type': 'text/plain' }).end('Not a Kagi connector link. Copy it again from the Kagi app.\n');
     } catch (e) {
       log('mcp error', e?.message ?? e);
       if (!res.headersSent) res.writeHead(500).end();
     }
   })
-  .listen(PORT, '0.0.0.0', () => {
-    log(`kagi agent mcp on :${PORT}, rpc ${RPC}`);
+  .listen(PORT, HOST, () => {
+    log(`kagi agent mcp on ${HOST}:${PORT}, rpc ${RPC}`);
     log('shared endpoint: /k/<connector token>');
-    if (OWN) log(`single-key endpoint for ${privateKeyToAccount(OWN.key).address}: ${TOKEN ? '/mcp/<MCP_TOKEN>' : '/mcp (no MCP_TOKEN: anyone with the URL can spend this allowance)'}`);
+    log(OWN ? `public demo at /demo spends from ${privateKeyToAccount(OWN.key).address}` : 'public demo at /demo: no demo key set, use_my_key only');
   });

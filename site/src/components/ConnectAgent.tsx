@@ -5,13 +5,15 @@ const TO = '0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E';
 const SHORT = `${TO.slice(0, 6)}…${TO.slice(-4)}`;
 const PROMPT = `Send 0.000002 ETH to ${TO}, then send 0.000008 ETH to the same address.`;
 const NAME = 'kagi';
+// Where the box starts: the public demo wallet, so every button works before anyone types.
+const DEMO = `${MCP_URL}/demo`;
 
 /** A connector link, from what the app copies: the link itself, or the kagi:0x…:0x… key string. */
 function toLink(raw: string): string | null {
   const v = raw.trim();
   const k = /^kagi:0x([0-9a-fA-F]{40}):0x([0-9a-fA-F]{64})$/.exec(v);
   if (k) return `${MCP_URL}/k/${k[1]}${k[2]}`;
-  const l = /^https:\/\/[^\s/]+\/k\/[0-9a-fA-F]{104}$/.exec(v);
+  const l = /^https:\/\/[^\s/]+\/(k\/[0-9a-fA-F]{104}|demo)$/.exec(v);
   return l ? v : null;
 }
 
@@ -94,7 +96,8 @@ async function copyText(t: string) {
 }
 
 export function ConnectAgent() {
-  const [raw, setRaw] = useState('');
+  const [raw, setRaw] = useState(DEMO);
+  const isDemo = raw.trim() === DEMO;
   const [done, setDone] = useState<{ id: string; ok: boolean } | null>(null);
   const [promptCopied, setPromptCopied] = useState(false);
   const link = toLink(raw);
@@ -127,14 +130,14 @@ export function ConnectAgent() {
           </li>
           <li>
             <b>Add it to your AI</b>
-            <span>Paste the link below and pick your app. Then ask it to pay someone.</span>
+            <span>Paste the link below and pick your app. Or skip the first two steps and try the demo wallet that is already there.</span>
           </li>
         </ol>
 
         <div className="connect">
           <div className="connect-setup panel">
             <label className="connect-field">
-              <span>Your connector link</span>
+              <span>Connector link</span>
               <input
                 type="text"
                 inputMode="url"
@@ -147,12 +150,15 @@ export function ConnectAgent() {
                   setRaw(e.target.value);
                   setDone(null);
                 }}
+                onFocus={(e) => e.target.select()}
                 aria-invalid={invalid}
               />
               <small className={invalid ? 'is-bad' : ''}>
                 {invalid
                   ? 'That is not a connector link. Copy it again from the Kagi app.'
-                  : 'It stays on this page. Nothing here is sent anywhere.'}
+                  : isDemo
+                    ? 'This is the public demo link. To use your own wallet, paste your link from the Kagi app here, or give your AI your session key in the chat and it switches over.'
+                    : 'Your own wallet. The link stays on this page. Nothing here is sent anywhere.'}
               </small>
             </label>
 
@@ -187,7 +193,7 @@ export function ConnectAgent() {
               </button>
             </div>
             <p className="connect-note">
-              Anyone with the link can spend what is left of that key's allowance. That is all they can do. They cannot raise the limit or outlast the expiry, and you can revoke the key from the phone.
+              Anyone with your own link can spend what is left of that key's allowance. That is all they can do. They cannot raise the limit or outlast the expiry, and you can revoke the key from the phone.
             </p>
           </div>
 
@@ -210,7 +216,7 @@ PORT=8790 node server.mjs                 # connector links become http://localh
 # or in a container, on Render, Railway, Fly or a VPS
 docker build -t kagi-agent-mcp . && docker run -p 8790:8790 kagi-agent-mcp`}</code></pre>
           <p className="connect-src">
-            Four tools: get_wallet, send_eth, wait_for_approval and request_higher_limit. Source and details on{' '}
+            Tools: get_wallet, send_eth, wait_for_approval and request_higher_limit, plus use_my_key on the demo link. Source and details on{' '}
             <a href={MCP_SRC_URL} target="_blank" rel="noreferrer">GitHub</a>.
           </p>
         </details>

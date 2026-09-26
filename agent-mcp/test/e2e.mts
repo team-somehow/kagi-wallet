@@ -57,7 +57,11 @@ const link = `http://127.0.0.1:8795/k/${account.slice(2)}${agentKey}`;
 await c.connect(new StreamableHTTPClientTransport(new URL(link)));
 const own = new Client({ name: 'own', version: '0' });
 await own.connect(new StreamableHTTPClientTransport(new URL('http://127.0.0.1:8795/mcp/t')));
-check((await own.listTools()).tools.length === 4, 'single-key endpoint still serves its tools');
+check((await own.listTools()).tools.some((t) => t.name === 'send_eth'), 'single-key endpoint still serves its tools');
+const demo = new Client({ name: 'demo', version: '0' });
+await demo.connect(new StreamableHTTPClientTransport(new URL('http://127.0.0.1:8795/demo')));
+const dw = (await demo.callTool({ name: 'get_wallet', arguments: {} })).structuredContent as Record<string, any>;
+check(dw.ok === true && dw.allowance_left === '0.000005 ETH', `public demo spends from the demo key (${dw.allowance_left})`);
 const bad = await fetch('http://127.0.0.1:8795/k/not-a-key', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
 check(bad.status === 404, `a bad connector link gets ${bad.status}`);
 const call = async (name: string, args: Record<string, unknown> = {}) => (await c.callTool({ name, arguments: args })).structuredContent as Record<string, any>;
@@ -115,6 +119,34 @@ try {
   check(bal === parseEther('0.000008'), `ABC received ${formatEther(bal)} ETH`);
   const s4 = await call('send_eth', { to: 'Bob', amount_eth: '0.000001' });
   check(s4.status === 'unknown_recipient', `unknown contact: ${s4.status}`);
+
+  // A server with no demo key: a connection starts empty, then use_my_key switches it to the user's key.
+  const bare = spawn('node', ['server.mjs'], {
+    cwd: new URL('..', import.meta.url).pathname,
+    env: { ...process.env, SESSION_KEY: '', RPC_URL: RPC, PORT: '8797', CONTACTS: JSON.stringify({ ABC }) },
+    stdio: ['ignore', 'ignore', 'inherit'],
+  });
+  try {
+    await new Promise((r) => setTimeout(r, 1500));
+    const u = new Client({ name: 'user', version: '0' });
+    await u.connect(new StreamableHTTPClientTransport(new URL('http://127.0.0.1:8797/demo')));
+    const ucall = async (name: string, args: Record<string, unknown> = {}) => (await u.callTool({ name, arguments: args })).structuredContent as Record<string, any>;
+    check((await u.listTools()).tools.some((t) => t.name === 'use_my_key'), 'the demo link offers use_my_key');
+    const empty = await ucall('get_wallet');
+    check(empty.status === 'not_configured', `before a key: ${empty.status}`);
+    const badKey = await ucall('use_my_key', { session_key: 'not a key' });
+    check(badKey.status === 'bad_key', `a bad key is refused: ${badKey.status}`);
+    const on = await ucall('use_my_key', { session_key: `kagi:${account}:0x${agentKey}` });
+    check(on.connected === true && on.allowance_total === '0.00002 ETH', `use_my_key connects this session (${on.allowance_left} left)`);
+    const after = await ucall('get_wallet');
+    check(after.ok === true && after.wallet?.toLowerCase() === account.toLowerCase(), 'later calls in the session use that key');
+    const other = new Client({ name: 'other', version: '0' });
+    await other.connect(new StreamableHTTPClientTransport(new URL('http://127.0.0.1:8797/demo')));
+    const o = (await other.callTool({ name: 'get_wallet', arguments: {} })).structuredContent as Record<string, any>;
+    check(o.status === 'not_configured', 'another connection does not see that key');
+  } finally {
+    bare.kill();
+  }
 } finally {
   srv.kill();
 }
