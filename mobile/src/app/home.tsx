@@ -29,6 +29,7 @@ export default function Home() {
   const { state } = useStore();
   const { info, error, live, sessions, totals, activity, limits, refresh } = useChain();
   const [gasCopied, setGasCopied] = useState(false);
+  const [addrCopied, setAddrCopied] = useState(false);
   const [twoSticks, setTwoSticks] = useState<boolean | null>(null);
   useFocusEffect(
     useCallback(() => {
@@ -140,11 +141,40 @@ export default function Home() {
             <Txt mono size={40} weight="bold" lineHeight={50}>
               {fmtAmount(info.balance)}
             </Txt>
-            <Pressable onPress={() => void Linking.openURL(`${explorer}/address/${info.account}`)}>
-              <Txt mono size={13} color={colors.muted}>
-                {shortAddr(info.account)}  view on Etherscan
+            {/* The wallet's own address, to fund it or share it: in full, copyable. */}
+            <View style={styles.address}>
+              <Txt size={13} color={colors.muted}>
+                Wallet address
               </Txt>
-            </Pressable>
+              <Txt mono size={14} lineHeight={21} selectable>
+                {info.account}
+              </Txt>
+              <View style={styles.addressActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    void Clipboard.setStringAsync(String(info.account)).then(() => {
+                      setAddrCopied(true);
+                      setTimeout(() => setAddrCopied(false), 2000);
+                    })
+                  }
+                  style={({ pressed }) => [styles.chip, styles.chipInk, pressed && styles.pressed]}
+                >
+                  <Txt size={14} weight="medium" color={colors.onFill}>
+                    {addrCopied ? 'Copied' : 'Copy address'}
+                  </Txt>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="link"
+                  onPress={() => void Linking.openURL(`${explorer}/address/${info.account}`)}
+                  style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+                >
+                  <Txt size={14} weight="medium">
+                    Etherscan
+                  </Txt>
+                </Pressable>
+              </View>
+            </View>
           </>
         ) : info ? (
           <View style={styles.gap}>
@@ -324,6 +354,10 @@ const styles = StyleSheet.create({
   top: { marginTop: space.m },
   gap: { gap: space.m },
   account: { marginTop: space.xl, gap: space.xs },
+  address: { marginTop: space.m, padding: space.m, gap: space.s, borderRadius: radius.m, backgroundColor: colors.panel },
+  addressActions: { flexDirection: 'row', gap: space.s, marginTop: space.xs },
+  chip: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: colors.line },
+  chipInk: { backgroundColor: colors.text, borderColor: colors.text },
   request: { marginTop: space.l, padding: space.m, gap: 4, borderRadius: radius.m, backgroundColor: colors.panel, borderLeftWidth: 3, borderLeftColor: colors.amber },
   section: { marginTop: space.xl, gap: space.s },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
