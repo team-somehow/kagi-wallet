@@ -32,7 +32,7 @@
 #include "secrets.example.h"
 #endif
 
-static const char* FW = "0.4.1";
+static const char* FW = "0.4.2";
 
 // ---- look -----------------------------------------------------------------
 
@@ -69,6 +69,17 @@ static Prompt prompt;
 static String resultText;
 static uint16_t resultColor;
 static bool resultMark = false;  // show Intercepta's mark above the text (its alerts only)
+
+// Button A is the built-in key (GPIO 11) or anything wired from G10 to GND on the external
+// port (G10 is that port's I2C clock, unused here). Both feed one debounced button, so every A
+// action (hold to approve, pair, open the vault window) works from either.
+static constexpr int PIN_A_EXT = 10;
+static m5::Button_Class btnA;
+static void pollButtons() {
+  M5.update();
+  btnA.setRawState(millis(), M5.BtnA.isPressed() || digitalRead(PIN_A_EXT) == LOW);
+}
+
 static uint32_t resultUntil = 0;
 static uint32_t lastPhone = 0;
 static bool dirty = true;
@@ -818,7 +829,7 @@ static bool animating() {
   if (mode == Mode::Unpaired || mode == Mode::Pairing || mode == Mode::Prompt) return true;
   if (mode == Mode::ConfirmWipe || mode == Mode::ConfirmWifi) return true;
   if (mode == Mode::Result) return millis() - modeSince < 1000;
-  if (mode == Mode::Home && isVault) return windowOpen() || (!vJoined && M5.BtnA.isPressed()) || millis() - modeSince < 800;
+  if (mode == Mode::Home && isVault) return windowOpen() || (!vJoined && btnA.isPressed()) || millis() - modeSince < 800;
   if (mode == Mode::Home) return millis() - modeSince < 800;
   return false;
 }
@@ -826,11 +837,11 @@ static bool animating() {
 // Hold A for `need` ms. true once, when the hold completes. Letting go early resets.
 static bool heldA(uint32_t need = 1000) {
   if (waitRelease) {
-    if (!M5.BtnA.isPressed()) waitRelease = false;
+    if (!btnA.isPressed()) waitRelease = false;
     holdProgress = 0;
     return false;
   }
-  if (!M5.BtnA.isPressed()) {
+  if (!btnA.isPressed()) {
     holdStart = 0;
     holdProgress = 0;
     return false;
@@ -936,7 +947,7 @@ static void onPair(JsonDocument& in) {
   pairCode = c.substring(0, 4) + " " + c.substring(4, 8);
   pairWaitingPhone = false;
   mode = Mode::Pairing;
-  waitRelease = M5.BtnA.isPressed();
+  waitRelease = btnA.isPressed();
   dirty = true;
   buzz(2);
   JsonDocument d;
@@ -1624,8 +1635,8 @@ static void vaultApprove() {
   // moment to settle, so the reply goes out with the window clear and pointing at the wrist.
   irSending("Let go, aim at the wrist");
   uint32_t t0 = millis();
-  while (M5.BtnA.isPressed() && millis() - t0 < 4000) {
-    M5.update();
+  while (btnA.isPressed() && millis() - t0 < 4000) {
+    pollButtons();
     delay(20);
   }
   uint32_t t1 = millis();
@@ -1785,7 +1796,7 @@ static void drawVault() {
     // Waiting to be added: hold A for 2 s, with the ring filling as you hold.
     title("ESP32 / SECOND", C_ACCENT);
     static uint32_t pressAt = 0;
-    if (M5.BtnA.isPressed()) {
+    if (btnA.isPressed()) {
       if (!pressAt) pressAt = millis();
     } else {
       pressAt = 0;
@@ -2500,6 +2511,7 @@ void setup() {
   auto cfg = M5.config();
   cfg.serial_baudrate = 0;  // already started above
   M5.begin(cfg);
+  pinMode(PIN_A_EXT, INPUT_PULLUP);  // external A button: G10 to GND
   M5.Display.setRotation(1);
   M5.Display.setBrightness(110);
   M5.Speaker.setVolume(140);
@@ -2554,7 +2566,7 @@ void setup() {
 }
 
 void loop() {
-  M5.update();
+  pollButtons();
 
   for (auto& line : ble::poll()) {
     lastSource = 'b';
@@ -2630,7 +2642,7 @@ void loop() {
 #endif
 
   // Vault: hold A for 2 seconds on the home screen to open the 2-minute reshare window.
-  if (isVault && !windowUntil && mode == Mode::Home && M5.BtnA.pressedFor(2000)) openWindow();
+  if (isVault && !windowUntil && mode == Mode::Home && btnA.pressedFor(2000)) openWindow();
   // Wrist: the vault has two minutes to answer a root request.
   if (rjob.active && millis() - rjob.sentAt > 90000) {
     rootStall("vault_timeout");
