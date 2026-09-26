@@ -1,11 +1,13 @@
 import { evmRevokeMessage, phoneOnlySign } from './frost';
-import { link, type Msg } from './link';
+import * as evm from './evm';
+import { listSessionAddresses } from './session';
 import { loadShard, rand } from './shard';
 
 /**
- * Revoke every live session key on the Leash account, signed by the phone's shard alone.
- * Used by hold-to-revoke on Home and by holding B on the wrist. Resolves with how many
- * keys were revoked on-chain; never throws, since revoking must not get in the way.
+ * Revoke every live session key on the Leash account, signed by the phone's shard alone and
+ * sent from the phone's gas wallet. Used by hold-to-revoke on Home and by holding B on the
+ * wrist. Resolves with how many keys were revoked on-chain; never throws, since revoking
+ * must not get in the way.
  */
 export async function revokeAllOnChain(groupKey: string | null): Promise<number> {
   if (!groupKey) return 0;
@@ -13,16 +15,15 @@ export async function revokeAllOnChain(groupKey: string | null): Promise<number>
   if (!shard) return 0;
   let revoked = 0;
   try {
-    const info = await link.request<Msg>({ t: 'evm_info?', groupKey }, 20000);
-    if (info.t !== 'evm_info' || !info.account) return 0;
-    const now = BigInt(String(info.now));
-    let nonce = BigInt(String(info.nonce));
-    const sessions = (info.sessions as { address: string; expiry: string }[]) ?? [];
-    for (const s of sessions) {
-      if (BigInt(s.expiry) <= now) continue;
-      const sig = phoneOnlySign(shard, evmRevokeMessage(Number(info.chainId), String(info.account), nonce, s.address), rand);
-      const r = await link.request<Msg>({ t: 'evm_revoke', groupKey, agent: s.address, sig }, 200000);
-      if (r.t === 'evm_result') {
+    const o = await evm.overview(groupKey);
+    if (!o.account) return 0;
+    let nonce = o.nonce;
+    for (const addr of await listSessionAddresses()) {
+      const s = await evm.session(o.account, addr as `0x${string}`);
+      if (s.expiry <= o.now) continue;
+      const sig = phoneOnlySign(shard, evmRevokeMessage(o.chainId, o.account, nonce, addr), rand);
+      const r = await evm.revoke(o.account, addr as `0x${string}`, sig);
+      if (r.status === 'success') {
         revoked++;
         nonce++;
       }

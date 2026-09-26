@@ -107,6 +107,55 @@ contract LeashAccountTest is SchnorrTest {
         assertEq(spent, 0);
     }
 
+    function declineSig(uint256 newCap, uint256 key) internal returns (uint256, uint256) {
+        return schnorrSign(key, sha256(abi.encodePacked("LEASH/decline", block.chainid, address(acct), acct.nonce(), agent, newCap)));
+    }
+
+    function test_AgentRequestsLimit() public {
+        doGrant(CAP);
+        vm.expectEmit(true, false, false, true, address(acct));
+        emit LeashAccount.LimitRequested(agent, CAP, CAP * 4, "need more");
+        vm.prank(agent);
+        acct.requestLimit(CAP * 4, "need more");
+    }
+
+    function test_RequestLimitNeedsLiveSessionAndIncrease() public {
+        vm.prank(agent);
+        vm.expectRevert("key expired or revoked");
+        acct.requestLimit(1 ether, "no session");
+        doGrant(CAP);
+        vm.prank(agent);
+        vm.expectRevert("limit must increase");
+        acct.requestLimit(CAP, "same");
+        vm.warp(expiry + 1);
+        vm.prank(agent);
+        vm.expectRevert("key expired or revoked");
+        acct.requestLimit(CAP * 2, "late");
+    }
+
+    function test_PhoneAloneDeclines() public {
+        doGrant(CAP);
+        uint256 n = acct.nonce();
+        (uint256 rx, uint256 s) = declineSig(CAP * 4, PHONE);
+        vm.expectEmit(true, false, false, true, address(acct));
+        emit LeashAccount.LimitDeclined(agent, CAP * 4);
+        acct.declineLimit(agent, CAP * 4, rx, s);
+        assertEq(acct.nonce(), n + 1);
+        (uint256 cap,,,) = acct.session(agent);
+        assertEq(cap, CAP, "decline keeps the limit");
+    }
+
+    function test_DeclineRejectsStrangerAndReplay() public {
+        doGrant(CAP);
+        (uint256 rx, uint256 s) = declineSig(CAP * 4, AGENT_PK);
+        vm.expectRevert("bad signature");
+        acct.declineLimit(agent, CAP * 4, rx, s);
+        (rx, s) = declineSig(CAP * 4, PHONE);
+        acct.declineLimit(agent, CAP * 4, rx, s);
+        vm.expectRevert("bad signature");
+        acct.declineLimit(agent, CAP * 4, rx, s);
+    }
+
     function limitSig(uint256 oldCap, uint256 newCap, uint256 exp, uint256 key) internal returns (uint256, uint256) {
         return schnorrSign(key, sha256(abi.encodePacked("LEASH/limit", block.chainid, address(acct), acct.nonce(), agent, oldCap, newCap, exp)));
     }

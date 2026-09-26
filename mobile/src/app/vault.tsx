@@ -8,6 +8,7 @@ import { TopBar } from '../components/TopBar';
 import { Fact } from '../components/Fact';
 import { Steps, type Step } from '../components/Steps';
 import { link, type Msg } from '../lib/link';
+import * as evm from '../lib/evm';
 import { dkgFinish, dkgStart, evmMessage } from '../lib/frost';
 import { combineRoot, cpt, partial, phoneReshare, pt, reshareCheck, rootNonces, type Commit, type RootShare } from '../lib/root';
 import { loadRoot, rand, saveRoot } from '../lib/shard';
@@ -48,8 +49,8 @@ export default function Vault() {
   const loadTreasury = useCallback(async (r: RootShare | null) => {
     if (!r || r.parties !== 3) return;
     try {
-      const i = await link.request<Msg>({ t: 'evm_root_info?', groupKey: r.groupKey }, 20000);
-      if (i.t === 'evm_root_info') setTreasury({ account: (i.account as string) ?? null, balance: String(i.balance), relayerBalance: String(i.relayerBalance) });
+      const i = await evm.rootInfo(r.groupKey);
+      setTreasury({ account: i.account, balance: String(i.balance), relayerBalance: String(i.gasBalance) });
     } catch {
       // offline: the screen still works without chain info
     }
@@ -148,18 +149,13 @@ export default function Vault() {
       setSig(null);
       const u = await unlockShard('Send from the root treasury');
       if (!u.ok) throw new Error(u.reason);
-      const req = async (o: Msg, ms = 200000) => {
-        const r = await link.request<Msg>(o, ms);
-        if (r.t === 'evm_error') throw new Error(String(r.reason));
-        return r;
-      };
-      // 1. The treasury, created once per root key.
-      let info = await req({ t: 'evm_root_info?', groupKey: root.groupKey }, 20000);
+      // 1. The treasury, created once per root key, paid for by the phone's gas wallet.
+      let info = await evm.rootInfo(root.groupKey);
       if (!info.account) {
         step('Sepolia', 'Creating the root treasury (about 20 s)');
-        const d = await req({ t: 'evm_root_deploy', groupKey: root.groupKey, fund: FUND.toString() });
+        const d = await evm.rootDeploy(root.groupKey, FUND);
         setTxs((t) => [...t, { label: 'Root treasury created', hash: String(d.hash) }]);
-        info = await req({ t: 'evm_root_info?', groupKey: root.groupKey }, 20000);
+        info = await evm.rootInfo(root.groupKey);
         step('Sepolia', `Treasury ${String(info.account).slice(0, 10)}…`, 'done');
       }
       // 2. Sign the send, 3 of 3.
@@ -204,7 +200,7 @@ export default function Vault() {
       }
       // 3. Send it.
       step('Sepolia', 'Sending the transaction');
-      const sub = await req({ t: 'evm_root_submit', groupKey: root.groupKey, to: TO, value: VALUE.toString(), sig: signature });
+      const sub = await evm.rootSubmit(root.groupKey, { to: TO as `0x${string}`, value: VALUE, sig: signature });
       setTxs((t) => [...t, { label: `Sent 0.000001 ETH, ${String(sub.status)}`, hash: String(sub.hash) }]);
       step('Sepolia', 'Landed', 'done');
       await loadTreasury(root);

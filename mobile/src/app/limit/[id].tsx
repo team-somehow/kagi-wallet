@@ -8,7 +8,10 @@ import { Button } from '../../components/Button';
 import { Fact } from '../../components/Fact';
 import { ManagerSign } from '../../components/ManagerSign';
 import { fmtEth, useChain } from '../../store/chain';
-import { link } from '../../lib/link';
+import * as evm from '../../lib/evm';
+import { evmDeclineMessage, phoneOnlySign } from '../../lib/frost';
+import { loadShard, rand } from '../../lib/shard';
+import { unlockShard } from '../../lib/biometrics';
 import { shortAddr } from '../../lib/format';
 import { colors, radius, space } from '../../theme';
 
@@ -19,7 +22,7 @@ import { colors, radius, space } from '../../theme';
  */
 export default function LimitRequestScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { limits, info, refresh } = useChain();
+  const { limits, info, refresh, setLimitLocal } = useChain();
   const r = limits[String(id)];
   const [nonce, setNonce] = useState<bigint | null>(null);
   const [sent, setSent] = useState(false);
@@ -43,10 +46,39 @@ export default function LimitRequestScreen() {
     );
   }
 
-  const decline = () => {
-    link.send({ t: 'limit_decision', id: r.id, approved: false });
+  // Declining needs only the phone's shard: saying no never waits on the stick.
+  const decline = async () => {
     setSent(true);
+    setLimitLocal(r.id, { status: 'submitting', error: null });
+    try {
+      const u = await unlockShard('Decline the higher limit');
+      if (!u.ok) throw new Error(u.reason);
+      const shard = await loadShard();
+      if (!shard) throw new Error('This phone has no shard.');
+      const i = (await refresh()) ?? info;
+      if (!i) throw new Error('Could not read Sepolia.');
+      const sig = phoneOnlySign(shard, evmDeclineMessage(i.chainId, r.account, i.nonce, r.agent, r.newCap), rand);
+      const d = await evm.declineLimit(r.account as `0x${string}`, r.agent as `0x${string}`, r.newCap, sig);
+      setLimitLocal(r.id, { status: d.status === 'success' ? 'rejected' : 'failed', hash: d.hash, error: d.status === 'success' ? null : 'The decline reverted.' });
+      void refresh();
+    } catch (e) {
+      setSent(false);
+      setLimitLocal(r.id, { status: 'waiting', error: evm.reason(e) });
+    }
   };
+
+  const approve = async (sig: string) => {
+    setSent(true);
+    setLimitLocal(r.id, { status: 'submitting', error: null });
+    try {
+      const x = await evm.raiseLimit(r.account as `0x${string}`, { agent: r.agent as `0x${string}`, oldCap: r.oldCap, newCap: r.newCap, expiry: r.expiry, sig });
+      setLimitLocal(r.id, { status: x.status === 'success' ? 'confirmed' : 'failed', hash: x.hash, error: x.status === 'success' ? null : 'The raise reverted on-chain.' });
+      void refresh();
+    } catch (e) {
+      setLimitLocal(r.id, { status: 'failed', error: evm.reason(e) });
+    }
+  };
+
   const minutes = info ? Math.max(0, Math.round(Number(r.expiry - info.now) / 60)) : null;
   const extra = r.newCap - r.oldCap;
   const explorer = info?.explorer ?? 'https://sepolia.etherscan.io';
@@ -87,7 +119,6 @@ export default function LimitRequestScreen() {
           <Fact label="Already spent" value={fmtEth(r.spent)} />
           <Fact label="Expiry" value={minutes === null ? 'unchanged' : `unchanged, ${minutes} min left`} mono={false} />
           <Fact label="Key" value={shortAddr(r.agent)} />
-          {r.transfer ? <Fact label="Waiting transfer" value={`${fmtEth(BigInt(r.transfer.value))} to ${shortAddr(r.transfer.to)}`} /> : null}
         </View>
 
         <View style={styles.note}>
@@ -120,20 +151,21 @@ export default function LimitRequestScreen() {
                 }}
                 onReject={(reason) => {
                   // B on the stick is a decision. A timeout is not: the owner can try again.
-                  if (reason === 'user') decline();
+                  if (reason === 'user') void decline();
                 }}
-                onDone={(sig) => {
-                  link.send({ t: 'limit_decision', id: r.id, approved: true, sig });
-                  setSent(true);
-                }}
+                onDone={(sig) => void approve(sig)}
               />
-              <Button label="Decline" variant="ghost" onPress={decline} />
+              <Button label="Decline" variant="ghost" onPress={() => void decline()} />
             </>
           )
         ) : null}
 
-        {r.status === 'waiting' && sent ? <Status title="Sending your answer" body="Waiting for the hub." /> : null}
-        {r.status === 'submitting' ? <Status title="Approved. Waiting for Sepolia" body="The agent stays paused until the new limit confirms on-chain." /> : null}
+        {r.error && r.status === 'waiting' ? (
+          <Txt size={14} color={colors.red}>
+            {r.error}
+          </Txt>
+        ) : null}
+        {r.status === 'submitting' ? <Status title="Sending your answer to Sepolia" body="The agent stays paused until it confirms on-chain." /> : null}
         {r.status === 'confirmed' ? (
           <>
             <Status title="New limit confirmed" body={`${r.name} can now spend up to ${fmtEth(r.newCap)} in total. It will retry its transfer.`} />

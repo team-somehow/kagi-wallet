@@ -1,5 +1,5 @@
 /**
- * Bluetooth LE link to the sticks, the main link. The hub (WiFi, relay, USB) is the fallback.
+ * Bluetooth LE link to the sticks. The only link: the phone talks to Sepolia itself.
  *
  * Each stick runs one GATT service (see firmware/wrist/src/ble.h): the phone writes lines to
  * RX, the stick notifies lines on TX. Lines are the same JSON as every other link, chunked to
@@ -86,7 +86,7 @@ class Ble {
     try {
       this.manager = new BleManager();
     } catch {
-      // Expo Go or a build without the native module: stay on the hub.
+      // Expo Go or a build without the native module: no sticks.
       this.available = false;
       return;
     }

@@ -9,15 +9,20 @@ import { Button } from '../components/Button';
 import { Fact } from '../components/Fact';
 import { ManagerSign } from '../components/ManagerSign';
 import { Steps } from '../components/Steps';
-import { useStore } from '../store/store';
 import { fmtEth, useChain } from '../store/chain';
-import { chatUrl, link, type Msg } from '../lib/link';
-import { newSessionKey, saveSessionKey, type SessionKey } from '../lib/session';
+import * as evm from '../lib/evm';
+import { connectionString, newSessionKey, saveSessionKey, type SessionKey } from '../lib/session';
 import { shortAddr } from '../lib/format';
 import { success, warn } from '../lib/haptics';
 import { colors, fonts, radius, space } from '../theme';
 
 type Phase = 'form' | 'sign' | 'submitting' | 'done' | 'error';
+
+// The agent pays its own gas, so its key gets a little Sepolia ETH with the grant: enough for
+// a handful of transfers and limit requests at about 1 gwei.
+const AGENT_GAS = 500_000_000_000_000n; // 0.0005 ETH
+// What the grant itself costs, with room to spare.
+const GRANT_GAS = 300_000_000_000_000n; // 0.0003 ETH
 
 const toWei = (eth: string): bigint | null => {
   const m = /^\s*(\d*)(?:\.(\d{0,18}))?\s*$/.exec(eth);
@@ -27,7 +32,6 @@ const toWei = (eth: string): bigint | null => {
 
 /** Give an agent its own key: a total ETH allowance and an expiry, approved on the stick. */
 export default function NewAgentKey() {
-  const { state } = useStore();
   const { info, refresh, sessions } = useChain();
   const [name, setName] = useState(() => {
     const taken = new Set(sessions.map((x) => x.name));
@@ -45,6 +49,7 @@ export default function NewAgentKey() {
   const [hash, setHash] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [sentHash, setSentHash] = useState<string | null>(null);
+  const [gasStep, setGasStep] = useState<'todo' | 'active' | 'done' | 'failed'>('todo');
   const [tick, setTick] = useState(0);
 
   // A clock for the waiting screen, only while it shows.
@@ -65,6 +70,10 @@ export default function NewAgentKey() {
       setError('This wallet has no Sepolia account yet. Create it from Home first.');
       return;
     }
+    if (i.gasBalance < AGENT_GAS + GRANT_GAS) {
+      setError(`The phone's gas wallet needs at least ${fmtEth(AGENT_GAS + GRANT_GAS)}. It has ${fmtEth(i.gasBalance)}. Top it up from Home.`);
+      return;
+    }
     setKey(newSessionKey(name.trim()));
     setPlan({ cap: cap!, expiry: i.now + BigInt(Math.round(mins * 60)), nonce: i.nonce, account: i.account, chainId: i.chainId });
     setPhase('sign');
@@ -74,35 +83,35 @@ export default function NewAgentKey() {
     if (!key || !plan) return;
     setPhase('submitting');
     setSentHash(null);
+    setGasStep('todo');
     setTick(0);
-    const reqId = Math.random().toString(36).slice(2);
-    const off = link.on((m) => {
-      if (m.t === 'evm_sent' && m.progressFor === reqId) setSentHash(String(m.hash));
-    });
     try {
       await saveSessionKey(key);
-      const r = await link.request<Msg>(
-        { t: 'evm_grant', reqId, groupKey: state.address, agent: key.address, name: key.name, cap: plan.cap.toString(), expiry: plan.expiry.toString(), sig },
-        200000,
-      );
-      if (r.t === 'evm_error') throw new Error(String(r.reason));
-      if (r.status !== 'success') throw new Error(`The grant reverted in ${String(r.hash)}.`);
-      setHash(String(r.hash));
+      const r = await evm.grant(plan.account as `0x${string}`, { agent: key.address as `0x${string}`, cap: plan.cap, expiry: plan.expiry, sig }, (h) => setSentHash(h));
+      if (r.status !== 'success') throw new Error(`The grant reverted in ${r.hash}.`);
+      setHash(r.hash);
+      // Gas money for the agent's own key. The grant stands even if this fails.
+      setGasStep('active');
+      try {
+        const g = await evm.sendGas(key.address as `0x${string}`, AGENT_GAS);
+        setGasStep(g.status === 'success' ? 'done' : 'failed');
+      } catch {
+        setGasStep('failed');
+      }
       setPhase('done');
       void success();
       void refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'The grant did not go through.');
+      setError(evm.reason(e));
       setPhase('error');
       void warn();
-    } finally {
-      off();
     }
   };
 
   const copy = async () => {
     if (!key) return;
-    await Clipboard.setStringAsync(key.privateKey);
+    if (!plan) return;
+    await Clipboard.setStringAsync(connectionString(key, plan.account));
     setCopied(true);
     void success();
   };
@@ -171,8 +180,13 @@ export default function NewAgentKey() {
               },
               {
                 label: 'Confirmed on-chain',
-                detail: sentHash ? `Waiting for a block, ${tick} s so far. Usually about 15 s.` : 'Next',
-                state: sentHash ? 'active' : 'todo',
+                detail: hash ? 'The key is live' : sentHash ? `Waiting for a block, ${tick} s so far. Usually about 15 s.` : 'Next',
+                state: hash ? 'done' : sentHash ? 'active' : 'todo',
+              },
+              {
+                label: 'Gas for the agent',
+                detail: gasStep === 'active' ? `Sending ${fmtEth(AGENT_GAS)} so the agent can pay its own fees` : 'Next',
+                state: gasStep === 'active' ? 'active' : 'todo',
               },
             ]}
           />
@@ -209,18 +223,15 @@ export default function NewAgentKey() {
             <Fact label="Expires" value={`in ${minutes} min`} mono={false} />
             <Fact label="Grant" value={hash ? shortAddr(hash, 10, 6) : '-'} />
           </View>
+          {gasStep === 'failed' ? (
+            <Txt size={14} color={colors.amber} lineHeight={20}>
+              The gas top-up for the agent did not go through. Send it a little Sepolia ETH at {shortAddr(key.address)} before it spends.
+            </Txt>
+          ) : null}
           <Txt size={15} color={colors.muted} lineHeight={22}>
-            Copy the session key and paste it into the agent chat. It can only spend its allowance. It is not your wallet key.
+            Copy the session key and paste it into your agent, for example the Leash MCP server. It can only spend its allowance. It is not your wallet key.
           </Txt>
           <Button label={copied ? 'Copied' : 'Copy session key'} variant="amber" onPress={() => void copy()} />
-          <View style={styles.card}>
-            <Txt size={13} color={colors.muted}>
-              Agent chat
-            </Txt>
-            <Txt mono size={14} selectable>
-              {chatUrl()}
-            </Txt>
-          </View>
         </View>
       ) : null}
     </Screen>

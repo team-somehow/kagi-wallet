@@ -6,7 +6,7 @@ import { wristMatches } from './WristBridge';
 import { Txt } from './Txt';
 
 export function wristStatus(wrist: Wrist, address: string | null): { text: string; color: string; ok: boolean } {
-  if (!wrist.connected) return { text: wrist.hub ? 'Wrist offline' : 'No connection', color: colors.red, ok: false };
+  if (!wrist.connected) return { text: 'Stick not connected', color: colors.red, ok: false };
   if (address && !wristMatches(wrist.groupKey, address)) return { text: 'Other wallet', color: colors.red, ok: false };
   if (!wrist.onArm) return { text: 'Off the arm', color: colors.amber, ok: false };
   return { text: 'On wrist', color: colors.text, ok: true };

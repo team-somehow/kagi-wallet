@@ -1,4 +1,5 @@
 import { Compare } from './components/Compare';
+import { ConnectAgent } from './components/ConnectAgent';
 import { Demo } from './components/Demo';
 import { GetLeash } from './components/GetLeash';
 import { Hardware } from './components/Hardware';
@@ -23,6 +24,7 @@ export function App() {
             <a href="#incidents">Why</a>
             <a href="#how">How</a>
             <a href="#hardware">Hardware</a>
+            <a href="#connect">Connect AI</a>
             <a href={REPO_URL} target="_blank" rel="noreferrer">GitHub</a>
             <a className="btn btn-primary btn-sm" href="#get">Get Leash</a>
           </div>
@@ -38,6 +40,7 @@ export function App() {
         <Hardware />
         <Compare />
         <GetLeash />
+        <ConnectAgent />
 
         <section className="section" id="sources">
           <div className="wrap">

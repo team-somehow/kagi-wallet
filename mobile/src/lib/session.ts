@@ -19,6 +19,14 @@ export interface SessionKey {
 const INDEX = 'leash.sessions.v1';
 const keyName = (address: string) => `leash.session.${address.toLowerCase().slice(2)}`;
 
+/**
+ * What the owner copies into an agent: the Leash account, then the session key. A raw key
+ * does not say which wallet it belongs to, so the account travels with it.
+ */
+export function connectionString(k: SessionKey, account: string): string {
+  return `leash:${account}:${k.privateKey}`;
+}
+
 export function newSessionKey(name: string): SessionKey {
   let priv: Uint8Array;
   do priv = rand(32);

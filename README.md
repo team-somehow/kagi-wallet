@@ -34,12 +34,12 @@ flowchart LR
     end
     A["🤖 Agent<br/>ephemeral key"]
 
-    P <-- "Bluetooth LE / hub" --> W
+    P <-- "Bluetooth LE" --> W
     W <-. "infrared" .-> V
 
-    A -- "spend ≤ cap<br/>(ECDSA)" --> LA
+    A -- "spend ≤ cap<br/>(ECDSA)<br/>ask for more" --> LA
     P & W -- "manager key 2-of-2<br/>grant · execute" --> LA
-    P -- "phone shard alone<br/>revoke" --> LA
+    P -- "phone shard alone<br/>revoke · decline" --> LA
     P & W & V -- "root key 3-of-3" --> RT
 
     LA[["LeashAccount"]]
@@ -73,9 +73,9 @@ contracts/   Solidity + Foundry. LeashAccount, RootTreasury, BIP340 verifier, fo
 firmware/    ESP32-S3 firmware (PlatformIO). One build runs as wrist or vault
   wrist/       the shard firmware: FROST, display, buttons, BLE, WiFi, IR
   irprobe/     bench tool for the IR link
-hub/         Node. Relay between phone and ESP32 devices, agent stand-in, Sepolia relayer
-mobile/      Expo / React Native app. The phone shard and the control surface
-scripts/     online.sh: run everything over public tunnels
+mobile/      Expo / React Native app. The phone shard, the control surface, and its own Sepolia client
+agent-mcp/   Node. A bare-bones MCP server that gives ChatGPT or Claude an agent wallet
+site/        the landing page
 IDEA.md      the full design, threat model and demo script
 ```
 
@@ -88,6 +88,9 @@ IDEA.md      the full design, threat model and demo script
 | `execute(to, value, data, rx, s)` | manager | any call: tokens, approvals, swaps, contracts |
 | `grant(agent, cap, expiry, rx, s)` | manager | registers an agent key with a cap and an expiry |
 | `revoke(agent, rx, s)` | phone or manager | kills an agent key immediately |
+| `raiseLimit(agent, oldCap, newCap, expiry, rx, s)` | manager | raises a key's total allowance, keeping what it spent and its expiry |
+| `requestLimit(newCap, reason)` | the agent itself | asks the owner for a higher total; the phone sees the event |
+| `declineLimit(agent, newCap, rx, s)` | phone or manager | answers no, so the agent stops waiting |
 | `spend(agent, to, value, v, r, s)` | agent | plain ETH only, within the cap, before the expiry, never to the account itself |
 | `isValidSignature(hash, sig)` | manager | ERC-1271 |
 
@@ -96,9 +99,9 @@ IDEA.md      the full design, threat model and demo script
 - **ERC-1271:** passes only for the manager key, over `sha256("LEASH/1271" ‖ chainid ‖ account ‖ hash)`. This enables SIWE, Permit2, and CoW, UniswapX or Seaport orders. Agent keys are excluded on purpose: a signed permit moves money without going through `spend`, so it would get around the cap.
 - **ERC-721 / ERC-1155 receivers:** `safeTransferFrom` and `safeMint` into the account succeed.
 - **ERC-165:** advertises all of the above.
-- **Not ERC-4337 (yet):** the hub's relayer submits every transaction and pays its gas.
+- **Not ERC-4337 (yet):** there is no relayer. The phone pays for its own transactions from a gas wallet, and an agent pays for its own from its session key, which the phone tops up when it grants it.
 
-**Gas** (Sepolia `eth_call` estimates from `hub/session-sim.ts`)
+**Gas** (Sepolia `eth_call` estimates)
 
 | Call | Gas |
 |---|---|
@@ -128,22 +131,21 @@ forge build
 forge test
 ```
 
-### 2. Hub
+### 2. Agent MCP (optional)
 
 ```bash
-cd hub
+cd agent-mcp
 npm install
-node compile.mjs        # forge build, then copy the ABI and bytecode for the hub
-npm start               # WebSocket :8787 for the phone, TCP :8788 for the ESP32 devices
+npm test                # anvil end to end: spend, ask for more, approve, decline
 ```
 
-The hub needs a funded Sepolia key in `hub/.relayer` (gitignored) to deploy accounts and relay transactions.
+See [`agent-mcp/README.md`](agent-mcp/README.md) to connect ChatGPT or Claude.
 
 ### 3. Firmware
 
 ```bash
 cd firmware/wrist
-cp src/secrets.example.h src/secrets.h   # WiFi SSID, password, hub name and IP
+cp src/secrets.example.h src/secrets.h   # optional WiFi settings; the phone link is Bluetooth
 pio run -e sticks3 -t upload
 pio device monitor
 ```
@@ -153,30 +155,22 @@ Flash the same build to both ESP32 devices, then give the second one the vault r
 ### 4. Phone
 
 ```bash
-adb reverse tcp:8787 tcp:8787 && adb reverse tcp:8081 tcp:8081
+adb reverse tcp:8081 tcp:8081
 cd mobile
 npm install
-npx expo start --android --localhost
+npx expo run:android
 ```
 
-The phone talks to the ESP32 devices over **Bluetooth LE** first, and falls back to the hub (WiFi, relay or USB).
-
-### Anywhere, over the internet
-
-```bash
-scripts/online.sh       # hub + Metro through Cloudflare quick tunnels, prints an exp:// link
-```
+The phone talks to the ESP32 devices over **Bluetooth LE** and to Sepolia directly. It keeps a gas wallet in its secure store: fund its address, shown on Home, with a little Sepolia ETH.
 
 ## Tests
 
 | Command | What it covers |
 |---|---|
-| `cd contracts && forge test` | 53 tests: unit and fuzz tests for every path, the official BIP340 vectors, real FROST signatures from the phone code |
-| `cd hub && npx tsx session-sim.ts` | the built contract on real Sepolia through `eth_call` with state overrides; costs nothing |
-| `cd hub && npx tsx gen-fixtures.ts` | regenerates the FROST fixture after any change to a signed-message format |
+| `cd contracts && forge test` | 61 tests: unit and fuzz tests for every path, the official BIP340 vectors, real FROST signatures from the phone code |
+| `cd mobile && npx tsx ../contracts/scripts/gen-fixtures.mts` | regenerates the FROST fixture after any change to a signed-message format |
 | `cd mobile && npx tsx scripts/frost.test.ts` | both FROST parties in JS, 200 signatures |
-| `cd hub && npm run selftest` | end to end on real hardware (wrist on the `sticks3-autotest` build) |
-| `cd hub && npx tsx selftest-root.ts` | 3-of-3 reshare and a root signature relayed over IR through the vault |
+| `cd agent-mcp && npm test` | on anvil: the phone's message builders, the contract and the MCP server, through a spend, a limit raise and a decline |
 
 The phone's `src/lib/frost.ts` and the firmware's `src/frost.cpp` must match byte for byte. The fixture test is what catches it when they drift.
 

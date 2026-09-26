@@ -11,7 +11,7 @@ forge fmt && forge lint
 ```
 
 - `test/fixtures/frost.json` holds signatures from the real phone + wrist code. Regenerate it
-  with `cd ../hub && npx tsx gen-fixtures.ts` whenever a signed message format changes.
-- `cd ../hub && node compile.mjs` runs `forge build` and copies the ABI and bytecode into
-  `hub/LeashAccount.json` and `hub/RootTreasury.json`, which is what the hub deploys.
-- Storage slots are fixed (`test_StorageLayout`): the hub's simulations write them directly.
+  with `cd ../mobile && npx tsx ../contracts/scripts/gen-fixtures.mts` whenever a signed message format changes.
+- `node scripts/export.mjs` runs `forge build` and writes the ABI and bytecode the apps use:
+  `mobile/src/lib/contracts.ts` and `agent-mcp/abi.json`.
+- Storage slots are fixed (`test_StorageLayout`), so tools that write them directly keep working.

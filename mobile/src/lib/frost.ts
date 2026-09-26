@@ -145,6 +145,11 @@ export function evmRevokeMessage(chainId: number, account: string, nonce: bigint
   return sha256(concatBytes(utf8ToBytes('LEASH/revoke'), u256(BigInt(chainId)), addr(account), u256(nonce), addr(agent)));
 }
 
+/** sha256("LEASH/decline" || chainid || account || nonce || agent || newCap). The phone signs this alone. */
+export function evmDeclineMessage(chainId: number, account: string, nonce: bigint, agent: string, newCap: bigint): Uint8Array {
+  return sha256(concatBytes(utf8ToBytes('LEASH/decline'), u256(BigInt(chainId)), addr(account), u256(nonce), addr(agent), u256(newCap)));
+}
+
 /** sha256("LEASH/1271" || chainid || account || hash). What the manager signs for ERC-1271. */
 export function evm1271Message(chainId: number, account: string, hash: Hex): Uint8Array {
   return sha256(concatBytes(utf8ToBytes('LEASH/1271'), u256(BigInt(chainId)), addr(account), hexToBytes(hash.replace(/^0x/, ''))));

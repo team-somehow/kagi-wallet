@@ -112,6 +112,7 @@ export const REPO_URL = 'https://github.com/team-somehow/leash-wallet';
 export const RELEASE_URL = `${REPO_URL}/releases/tag/v0.1.0`;
 export const APK_URL = `${REPO_URL}/releases/download/v0.1.0/leash-1.0.0.apk`;
 export const FIRMWARE_SRC_URL = `${REPO_URL}/tree/main/firmware/wrist`;
+export const MCP_SRC_URL = `${REPO_URL}/tree/main/agent-mcp`;
 export const FIRMWARE = {
   version: '0.1.0',
   manifest: './firmware/manifest.json',

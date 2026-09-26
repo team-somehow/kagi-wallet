@@ -12,21 +12,27 @@ import { LeashFlow } from '../../components/Leash';
 import { useStore } from '../../store/store';
 import { dkgFinish, dkgStart, phoneKey, type Pop, type Share } from '../../lib/frost';
 import { link, type Msg } from '../../lib/link';
+import * as evm from '../../lib/evm';
+import * as Clipboard from 'expo-clipboard';
+import { shortAddr } from '../../lib/format';
 import { rand, saveShard } from '../../lib/shard';
 import { unlockShard } from '../../lib/biometrics';
 import { success, tap, warn } from '../../lib/haptics';
 import { colors, space } from '../../theme';
 
-type Phase = 'search' | 'hold' | 'keygen' | 'lock' | 'account' | 'ready' | 'accountError' | 'error';
+type Phase = 'search' | 'hold' | 'keygen' | 'lock' | 'fund' | 'account' | 'ready' | 'accountError' | 'error';
 
-// Starting balance for the Sepolia account, from the hub's relayer. Tiny: testnet ETH is scarce.
+// Starting balance for the Sepolia account, from the phone's gas wallet. Tiny: testnet ETH is scarce.
 const FUND = 50_000_000_000_000n; // 0.00005 ETH
+// The gas wallet needs this much to deploy and fund the account, with room to spare.
+const NEED = 2_000_000_000_000_000n; // 0.002 ETH
 
 const COPY: Record<Phase, { title: string; body: string }> = {
   search: { title: 'Wake your stick', body: 'Switch it on and keep it close. The phone finds it over Bluetooth.' },
   hold: { title: 'Press and hold A', body: 'Hold the A button on your stick until its ring fills.' },
   keygen: { title: 'Creating your key', body: 'Phone and stick each make half. Neither side ever holds the whole key.' },
   lock: { title: 'Wallet created', body: 'Last step: lock your half of the key to your fingerprint.' },
+  fund: { title: 'Add gas money', body: 'The phone pays its own Sepolia fees from a gas wallet. Send it at least 0.002 Sepolia ETH, from a faucet or another wallet. This continues by itself once it arrives.' },
   account: { title: 'Creating your account', body: 'Putting your wallet on Sepolia. This takes about 20 seconds.' },
   ready: { title: 'Your wallet is ready', body: 'It holds 0.00005 test ETH on Sepolia. Next, give an agent its own key.' },
   accountError: { title: 'The account is not on Sepolia yet', body: '' },
@@ -112,27 +118,47 @@ export default function Connect() {
     void deploy();
   };
 
-  // 3. Put the wallet on Sepolia in the same journey.
+  // 3. Put the wallet on Sepolia in the same journey, paid for by the phone's gas wallet.
+  const [gas, setGas] = useState<{ address: string; balance: bigint } | null>(null);
+  const [copied, setCopied] = useState(false);
   const deploy = async () => {
     const s = share.current;
     if (!s) return;
     setError('');
-    setPhase('account');
     try {
-      const info = await link.request<Msg>({ t: 'evm_info?', groupKey: s.groupKey }, 20000);
-      if (info.t === 'evm_error') throw new Error(String(info.reason));
-      if (!info.account) {
-        const r = await link.request<Msg>({ t: 'evm_deploy', groupKey: s.groupKey, phoneKey: phoneKey(s), fund: FUND.toString() }, 200000);
-        if (r.t === 'evm_error') throw new Error(String(r.reason));
+      const existing = await evm.accountOf(s.groupKey);
+      if (!existing) {
+        const w = await evm.gasWallet();
+        const balance = await evm.pub.getBalance({ address: w.address });
+        setGas({ address: w.address, balance });
+        if (balance < NEED) {
+          setPhase('fund');
+          return;
+        }
+        setPhase('account');
+        await evm.deploy(s.groupKey, phoneKey(s), FUND);
       }
       void success();
       setPhase('ready');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not reach Sepolia.');
+      setError(evm.reason(e));
       setPhase('accountError');
       void warn();
     }
   };
+
+  // Waiting for gas money: check the balance every few seconds, then carry on.
+  useEffect(() => {
+    if (phase !== 'fund' || !gas) return;
+    const t = setInterval(() => {
+      void evm.pub.getBalance({ address: gas.address as `0x${string}` }).then((balance) => {
+        setGas((g) => (g ? { ...g, balance } : g));
+        if (balance >= NEED) void deploy();
+      }).catch(() => undefined);
+    }, 5000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, gas?.address]);
 
   const open = () => {
     router.dismissAll();
@@ -154,6 +180,8 @@ export default function Connect() {
           <Button label="Lock with fingerprint" onPress={() => void finish()} />
         ) : phase === 'ready' ? (
           <Button label="Open wallet" onPress={open} />
+        ) : phase === 'fund' ? (
+          <Button label="Finish later" variant="ghost" onPress={open} />
         ) : phase === 'accountError' ? (
           <>
             <Button label="Try again" onPress={() => void deploy()} />
@@ -179,6 +207,23 @@ export default function Connect() {
         {phase === 'keygen' ? <LeashFlow /> : null}
         {phase === 'lock' || phase === 'accountError' ? <StickArt screen="Wallet ready" /> : null}
         {phase === 'account' ? <LeashFlow /> : null}
+        {phase === 'fund' && gas ? (
+          <View style={styles.fund}>
+            <Txt mono size={15} selectable align="center">
+              {gas.address}
+            </Txt>
+            <Txt size={14} color={colors.muted} align="center">
+              Balance {Number(gas.balance) / 1e18} ETH. Waiting for {Number(NEED) / 1e18} ETH.
+            </Txt>
+            <Button
+              label={copied ? 'Copied' : `Copy ${shortAddr(gas.address)}`}
+              variant="secondary"
+              onPress={() => {
+                void Clipboard.setStringAsync(gas.address).then(() => setCopied(true));
+              }}
+            />
+          </View>
+        ) : null}
         {phase === 'ready' ? <StickArt screen="Wallet ready" /> : null}
       </View>
       {phase === 'search' ? (
@@ -192,5 +237,6 @@ export default function Connect() {
 
 const styles = StyleSheet.create({
   body: { marginTop: space.m },
+  fund: { gap: space.m, alignSelf: 'stretch' },
   art: { marginTop: space.xxl, marginBottom: space.l, alignItems: 'center', justifyContent: 'center', minHeight: 200 },
 });

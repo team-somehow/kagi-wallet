@@ -82,7 +82,6 @@ export default function RootLayout() {
           <Stack.Screen name="revoke" options={{ presentation: 'modal', gestureEnabled: false }} />
           <Stack.Screen name="demo" options={{ presentation: 'modal' }} />
           <Stack.Screen name="wrist" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="chain" options={{ presentation: 'modal' }} />
           <Stack.Screen name="vault" options={{ presentation: 'modal' }} />
           <Stack.Screen name="agent" options={{ presentation: 'modal' }} />
           <Stack.Screen name="session/[address]" options={{ presentation: 'modal' }} />

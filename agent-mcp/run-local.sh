@@ -1,6 +1,6 @@
 #!/bin/sh
 # Run the agent MCP on this machine behind a public HTTPS tunnel, and print the URL for ChatGPT.
-# usage: SESSION_KEY=0x… ./run-local.sh      (the Leash hub must be running on :8787)
+# usage: SESSION_KEY='leash:<account>:<key>' ./run-local.sh   (what the Leash phone app copies)
 set -e
 cd "$(dirname "$0")"
 [ -n "$SESSION_KEY" ] || { echo "Set SESSION_KEY to the key copied from the Leash phone app."; exit 1; }

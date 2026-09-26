@@ -23,16 +23,12 @@ export function WristBridge() {
 
   useEffect(() => {
     link.start();
-    const offState = link.onState((open) => {
-      if (!open) dispatch({ type: 'WRIST', patch: { hub: false, connected: false } });
-      else dispatch({ type: 'WRIST', patch: { hub: true } });
-    });
     const off = link.on((m) => {
       switch (m.t) {
         case 'hub':
           dispatch({
             type: 'WRIST',
-            patch: { hub: true, connected: Boolean(m.wrist), via: parseVia(m.via) },
+            patch: { connected: Boolean(m.wrist), via: parseVia(m.via) },
           });
           break;
         case 'hello':
@@ -56,7 +52,7 @@ export function WristBridge() {
               onArm: Boolean(m.onArm),
               battery: Number(m.battery),
               paired: Boolean(m.paired),
-              via: parseVia(m.via) ?? 'usb',
+              via: 'ble',
               ssid: typeof m.ssid === 'string' ? m.ssid : null,
             },
           });
@@ -75,7 +71,6 @@ export function WristBridge() {
     });
     return () => {
       off();
-      offState();
     };
   }, [dispatch]);
 

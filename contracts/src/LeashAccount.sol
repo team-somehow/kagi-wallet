@@ -14,6 +14,8 @@ import {LeashBase} from "./LeashBase.sol";
 ///   execute  sha256("LEASH/evm"    || chainid || this || nonce || to || value || data)
 ///   grant    sha256("LEASH/grant"  || chainid || this || nonce || agent || cap || expiry)
 ///   revoke   sha256("LEASH/revoke" || chainid || this || nonce || agent)
+///   limit    sha256("LEASH/limit"  || chainid || this || nonce || agent || oldCap || newCap || expiry)
+///   decline  sha256("LEASH/decline"|| chainid || this || nonce || agent || newCap)
 ///   spend    keccak256("LEASH/spend" || chainid || this || agent || sessionNonce || to || value)
 ///   1271     sha256("LEASH/1271"   || chainid || this || hash), signature = rx || s (64 bytes)
 /// The wrist rebuilds the manager messages itself from what it shows before it signs.
@@ -47,6 +49,8 @@ contract LeashAccount is LeashBase {
     event LimitRaised(address indexed agent, uint256 oldCap, uint256 newCap);
     event Revoked(address indexed agent);
     event Spent(address indexed agent, address indexed to, uint256 value);
+    event LimitRequested(address indexed agent, uint256 oldCap, uint256 newCap, string reason);
+    event LimitDeclined(address indexed agent, uint256 newCap);
 
     constructor(uint256 groupKey_, uint256 phoneKey_) payable LeashBase(groupKey_) {
         phoneKey = phoneKey_;
@@ -88,6 +92,16 @@ contract LeashAccount is LeashBase {
         emit LimitRaised(agent, oldCap, newCap);
     }
 
+    /// The owner says no to a limit request. Like revoke, the phone's shard alone is enough:
+    /// declining only keeps the current limit. It exists so the agent learns the answer.
+    function declineLimit(address agent, uint256 newCap, uint256 rx, uint256 s) external {
+        uint256 n = nonce;
+        bytes32 m = sha256(abi.encodePacked("LEASH/decline", block.chainid, address(this), n, agent, newCap));
+        require(Bip340.verify(m, rx, s, phoneKey) || Bip340.verify(m, rx, s, groupKey), "bad signature");
+        nonce = n + 1;
+        emit LimitDeclined(agent, newCap);
+    }
+
     /// Any single shard can stop a key: the phone alone, or phone and wrist together.
     function revoke(address agent, uint256 rx, uint256 s) external {
         uint256 n = nonce;
@@ -99,6 +113,16 @@ contract LeashAccount is LeashBase {
     }
 
     // ---- agent ---------------------------------------------------------------------------
+
+    /// A live session key asks its owner for a higher total allowance. Only the agent itself
+    /// can ask (it sends the transaction and pays its gas); the phone watches for the event.
+    function requestLimit(uint256 newCap, string calldata reason) external {
+        Session storage sess = _sessions[msg.sender];
+        require(sess.expiry > block.timestamp, "key expired or revoked");
+        require(newCap > sess.cap, "limit must increase");
+        require(bytes(reason).length <= 200, "reason too long");
+        emit LimitRequested(msg.sender, sess.cap, newCap, reason);
+    }
 
     /// Sends plain ETH from the account, signed by the agent's own ephemeral key. No calldata,
     /// so a session can't approve tokens or call out. Revert reasons are plain strings so the

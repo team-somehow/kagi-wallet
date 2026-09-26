@@ -59,7 +59,6 @@ export default function Demo() {
         <Txt size={15} weight="medium" color={colors.muted}>
           Chain
         </Txt>
-        <Button label="Sepolia testnet" variant="secondary" onPress={() => router.push('/chain')} />
         <Button label="Vault and root key" variant="secondary" onPress={() => router.push('/vault')} />
       </View>
 

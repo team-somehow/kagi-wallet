@@ -9,13 +9,12 @@ import { Button } from '../../components/Button';
 import { Fact } from '../../components/Fact';
 import { HoldButton } from '../../components/HoldButton';
 import { LedBar } from '../../components/LedBar';
-import { useStore } from '../../store/store';
 import { fmtEth, useChain } from '../../store/chain';
-import { chatUrl, link, type Msg } from '../../lib/link';
+import * as evm from '../../lib/evm';
 import { evmRevokeMessage, phoneOnlySign } from '../../lib/frost';
 import { loadShard, rand } from '../../lib/shard';
 import { unlockShard } from '../../lib/biometrics';
-import { loadSessionKey } from '../../lib/session';
+import { connectionString, loadSessionKey } from '../../lib/session';
 import { shortAddr } from '../../lib/format';
 import { success, warn } from '../../lib/haptics';
 import { colors, radius, space } from '../../theme';
@@ -25,7 +24,6 @@ type RevokeState = { phase: 'idle' } | { phase: 'working' } | { phase: 'done'; h
 /** One agent key: what it can still spend, until when, what it did, and a way to cut it off. */
 export default function SessionDetail() {
   const { address } = useLocalSearchParams<{ address: string }>();
-  const { state } = useStore();
   const { info, sessions, activity, refresh } = useChain();
   const s = sessions.find((x) => x.address.toLowerCase() === String(address).toLowerCase());
   const [copied, setCopied] = useState(false);
@@ -55,7 +53,7 @@ export default function SessionDetail() {
   const copy = async () => {
     const k = await loadSessionKey(s.address);
     if (!k) return;
-    await Clipboard.setStringAsync(k.privateKey);
+    await Clipboard.setStringAsync(connectionString(k, String(info.account)));
     setCopied(true);
     void success();
     setTimeout(() => setCopied(false), 2500);
@@ -71,9 +69,8 @@ export default function SessionDetail() {
       if (!shard) throw new Error('This phone has no shard.');
       const i = (await refresh()) ?? info;
       const sig = phoneOnlySign(shard, evmRevokeMessage(i.chainId, String(i.account), i.nonce, s.address), rand);
-      const r = await link.request<Msg>({ t: 'evm_revoke', groupKey: state.address, agent: s.address, sig }, 200000);
-      if (r.t === 'evm_error') throw new Error(String(r.reason));
-      if (r.status !== 'success') throw new Error(`The revoke reverted in ${String(r.hash)}.`);
+      const r = await evm.revoke(i.account as `0x${string}`, s.address as `0x${string}`, sig);
+      if (r.status !== 'success') throw new Error(`The revoke reverted in ${r.hash}.`);
       setRevoke({ phase: 'done', hash: String(r.hash) });
       void success();
       void refresh();
@@ -149,7 +146,7 @@ export default function SessionDetail() {
           <View style={styles.gap}>
             <Button label={copied ? 'Copied' : 'Copy session key'} variant="secondary" onPress={() => void copy()} />
             <Txt size={13} color={colors.faint}>
-              Paste it into the agent chat at {chatUrl()}. It spends only this allowance.
+              Paste it into your agent, for example the Leash MCP server. It spends only this allowance.
             </Txt>
           </View>
         ) : null}

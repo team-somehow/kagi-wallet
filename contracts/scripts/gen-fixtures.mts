@@ -1,10 +1,10 @@
 // Writes contracts/test/fixtures/frost.json: signatures made by the real phone + wrist FROST
 // code (mobile/src/lib/frost), for the forge tests to check against the Solidity contracts.
 // This is what keeps the TypeScript message builders and the contracts' digests in step.
-// Run: npx tsx gen-fixtures.ts
+// Run from mobile/ (for its node_modules): npx tsx ../contracts/scripts/gen-fixtures.mts
 import { randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
-import { combine, dkgFinish, dkgStart, evm1271Message, evmGrantMessage, evmMessage, evmRevokeMessage, nonces, phoneKey, phoneOnlySign, reference } from '../mobile/src/lib/frost';
+import { combine, dkgFinish, dkgStart, evm1271Message, evmGrantMessage, evmMessage, evmRevokeMessage, nonces, phoneKey, phoneOnlySign, reference } from '../../mobile/src/lib/frost';
 
 const rand = (n: number) => new Uint8Array(randomBytes(n));
 const phone = dkgStart(rand);
@@ -42,5 +42,5 @@ const fixture = {
   revokeSig: `0x${phoneOnlySign(share, evmRevokeMessage(chainId, account, 2n, agent), rand)}`,
   sig1271: managerSign(evm1271Message(chainId, account, hash)),
 };
-writeFileSync(new URL('../contracts/test/fixtures/frost.json', import.meta.url), `${JSON.stringify(fixture, null, 2)}\n`);
+writeFileSync(new URL('../test/fixtures/frost.json', import.meta.url), `${JSON.stringify(fixture, null, 2)}\n`);
 console.log('wrote contracts/test/fixtures/frost.json');

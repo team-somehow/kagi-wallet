@@ -9,7 +9,8 @@ import { LedBar } from '../components/LedBar';
 import { WristChip } from '../components/WristChip';
 import { useStore } from '../store/store';
 import { fmtEth, useChain, type ChainSession } from '../store/chain';
-import { link, type Msg } from '../lib/link';
+import * as Clipboard from 'expo-clipboard';
+import * as evm from '../lib/evm';
 import { loadShard } from '../lib/shard';
 import { phoneKey } from '../lib/frost';
 import { shortAddr } from '../lib/format';
@@ -18,11 +19,14 @@ import { revokeAllOnChain } from '../lib/chainRevoke';
 import { colors, radius, space } from '../theme';
 
 const FUND = 50_000_000_000_000n; // 0.00005 ETH
+// Below this the phone can do only a couple more transactions.
+const LOW_GAS = 600_000_000_000_000n; // 0.0006 ETH
 
 /** The wallet at a glance: the account, the agent's access, and what it did. */
 export default function Home() {
   const { state } = useStore();
-  const { info, hubUp, error, live, sessions, totals, activity, limits, refresh } = useChain();
+  const { info, error, live, sessions, totals, activity, limits, refresh } = useChain();
+  const [gasCopied, setGasCopied] = useState(false);
   const earlier = sessions.filter((x) => x.status !== 'active');
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
@@ -35,12 +39,11 @@ export default function Home() {
     setDeploying(true);
     setDeployError(null);
     try {
-      const r = await link.request<Msg>({ t: 'evm_deploy', groupKey: s.groupKey, phoneKey: phoneKey(s), fund: FUND.toString() }, 200000);
-      if (r.t === 'evm_error') throw new Error(String(r.reason));
+      await evm.deploy(s.groupKey, phoneKey(s), FUND);
       void success();
       await refresh();
     } catch (e) {
-      setDeployError(e instanceof Error ? e.message : 'Could not reach Sepolia.');
+      setDeployError(evm.reason(e));
       void warn();
     } finally {
       setDeploying(false);
@@ -86,11 +89,7 @@ export default function Home() {
         </View>
       </View>
 
-      {!hubUp ? (
-        <Txt size={14} color={colors.red} style={styles.top}>
-          Not connected to the hub. Showing the last known state.
-        </Txt>
-      ) : error && !info ? (
+      {error && !info ? (
         <Txt size={14} color={colors.red} style={styles.top}>
           {error}
         </Txt>
@@ -183,6 +182,39 @@ export default function Home() {
               ))}
             </>
           ) : null}
+        </View>
+      ) : null}
+
+      {info ? (
+        <View style={styles.section}>
+          <Txt size={15} weight="medium" color={colors.muted}>
+            Gas wallet
+          </Txt>
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <Txt mono size={15} color={info.gasBalance < LOW_GAS ? colors.amber : colors.text}>
+                {fmtEth(info.gasBalance)}
+              </Txt>
+              <Pressable
+                hitSlop={8}
+                onPress={() => {
+                  void Clipboard.setStringAsync(info.gasAddress).then(() => {
+                    setGasCopied(true);
+                    setTimeout(() => setGasCopied(false), 2500);
+                  });
+                }}
+              >
+                <Txt mono size={13} color={colors.muted}>
+                  {gasCopied ? 'Copied' : shortAddr(info.gasAddress)}
+                </Txt>
+              </Pressable>
+            </View>
+            <Txt size={13} color={info.gasBalance < LOW_GAS ? colors.amber : colors.faint}>
+              {info.gasBalance < LOW_GAS
+                ? 'Running low. Send Sepolia ETH to this address, or the phone cannot grant, revoke or decide limits.'
+                : 'Pays the phone’s Sepolia fees. It has no power over your wallet.'}
+            </Txt>
+          </View>
         </View>
       ) : null}
 
