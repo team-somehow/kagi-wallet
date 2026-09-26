@@ -24,31 +24,30 @@ Every piece is a standard, stacked so that each layer only sees the layer below 
 
 ```mermaid
 flowchart LR
-    Pair["FROST key generation"]
-    Shares["Phone + Kagi Wallet shares"]
-    Sign["FROST signing, 2 rounds"]
-    Sig["One BIP340 signature"]
-    Verify["Bip340.sol: ecrecover trick"]
-    Account["KagiAccount"]
-    ERCs["ERC-1271, 165, 721, 1155"]
+    subgraph S1["1. Pairing, once"]
+        direction TB
+        p1["Phone and Kagi Wallet each pick a secret share"] ~~~ p2["Each proves it holds its share"] ~~~ p3["Wallet key = sum of the public shares"]
+    end
+    subgraph S2["2. Signing, every approval"]
+        direction TB
+        s1["Both commit to fresh nonces"] ~~~ s2["Both sign their half (FROST)"] ~~~ s3["Result: one BIP340 signature"]
+    end
+    subgraph S3["3. On-chain check"]
+        direction TB
+        v1["Bip340.sol"] ~~~ v2["Uses ecrecover and modexp"] ~~~ v3["Costs about a normal signature"]
+    end
+    subgraph S4["4. What it unlocks"]
+        direction TB
+        u1["Grant, raise, execute"] ~~~ u2["ERC-1271 signatures"] ~~~ u3["RootTreasury with 3-of-3"]
+    end
+    S1 ==> S2 ==> S3 ==> S4
 
-    AgentKey["Agent key (ECDSA)"]
-    Ecrecover["ecrecover"]
-    Spend["spend"]
-
-    Pair --> Shares --> Sign --> Sig --> Verify --> Account --> ERCs
-    AgentKey --> Ecrecover --> Spend
-
-    classDef device fill:#DCE9F4,stroke:#1C6296,color:#0B3A5E
-    classDef crypto fill:#F3E4D5,stroke:#B35F17,color:#5A2E08
-    classDef chain fill:#FFFFFF,stroke:#8A939F,color:#111820
-    classDef std fill:#E4F2E8,stroke:#3C7A52,color:#163A22
-    classDef agent fill:#EEF0F3,stroke:#5C6674,color:#111820
-    class Pair,Shares device
-    class Sign,Sig crypto
-    class Verify,Account,Ecrecover,Spend chain
-    class ERCs std
-    class AgentKey agent
+    classDef box fill:#FFFFFF,stroke:#CBD2DA,color:#111820
+    class p1,p2,p3,s1,s2,s3,v1,v2,v3,u1,u2,u3 box
+    style S1 fill:#DCE9F4,stroke:#1C6296,color:#0B3A5E
+    style S2 fill:#F3E4D5,stroke:#B35F17,color:#5A2E08
+    style S3 fill:#EEF0F3,stroke:#5C6674,color:#111820
+    style S4 fill:#E4F2E8,stroke:#3C7A52,color:#163A22
 ```
 
 ## 2. FROST: one key, split across devices

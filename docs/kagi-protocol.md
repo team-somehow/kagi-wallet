@@ -39,45 +39,38 @@ Four contracts, 277 lines of Solidity.
 
 ```mermaid
 flowchart LR
-    Agent["AI agent"]
-    Phone["Phone"]
-    Kagi["Kagi Wallet"]
-    Second["Second stick"]
-
-    subgraph Account["KagiAccount"]
-        Spend["spend"]
-        Request["requestLimit"]
-        Admin["grant · raise limit · execute"]
-        Stop["revoke · decline"]
+    subgraph L1["Agent alone"]
+        direction TB
+        a1["Session key (ECDSA)"] ~~~ a2["Pay under the cap"] ~~~ a3["Ask for more"]
     end
+    subgraph L2["Phone alone"]
+        direction TB
+        b1["Phone key"] ~~~ b2["Revoke a key"] ~~~ b3["Decline a request"]
+    end
+    subgraph L3["Phone + Kagi Wallet"]
+        direction TB
+        c1["Manager key, 2-of-2"] ~~~ c2["Grant a key, raise a limit"] ~~~ c3["Any call, ERC-1271"]
+    end
+    subgraph L4["Phone + Kagi Wallet + second stick"]
+        direction TB
+        d1["Root key, 3-of-3"] ~~~ d2["RootTreasury"] ~~~ d3["Move treasury funds"]
+    end
+    L1 ~~~ L2 ~~~ L3 ~~~ L4
 
-    Manager["Manager key 2-of-2"]
-    Root["Root key 3-of-3"]
-    Treasury["RootTreasury"]
-
-    Agent -- "pays under the cap" --> Spend
-    Agent -- "asks for more" --> Request
-    Request -. "alert" .-> Phone
-    Phone --> Manager
-    Kagi --> Manager
-    Manager --> Admin
-    Phone -- "alone" --> Stop
-    Phone --> Root
-    Kagi --> Root
-    Second --> Root
-    Root --> Treasury
-
-    classDef agent fill:#EEF0F3,stroke:#5C6674,color:#111820
-    classDef device fill:#DCE9F4,stroke:#1C6296,color:#0B3A5E
-    classDef key fill:#F3E4D5,stroke:#B35F17,color:#5A2E08
-    classDef fn fill:#FFFFFF,stroke:#8A939F,color:#111820
-    classDef vault fill:#F8E8EB,stroke:#AA3448,color:#5C1422
-    class Agent agent
-    class Phone,Kagi,Second device
-    class Manager,Root key
-    class Spend,Request,Admin,Stop fn
-    class Treasury vault
-    style Account fill:#F8FAFC,stroke:#CBD2DA,color:#111820
+    classDef agent fill:#FFFFFF,stroke:#8A939F,color:#111820
+    classDef stop fill:#FFFFFF,stroke:#C4302A,color:#7A1B16
+    classDef human fill:#FFFFFF,stroke:#B35F17,color:#5A2E08
+    classDef root fill:#FFFFFF,stroke:#AA3448,color:#5C1422
+    classDef keybox font-weight:bold
+    class a1,a2,a3 agent
+    class b1,b2,b3 stop
+    class c1,c2,c3 human
+    class d1,d2,d3 root
+    class a1,b1,c1,d1 keybox
+    style L1 fill:#EEF0F3,stroke:#8A939F,color:#111820
+    style L2 fill:#F6DEDA,stroke:#C4302A,color:#7A1B16
+    style L3 fill:#F3E4D5,stroke:#B35F17,color:#5A2E08
+    style L4 fill:#F8E8EB,stroke:#AA3448,color:#5C1422
 ```
 
 The arrows are the only ways in. The agent can reach two functions, and one of them only emits an event. Every other function needs a signature from keys the owner's devices hold.
