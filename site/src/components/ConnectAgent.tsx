@@ -52,8 +52,9 @@ const TARGETS: Target[] = [
     logo: './ai/claude.svg',
     how: 'Custom connector',
     copy: (u) => u,
-    open: () => 'https://claude.ai/settings/connectors',
-    after: 'Link copied. Choose Add custom connector, name it kagi and paste the link. It then works in Claude on the web, desktop and phone.',
+    // Claude has no way to pre-fill a custom connector from a link, so the URL is copied instead.
+    open: () => 'https://claude.ai/new#customize/connectors',
+    after: 'Link copied. Claude can’t pre-fill it: choose Add custom connector, type kagi as the name, paste the link as the URL and add it. It then works in Claude on the web, desktop and phone.',
   },
   {
     id: 'claude-code',

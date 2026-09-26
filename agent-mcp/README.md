@@ -27,7 +27,7 @@ their own key: `https://13-235-16-182.sslip.io/k/<account><key>`.
 1. In the Kagi phone app, create an agent key and tap **Copy connector link**.
 2. Add the link as an MCP server. The website's Connect your AI section has a button for each app:
    - **ChatGPT:** add a custom connector with the link and no authentication
-   - **Claude** (web, desktop and mobile): Settings → Connectors → Add custom connector, and paste the link
+   - **Claude** (web, desktop and mobile): open [claude.ai/new#customize/connectors](https://claude.ai/new#customize/connectors), choose Add custom connector, name it `kagi` and paste the link
    - **Claude Code** (terminal, or its VS Code and JetBrains extensions): `claude mcp add --transport http kagi <link>`
    - **Codex:** `codex mcp add kagi --url <link>`
    - **Cursor, VS Code:** one-click install links built from the link
