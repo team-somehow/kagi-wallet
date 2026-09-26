@@ -72,7 +72,7 @@ export default function PresentationSettings() {
             adding the second device.
           </Txt>
           <Txt size={12} mono color={colors.muted}>
-            ABC: {DEMO_RECIPIENT}
+            Pays {DEMO_RECIPIENT}
           </Txt>
           <Txt size={14} color={colors.amber}>
             {demo.message}

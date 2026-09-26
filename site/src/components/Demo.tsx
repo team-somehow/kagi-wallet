@@ -58,7 +58,7 @@ const notes: Record<Phase, string> = {
   declined: 'The waiting payment was not sent.',
   join: 'Simulated setup · your account stays the same.',
   joining: 'Sealed shares over BLE.',
-  joined: 'Next transfer: 12 µETH to ABC.',
+  joined: 'Next transfer: 12 µETH to 0xBB0D…DCe0.',
 };
 
 export function Demo() {
@@ -492,7 +492,7 @@ export function Demo() {
                     ) : (
                       <>
                         <Row
-                          label={done ? 'Sent to ABC' : declined ? 'Cancelled transfer' : 'Waiting transfer'}
+                          label={done ? 'Sent to 0xBB0D…DCe0' : declined ? 'Cancelled transfer' : 'Waiting transfer'}
                           value={`${payment} µETH`}
                         />
                         <Row label="Already spent" value={`${currentSpent} µETH`} />
@@ -533,8 +533,8 @@ export function Demo() {
                   {join
                     ? 'Your wallet stays connected to your agent.'
                     : dual
-                      ? 'You: “Send 0.000012 ETH to ABC.”'
-                      : 'You: “Send 0.000002 ETH, then 0.000008 ETH to ABC.”'}
+                      ? 'You: “Send 0.000012 ETH to 0xBB0D…DCe0.”'
+                      : 'You: “Send 0.000002 ETH, then 0.000008 ETH to 0xBB0D…DCe0.”'}
                 </div>
                 <div className="kg-chat-answer" aria-live="polite">
                   {done ? <Check /> : <Pause />}
@@ -542,7 +542,7 @@ export function Demo() {
                     {join
                       ? 'Same account and session key. Under-limit transfers remain automatic.'
                       : done
-                        ? `${payment} µETH sent to ABC. ${cap - currentSpent} µETH remains in my allowance.`
+                        ? `${payment} µETH sent to 0xBB0D…DCe0. ${cap - currentSpent} µETH remains in my allowance.`
                         : declined
                           ? 'You declined. I did not send the payment or change the allowance.'
                           : phase === 'confirming'

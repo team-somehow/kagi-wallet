@@ -8,7 +8,7 @@ import { KagiAccountAbi } from './contracts';
 import { loadSessionKey } from './session';
 import * as evm from './evm';
 
-export const DEMO_RECIPIENT = '0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0' as const; // ABC in agent-mcp/contacts.json
+export const DEMO_RECIPIENT = '0xBB0Dd7ca77B6BD6c1AC7F5727139D8D51228DCe0' as const; // the gas sponsor wallet, so demo payments flow back into gas
 const STORAGE = 'kagi.agent-demo.v1';
 const MICRO = 1_000_000_000_000n;
 type Job = {
@@ -24,7 +24,7 @@ type Job = {
 type State = { running: boolean; message: string; hash?: Hex; saved: boolean };
 let snapshot: State = {
   running: false,
-  message: 'Send 2 µETH, then 8 µETH to ABC. The second transfer requests more access when it exceeds the allowance.',
+  message: 'Send 2 µETH, then 8 µETH to 0xBB0D…DCe0. The second transfer requests more access when it exceeds the allowance.',
   saved: false,
 };
 const listeners = new Set<() => void>();
@@ -190,7 +190,7 @@ export async function runAgentDemo(account: Hex, agent: Hex, secondAct = false) 
       const value = BigInt(job.amounts[job.index]) * MICRO;
       if (session.spent + value > session.cap) {
         const newCap = (session.spent + value) * 2n;
-        await send('request', [newCap, `In-app test agent: send ${job.amounts[job.index]} microETH to ABC.`], newCap);
+        await send('request', [newCap, `In-app test agent: send ${job.amounts[job.index]} microETH to 0xBB0D…DCe0.`], newCap);
         continue;
       }
       const digest = keccak256(
