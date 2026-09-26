@@ -15,6 +15,7 @@
 //   MCP_TOKEN    also serves SESSION_KEY at /mcp/<MCP_TOKEN>, the older private form
 //   RPC_URL      default https://ethereum-sepolia-rpc.publicnode.com
 //   EXPLORER     default https://sepolia.etherscan.io
+//   MAINNET_RPC_URL  default https://ethereum-rpc.publicnode.com (wallets on Ethereum mainnet)
 //   CONTACTS     JSON name -> address; default contacts.json next to this file
 //   MULTIBAAS_URL, MULTIBAAS_API_KEY  optional: Curvegrid MultiBaas, for get_activity (multibaas.mjs)
 //   INTERCEPTA_API_KEY  optional: screen every destination before the key signs (intercepta.mjs)
@@ -95,8 +96,27 @@ function keyProblem(raw) {
 const OWN = parseKey(process.env.SESSION_KEY);
 
 const pub = createPublicClient({ transport: httpTransport(RPC) });
-let chainId = null;
-const getChainId = async () => (chainId ??= await pub.getChainId());
+
+// Each wallet lives on the testnet or on Ethereum mainnet. The connector link carries only the
+// account, so the server finds the chain by where the account's contract is, once per account.
+const TESTNET_ID = 11155111;
+const NETWORKS = [
+  { id: TESTNET_ID, name: 'testnet (Sepolia)', rpc: RPC, explorer: EXPLORER },
+  { id: 1, name: 'Ethereum mainnet', rpc: process.env.MAINNET_RPC_URL ?? 'https://ethereum-rpc.publicnode.com', explorer: 'https://etherscan.io' },
+].map((n) => ({ ...n, pub: createPublicClient({ transport: httpTransport(n.rpc) }) }));
+const accountNet = new Map();
+async function netOf(account) {
+  if (accountNet.has(account)) return accountNet.get(account);
+  for (const n of NETWORKS) {
+    const code = await n.pub.getCode({ address: account }).catch(() => null);
+    if (code && code !== '0x') {
+      accountNet.set(account, n);
+      if (n.id === TESTNET_ID) track(account, ABI); // MultiBaas indexes the testnet
+      return n;
+    }
+  }
+  return null;
+}
 
 const contacts = () => {
   if (process.env.CONTACTS) return JSON.parse(process.env.CONTACTS);
@@ -119,8 +139,6 @@ function why(e) {
 
 // Limit requests filed through this server: "<agent>:<request_id>" -> what it asked, and any paused payment.
 const requests = new Map();
-// Accounts already checked to hold a Kagi contract.
-const ACCOUNTS = new Set();
 
 const reply = (data) => {
   const clean = JSON.parse(JSON.stringify(data, (_, v) => (typeof v === 'bigint' ? v.toString() : v)));
@@ -131,17 +149,25 @@ function forKey(parsed) {
   const KEY = parsed.key;
   const ACCOUNT = parsed.account;
   const AGENT = privateKeyToAccount(KEY);
-  const wallet = createWalletClient({ account: AGENT, transport: httpTransport(RPC) });
+
+  // This wallet's chain, resolved on first use by every entry point (see netOf).
+  let NET = null;
+  let pub = null;
+  let wallet = null;
+  const txLink = (h) => `${NET.explorer}/tx/${h}`;
+  async function ready() {
+    if (NET) return;
+    const n = await netOf(ACCOUNT);
+    if (!n) throw new Error(`There is no Kagi account at ${ACCOUNT} on the testnet or Ethereum mainnet. Copy the key again from the Kagi phone app.`);
+    NET = n;
+    pub = n.pub;
+    wallet = createWalletClient({ account: AGENT, transport: httpTransport(n.rpc) });
+  }
 
   // ---- chain ------------------------------------------------------------------------------
 
   async function state() {
-    if (!ACCOUNTS.has(ACCOUNT)) {
-      const code = await pub.getCode({ address: ACCOUNT });
-      if (!code || code === '0x') throw new Error(`There is no Kagi account at ${ACCOUNT} on this network. Copy the key again from the Kagi phone app.`);
-      ACCOUNTS.add(ACCOUNT);
-      track(ACCOUNT, ABI); // start MultiBaas indexing now, so get_activity has the history later
-    }
+    await ready();
     const [[cap, spent, expiry, nonce], balance, gas, block] = await Promise.all([
       pub.readContract({ address: ACCOUNT, abi: ABI, functionName: 'session', args: [AGENT.address] }),
       pub.getBalance({ address: ACCOUNT }),
@@ -171,6 +197,7 @@ function forKey(parsed) {
   }
 
   async function walletInfo() {
+    await ready();
     const s = await state();
     if (s.status === 'unknown') return { ok: false, error: 'This session key has no session on that Kagi account. Create the key from the Kagi phone app.' };
     return {
@@ -185,7 +212,8 @@ function forKey(parsed) {
       wallet_balance: eth(s.balance),
       gas_left: eth(s.gas),
       contacts: contacts(),
-      explorer: `${EXPLORER}/address/${ACCOUNT}`,
+      network: NET.name,
+      explorer: `${NET.explorer}/address/${ACCOUNT}`,
     };
   }
 
@@ -247,7 +275,7 @@ function forKey(parsed) {
     const digest = keccak256(
       encodePacked(
         ['string', 'uint256', 'address', 'address', 'uint256', 'address', 'uint256'],
-        ['KAGI/spend', BigInt(await getChainId()), ACCOUNT, AGENT.address, s.nonce, rcpt.address, value],
+        ['KAGI/spend', BigInt(NET.id), ACCOUNT, AGENT.address, s.nonce, rcpt.address, value],
       ),
     );
     const sig = await sign({ hash: digest, privateKey: KEY });
@@ -268,6 +296,7 @@ function forKey(parsed) {
 
 
   async function askForMore(newCap, reason, payment) {
+    await ready();
     try {
       const r = await send('requestLimit', [newCap, String(reason).slice(0, 200)]);
       if (r.status !== 'success') return { status: 'failed', message: 'The request reverted on-chain.' };
@@ -283,6 +312,7 @@ function forKey(parsed) {
 
   /** A request's newCap and block, from memory or from its own transaction. */
   async function lookup(id) {
+    await ready();
     const k = `${AGENT.address}:${id}`;
     if (requests.has(k)) return requests.get(k);
     try {
@@ -311,6 +341,7 @@ function forKey(parsed) {
 
   /** Poll the chain for the owner's answer: a raise that covers it, or a decline. */
   async function waitForOwner(id, seconds) {
+    await ready();
     const req = await lookup(id);
     if (!req) return { status: 'unknown_request' };
     const until = Date.now() + seconds * 1000;
@@ -331,6 +362,8 @@ function forKey(parsed) {
 
   /** The account's history from MultiBaas: every spend, request, raise, decline, grant and revoke. */
   async function history() {
+    await ready();
+    if (NET.id !== TESTNET_ID) return { ok: false, network: NET.name, message: 'History comes from the MultiBaas testnet index, so it is not available for Ethereum mainnet wallets yet.' };
     const { justLinked, rows } = await mbActivity(ACCOUNT, ABI);
     const me = AGENT.address.toLowerCase();
     const who = (a) => (!a ? null : a.toLowerCase() === me ? 'this agent' : a);
@@ -356,6 +389,8 @@ function forKey(parsed) {
 
   /** Totals and approvals for this wallet, aggregated by MultiBaas Event Queries. */
   async function summary() {
+    await ready();
+    if (NET.id !== TESTNET_ID) return { ok: false, network: NET.name, message: 'Spending totals come from the MultiBaas testnet index, so they are not available for Ethereum mainnet wallets yet.' };
     const r = await spendingSummary(ACCOUNT, ABI);
     const me = AGENT.address.toLowerCase();
     const label = (a) => (a === me ? 'this agent' : a);
@@ -382,7 +417,7 @@ function forKey(parsed) {
     };
   }
 
-  return { AGENT, ACCOUNT, walletInfo, transfer, askForMore, waitForOwner, history, summary, requestsKey: (id) => `${AGENT.address}:${id}` };
+  return { AGENT, ACCOUNT, walletInfo, transfer, askForMore, waitForOwner, history, summary, txLink, requestsKey: (id) => `${AGENT.address}:${id}` };
 }
 
 // ---- tools --------------------------------------------------------------------------------
@@ -417,7 +452,7 @@ function buildServer(current, setKey) {
     { name: 'kagi-agent', version: '0.2.0' },
     {
       instructions:
-        'You control a Kagi agent wallet on-chain. It holds a session key with a total ETH allowance ' +
+        'You control a Kagi agent wallet on-chain, on the testnet or Ethereum mainnet (get_wallet says which; on mainnet it is real ETH). It holds a session key with a total ETH allowance ' +
         'and an expiry set by its owner. Call get_wallet first. Use send_eth for payments. If a payment is over the ' +
         'allowance, send_eth asks the owner for a higher limit automatically; then call wait_for_approval with the ' +
         'request_id, which sends the payment once the owner approves. ' +
@@ -614,9 +649,9 @@ function buildServer(current, setKey) {
           expired: 'Nobody answered in time. Nothing changed and the payment was not sent.',
           unknown_request: 'No such request.',
         };
-        return reply({ status: w.status, message: msg[w.status] ?? w.status, tx: w.hash ? txLink(w.hash) : null });
+        return reply({ status: w.status, message: msg[w.status] ?? w.status, tx: w.hash ? a.txLink(w.hash) : null });
       }
-      const result = { status: 'approved', new_total: eth(w.newCap), limit_tx: w.hash ? txLink(w.hash) : null };
+      const result = { status: 'approved', new_total: eth(w.newCap), limit_tx: w.hash ? a.txLink(w.hash) : null };
       const pending = req?.payment;
       if (!pending) return reply(result);
       req.payment = null;

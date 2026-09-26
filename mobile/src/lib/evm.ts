@@ -23,52 +23,102 @@ import {
   type Hex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { sepolia } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 import { KagiAccountAbi, KagiAccountBytecode, RootTreasuryAbi, RootTreasuryBytecode } from './contracts';
 import { rand } from './shard';
 
-export const CHAIN_ID = sepolia.id;
-export const EXPLORER = 'https://sepolia.etherscan.io';
-const RPC = process.env.EXPO_PUBLIC_SEPOLIA_RPC ?? 'https://ethereum-sepolia-rpc.publicnode.com';
 // 5: the account has requestLimit and declineLimit. Wallets recorded under older versions redeploy.
 const VERSION = 5;
-
-export const pub = createPublicClient({ chain: sepolia, transport: http(RPC) });
 type Addr = `0x${string}`;
+
+// ---- the network --------------------------------------------------------------------------
+// Sepolia (testnet) or Ethereum mainnet, chosen in More and kept in the secure store. Switching
+// is live: these bindings are reassigned, and everything reads them through evm.*. Each network
+// has its own Kagi account for the same key shares, so switching starts the account flow again.
+
+export type Network = 'testnet' | 'mainnet';
+const NETWORK_KEY = 'kagi.network.v1';
+const NETS = {
+  testnet: { chain: sepolia, rpc: process.env.EXPO_PUBLIC_SEPOLIA_RPC ?? 'https://ethereum-sepolia-rpc.publicnode.com', explorer: 'https://sepolia.etherscan.io', label: 'Testnet (Sepolia)' },
+  mainnet: { chain: mainnet, rpc: process.env.EXPO_PUBLIC_MAINNET_RPC ?? 'https://ethereum-rpc.publicnode.com', explorer: 'https://etherscan.io', label: 'Ethereum mainnet' },
+} as const;
+
+function savedNetwork(): Network {
+  try {
+    return SecureStore.getItem(NETWORK_KEY) === 'mainnet' ? 'mainnet' : 'testnet';
+  } catch {
+    return 'testnet';
+  }
+}
+
+export let network: Network = savedNetwork();
+export let CHAIN_ID: number = NETS[network].chain.id;
+export let EXPLORER: string = NETS[network].explorer;
+let CHAIN: typeof sepolia | typeof mainnet = NETS[network].chain;
+let RPC: string = NETS[network].rpc;
+export let pub = createPublicClient({ chain: CHAIN, transport: http(RPC) });
+export const networkLabel = (n: Network = network) => NETS[n].label;
+
+const networkListeners = new Set<(n: Network) => void>();
+export function onNetworkChange(l: (n: Network) => void) {
+  networkListeners.add(l);
+  return () => void networkListeners.delete(l);
+}
+
+/** Switch the whole app to another network, now and on the next launch. */
+export function switchNetwork(n: Network) {
+  if (n === network) return;
+  SecureStore.setItem(NETWORK_KEY, n);
+  network = n;
+  CHAIN = NETS[n].chain;
+  CHAIN_ID = CHAIN.id;
+  RPC = NETS[n].rpc;
+  EXPLORER = NETS[n].explorer;
+  pub = createPublicClient({ chain: CHAIN, transport: http(RPC) });
+  gasCache = null;
+  networkListeners.forEach((l) => l(n));
+}
 
 // ---- the gas wallet -------------------------------------------------------------------
 
 const GAS_KEY = 'kagi.gas.v1';
+// On mainnet the phone keeps its own gas key and the owner funds it: never the sponsor key.
+const MAINNET_GAS_KEY = 'kagi.gas.mainnet.v1';
 // Anyone with the APK can read a compiled-in key: testnet only, keep its balance small.
 const BUILD_GAS_KEY = process.env.EXPO_PUBLIC_GAS_SPONSOR_KEY;
 let gasCache: ReturnType<typeof privateKeyToAccount> | null = null;
 
+/** Whether this network's gas wallet is the shared testnet sponsor (so it tops up by itself). */
+export const sponsoredGas = () => network === 'testnet' && Boolean(BUILD_GAS_KEY && /^0x[0-9a-fA-F]{64}$/.test(BUILD_GAS_KEY));
+
 export async function gasWallet() {
   if (gasCache) return gasCache;
-  if (BUILD_GAS_KEY && /^0x[0-9a-fA-F]{64}$/.test(BUILD_GAS_KEY)) {
+  if (sponsoredGas()) {
     gasCache = privateKeyToAccount(BUILD_GAS_KEY as Hex);
     return gasCache;
   }
-  let priv = await SecureStore.getItemAsync(GAS_KEY);
+  const slot = network === 'mainnet' ? MAINNET_GAS_KEY : GAS_KEY;
+  let priv = await SecureStore.getItemAsync(slot);
   if (!priv) {
     let k: Uint8Array;
     do k = rand(32);
     while (!secp256k1.utils.isValidSecretKey(k));
     priv = `0x${bytesToHex(k)}`;
-    await SecureStore.setItemAsync(GAS_KEY, priv);
+    await SecureStore.setItemAsync(slot, priv);
   }
   gasCache = privateKeyToAccount(priv as Hex);
   return gasCache;
 }
 
 async function walletClient() {
-  return createWalletClient({ account: await gasWallet(), chain: sepolia, transport: http(RPC) });
+  return createWalletClient({ account: await gasWallet(), chain: CHAIN, transport: http(RPC) });
 }
 
 // Frugal fees: just above the current base fee, a tiny tip.
 async function fees() {
   const b = await pub.getBlock();
-  const tip = 1_000_000n;
+  // Mainnet needs a real tip to be picked up promptly; testnet takes almost nothing.
+  const tip = network === 'mainnet' ? 100_000_000n : 1_000_000n;
   return { maxPriorityFeePerGas: tip, maxFeePerGas: ((b.baseFeePerGas ?? 1_000_000_000n) * 125n) / 100n + tip };
 }
 
@@ -76,7 +126,7 @@ export function reason(e: unknown): string {
   if (e instanceof BaseError) {
     const r = e.walk((x) => x instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | null;
     if (r?.reason) return r.reason;
-    if (/insufficient funds/i.test(e.message)) return 'The phone gas wallet is out of test ETH. Top it up from Home.';
+    if (/insufficient funds/i.test(e.message)) return `The phone gas wallet is out of ${network === 'mainnet' ? 'ETH' : 'test ETH'}. Top it up from Home.`;
     return e.shortMessage;
   }
   return e instanceof Error ? e.message : String(e);
@@ -113,7 +163,7 @@ async function call(address: Addr, abi: Abi, functionName: string, args: readonl
   } catch (e) {
     throw new Error(`The account refused it: ${reason(e)}`);
   }
-  const hash = await w.writeContract({ address, abi, functionName, args, chain: sepolia, ...(await fees()) });
+  const hash = await w.writeContract({ address, abi, functionName, args, chain: CHAIN, ...(await fees()) });
   // Save the public hash before waiting so a retry after restart tracks the same transaction.
   try { await SecureStore.setItemAsync(journal, hash); }
   catch { onHash?.(hash); throw new PendingTransactionError(hash); }
@@ -122,8 +172,9 @@ async function call(address: Addr, abi: Abi, functionName: string, args: readonl
 
 // ---- which account belongs to which key -------------------------------------------------
 
-const acctKey = (gk: string) => `kagi.account.${gk.slice(0, 32)}`;
-const rootKeyName = (rk: string) => `kagi.root.${rk.slice(0, 32)}`;
+// One account per network for the same key: testnet keeps its original slot.
+const acctKey = (gk: string) => `kagi.account.${network === 'mainnet' ? 'mainnet.' : ''}${gk.slice(0, 32)}`;
+const rootKeyName = (rk: string) => `kagi.root.${network === 'mainnet' ? 'mainnet.' : ''}${rk.slice(0, 32)}`;
 
 export async function accountOf(gk: string): Promise<Addr | null> {
   try {
@@ -170,7 +221,7 @@ export async function deploy(gk: string, phoneKey: string, fund: bigint): Promis
   } catch (e) {
     throw new Error(reason(e));
   }
-  const hash = await w.sendTransaction({ data, value: fund, gas: (gas * 120n) / 100n, chain: sepolia, ...(await fees()) });
+  const hash = await w.sendTransaction({ data, value: fund, gas: (gas * 120n) / 100n, chain: CHAIN, ...(await fees()) });
   const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
   if (r.status !== 'success' || !r.contractAddress) throw new Error(`The deploy failed in ${hash}.`);
   await SecureStore.setItemAsync(acctKey(gk), JSON.stringify({ version: VERSION, account: r.contractAddress, deployTx: hash }));
@@ -186,7 +237,7 @@ export async function grant(account: Addr, m: { agent: Addr; cap: bigint; expiry
 /** Plain ETH from the gas wallet, e.g. gas money for an agent's own key. */
 export async function sendGas(to: Addr, value: bigint): Promise<Sent> {
   const w = await walletClient();
-  const hash = await w.sendTransaction({ to, value, chain: sepolia, ...(await fees()) });
+  const hash = await w.sendTransaction({ to, value, chain: CHAIN, ...(await fees()) });
   try {
     const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
     return { hash, status: r.status };
@@ -266,7 +317,7 @@ export async function rootDeploy(rk: string, fund: bigint): Promise<{ account: A
   const w = await walletClient();
   const data = `${RootTreasuryBytecode}${rk.padStart(64, '0')}` as Hex;
   const gas = await pub.estimateGas({ account: w.account, data, value: fund });
-  const hash = await w.sendTransaction({ data, value: fund, gas: (gas * 120n) / 100n, chain: sepolia, ...(await fees()) });
+  const hash = await w.sendTransaction({ data, value: fund, gas: (gas * 120n) / 100n, chain: CHAIN, ...(await fees()) });
   const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
   if (r.status !== 'success' || !r.contractAddress) throw new Error(`The deploy failed in ${hash}.`);
   await SecureStore.setItemAsync(rootKeyName(rk), JSON.stringify({ account: r.contractAddress, deployTx: hash }));

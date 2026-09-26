@@ -132,8 +132,8 @@ export default function Home() {
       <SpatialDevices two={Boolean(twoSticks)} joined={Boolean(twoSticks)} connected={state.wrist.connected}
         value={live.length ? fmtAmount(totals.left) : undefined} detail={live.length ? 'Agent allowance left' : 'Your physical boundary'} />
       <View style={styles.account}>
-        <Txt size={15} color={colors.muted}>
-          Wallet on-chain
+        <Txt size={15} weight={evm.network === 'mainnet' ? 'medium' : 'regular'} color={evm.network === 'mainnet' ? colors.red : colors.muted}>
+          {evm.network === 'mainnet' ? 'Wallet on Ethereum mainnet' : 'Wallet on testnet'}
         </Txt>
         {info?.account ? (
           <>
@@ -180,6 +180,11 @@ export default function Home() {
             <Txt size={16} color={colors.faint}>
               This wallet is not on-chain yet.
             </Txt>
+            {evm.network === 'mainnet' ? (
+              <Txt size={14} color={colors.muted} lineHeight={20}>
+                Creating it on Ethereum mainnet costs about 0.006 ETH in gas. Send that to the phone’s gas wallet below first. The contracts are not audited: keep only small amounts in it.
+              </Txt>
+            ) : null}
             {deployError ? (
               <Txt size={14} color={colors.red}>
                 {deployError}
@@ -257,7 +262,7 @@ export default function Home() {
             {info.gasBalance === 0n ? 'Out of gas' : 'Gas running low'}
           </Txt>
           <Txt size={14} color={colors.muted} lineHeight={20}>
-            The phone pays its gas fees from a gas wallet with {fmtEth(info.gasBalance)} left. Send it a little test ETH, or the phone cannot grant, revoke or decide limits.
+            The phone pays its gas fees from a gas wallet with {fmtEth(info.gasBalance)} left. Send it a little {evm.network === 'mainnet' ? 'ETH' : 'test ETH'}, or the phone cannot grant, revoke or decide limits.
           </Txt>
           <Button
             label={gasCopied ? 'Copied' : `Copy ${shortAddr(info.gasAddress)}`}

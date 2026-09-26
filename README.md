@@ -177,6 +177,16 @@ Or skip the build and install the APK from the [latest release](https://github.c
 
 The phone talks to the ESP32 devices over **Bluetooth LE** and to the chain directly. It keeps a gas wallet in its secure store: fund its address, shown on Home, with a little test ETH.
 
+## Networks
+
+The app runs on the **testnet (Sepolia)** by default. **More → Ethereum mainnet** switches it to Ethereum mainnet after a confirmation. The same phone and Kagi Wallet stay paired; mainnet gets its own wallet account, so the flow starts again from Home with **Create on-chain account**. Switching back brings the testnet wallet back untouched.
+
+On mainnet:
+- The phone uses its own gas wallet, which you fund (about 0.006 ETH to create the account). The testnet gas sponsor compiled into the APK is never used on mainnet.
+- The agent MCP server finds each wallet's chain by where its contract lives, so connector links work unchanged.
+- Spending history and totals (Curvegrid MultiBaas) are testnet-only for now.
+- The contracts are not audited. Keep only small amounts in a mainnet wallet.
+
 ## Tests
 
 | Command | What it covers |

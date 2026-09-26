@@ -7,6 +7,7 @@ import { Txt } from '../../components/Txt';
 import { Button } from '../../components/Button';
 import { useChain } from '../../store/chain';
 import { DEMO_RECIPIENT, restoreAgentDemo, runAgentDemo, useAgentDemo } from '../../lib/agentDemo';
+import * as evm from '../../lib/evm';
 import { EXPLORER } from '../../lib/evm';
 import { usePresentation } from '../../components/Presentation';
 import { resetEverything, type ResetStep } from '../../lib/reset';
@@ -39,6 +40,16 @@ export default function PresentationSettings() {
       setResetError(e instanceof Error ? e.message : String(e));
     }
   };
+  // Testnet or Ethereum mainnet. Going to mainnet asks first: it is real money.
+  const [net, setNet] = useState(evm.network);
+  const [confirmMainnet, setConfirmMainnet] = useState(false);
+  useEffect(() => evm.onNetworkChange(setNet), []);
+  const switchTo = (n: evm.Network) => {
+    setConfirmMainnet(false);
+    evm.switchNetwork(n);
+    router.navigate('/home');
+  };
+
   return (
     <Screen scroll>
       <TopBar title="More" />
@@ -65,6 +76,36 @@ export default function PresentationSettings() {
           </View>
           <Switch accessibilityLabel="Kagi Wallet sounds" value={p.sound} onValueChange={(sound) => p.update({ sound })} />
         </View>
+        <View style={[styles.row, net === 'mainnet' && styles.rowMainnet]}>
+          <View style={styles.copy}>
+            <Txt>Ethereum mainnet</Txt>
+            <Txt size={13} color={net === 'mainnet' ? colors.red : colors.muted}>
+              {net === 'mainnet' ? 'On. Real ETH, on Ethereum mainnet.' : 'Off. You are on the testnet (Sepolia).'}
+            </Txt>
+          </View>
+          <Switch
+            accessibilityLabel="Ethereum mainnet"
+            value={net === 'mainnet' || confirmMainnet}
+            onValueChange={(on) => (on ? setConfirmMainnet(true) : net === 'mainnet' ? switchTo('testnet') : setConfirmMainnet(false))}
+          />
+        </View>
+        {confirmMainnet && net !== 'mainnet' ? (
+          <View style={styles.confirm}>
+            <Txt size={17} weight="medium">
+              Switch to Ethereum mainnet?
+            </Txt>
+            <Txt size={14} color={colors.muted} lineHeight={20}>
+              This uses real ETH. Your phone and Kagi Wallet stay paired, and you create a new wallet account on mainnet, so the
+              flow starts again from Home. The phone gets its own gas wallet there: fund it with about 0.006 ETH to create the
+              account. The contracts are not audited, so keep only small amounts in it. Spending history stays on testnet for
+              now. Your testnet wallet is untouched and comes back when you switch back.
+            </Txt>
+            <Button label="Switch to Ethereum mainnet" variant="danger" onPress={() => switchTo('mainnet')} />
+            <Button label="Stay on testnet" variant="ghost" onPress={() => setConfirmMainnet(false)} />
+          </View>
+        ) : null}
+
+        {net === 'mainnet' ? null : (
         <View style={styles.testAgent}>
           <Txt size={22}>In-app test agent</Txt>
           <Txt size={14} color={colors.muted}>
@@ -107,6 +148,7 @@ export default function PresentationSettings() {
             />
           ) : null}
         </View>
+        )}
         <Button label="Agent access" onPress={() => router.push('/agent')} />
         <Button label="Second stick" variant="secondary" onPress={() => router.push('/vault')} />
         <Txt size={12} color={colors.muted}>
@@ -160,5 +202,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.m,
   },
   copy: { flex: 1, gap: 5 },
+  rowMainnet: { borderWidth: 1, borderColor: colors.red },
+  confirm: { borderWidth: 1, borderColor: colors.red, borderRadius: radius.m, padding: space.m, gap: space.m, backgroundColor: colors.panel },
   reset: { borderWidth: 1, borderColor: colors.red, borderRadius: radius.m, padding: space.m, gap: space.m, marginTop: space.l },
 });

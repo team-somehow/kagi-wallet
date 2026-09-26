@@ -118,6 +118,10 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
     navRef.current = navReady;
   }, [navReady]);
 
+  // The network (testnet or mainnet): switching it starts the chain view from nothing.
+  const [net, setNet] = useState(evm.network);
+  useEffect(() => evm.onNetworkChange(setNet), []);
+
   const refresh = useCallback(async () => {
     if (!groupKey) return null;
     try {
@@ -153,9 +157,10 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
       setError(evm.reason(e));
       return null;
     }
-  }, [groupKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- net: a new network re-reads everything
+  }, [groupKey, net]);
 
-  // A new wallet starts from nothing.
+  // A new wallet, or a new network, starts from nothing.
   useEffect(() => {
     scanned.current = null;
     const t = setTimeout(() => {
@@ -163,7 +168,7 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
       setInfo(null);
     }, 0);
     return () => clearTimeout(t);
-  }, [groupKey]);
+  }, [groupKey, net]);
 
   // Keep the chain view fresh while the wallet exists: about one block.
   useEffect(() => {

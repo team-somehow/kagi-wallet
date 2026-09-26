@@ -26,8 +26,12 @@ type Phase = 'search' | 'hold' | 'keygen' | 'lock' | 'fund' | 'account' | 'ready
 // Starting balance for the on-chain account, from the phone's gas wallet. Tiny: testnet ETH is scarce.
 const FUND = 50_000_000_000_000n; // 0.00005 ETH
 // The gas wallet needs this much to deploy and fund the account, with room to spare.
-const NEED = 2_000_000_000_000_000n; // 0.002 ETH
+const NEED_TESTNET = 2_000_000_000_000_000n; // 0.002 ETH
+const NEED_MAINNET = 6_000_000_000_000_000n; // 0.006 ETH: deploying costs about 1M gas at mainnet fees
+const need = () => (evm.network === 'mainnet' ? NEED_MAINNET : NEED_TESTNET);
 
+// On mainnet the gas wallet is the phone's own, funded by the owner with real ETH.
+const FUND_MAINNET = { title: 'Add gas money', body: 'The phone pays its own gas fees from a gas wallet. Send it at least 0.006 ETH on Ethereum mainnet. This continues by itself once it arrives. The contracts are not audited: keep only small amounts in the wallet.' };
 const COPY: Record<Phase, { title: string; body: string }> = {
   search: { title: 'Wake your stick', body: 'Switch it on and keep it close. The phone finds it over Bluetooth.' },
   hold: { title: 'Press and hold', body: 'Hold the button on your stick until its ring fills.' },
@@ -132,7 +136,7 @@ export default function Connect() {
         const w = await evm.gasWallet();
         const balance = await evm.pub.getBalance({ address: w.address });
         setGas({ address: w.address, balance });
-        if (balance < NEED) {
+        if (balance < need()) {
           setPhase('fund');
           return;
         }
@@ -154,7 +158,7 @@ export default function Connect() {
     const t = setInterval(() => {
       void evm.pub.getBalance({ address: gas.address as `0x${string}` }).then((balance) => {
         setGas((g) => (g ? { ...g, balance } : g));
-        if (balance >= NEED) void deploy();
+        if (balance >= need()) void deploy();
       }).catch(() => undefined);
     }, 5000);
     return () => clearInterval(t);
@@ -173,7 +177,7 @@ export default function Connect() {
     setPhase('search');
   };
 
-  const c = COPY[phase];
+  const c = phase === 'fund' && evm.network === 'mainnet' ? FUND_MAINNET : COPY[phase];
   return (
     <Screen
       footer={
@@ -214,7 +218,7 @@ export default function Connect() {
               {gas.address}
             </Txt>
             <Txt size={14} color={colors.muted} align="center">
-              Balance {Number(gas.balance) / 1e18} ETH. Waiting for {Number(NEED) / 1e18} ETH.
+              Balance {Number(gas.balance) / 1e18} ETH. Waiting for {Number(need()) / 1e18} ETH.
             </Txt>
             <Button
               label={copied ? 'Copied' : `Copy ${shortAddr(gas.address)}`}

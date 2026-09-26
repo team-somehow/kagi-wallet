@@ -7,6 +7,7 @@ import { Fact } from '../../components/Fact';
 import { InterceptaMark } from '../../components/BrandMarks';
 import { fmtEth, useChain } from '../../store/chain';
 import { MCP_URL } from '../../lib/session';
+import * as evm from '../../lib/evm';
 import { shortAddr } from '../../lib/format';
 import { colors, radius, space } from '../../theme';
 
@@ -30,7 +31,9 @@ async function fetchSummary(account: string): Promise<Summary> {
  */
 export default function Spending() {
   const { info, sessions } = useChain();
-  const account = info?.account ? String(info.account) : null;
+  // The MultiBaas deployment indexes the testnet, so the summary is testnet-only for now.
+  const onMainnet = evm.network === 'mainnet';
+  const account = info?.account && !onMainnet ? String(info.account) : null;
   const explorer = info?.explorer ?? 'https://sepolia.etherscan.io';
   const [data, setData] = useState<Summary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +85,11 @@ export default function Spending() {
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.body} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}>
-        {!account ? (
+        {onMainnet ? (
+          <Txt size={15} color={colors.muted} lineHeight={22}>
+            Spending history is on testnet for now. The MultiBaas index this screen reads covers the testnet; mainnet support comes with a mainnet deployment.
+          </Txt>
+        ) : !account ? (
           <Txt size={15} color={colors.muted}>
             Create the wallet on-chain first. Its spending shows up here.
           </Txt>
