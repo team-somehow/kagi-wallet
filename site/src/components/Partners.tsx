@@ -69,7 +69,7 @@ const PARTNERS: Partner[] = [
     record: {
       label: 'Demo recipients · live verdicts',
       rows: [
-        { k: '0xD130…8107 (contact ABC)', v: 'Pass · risk 0', tone: 'ok' },
+        { k: '0xBB0D…DCe0 (contact ABC)', v: 'Pass · risk 0', tone: 'ok' },
         { k: '0x7aa2…f67E', v: 'Hold · risk 45, phishing transfer', tone: 'wait' },
         { k: '0x098B…2f96 (Tornado Cash)', v: 'Refuse · sanctioned', tone: 'stop' },
       ],
