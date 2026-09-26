@@ -32,7 +32,7 @@
 #include "secrets.example.h"
 #endif
 
-static const char* FW = "0.3.3";
+static const char* FW = "0.4.0";
 
 // ---- look -----------------------------------------------------------------
 
@@ -381,17 +381,17 @@ static void wipeShare() {
 
 // ---- drawing --------------------------------------------------------------
 
-// A shallow lit surface keeps the tiny screen readable while giving it depth.
-static uint16_t themeGlow(uint8_t amount) {
-  return isVault ? M5.Display.color565(amount, amount * 105 / 255, amount * 126 / 255)
-                 : M5.Display.color565(amount * 90 / 255, amount * 190 / 255, amount);
+// Light mode, matching the phone app: cool aluminium ground, ink text, one deep accent per
+// role. Everything that used to glow out of black now tints the light ground towards it.
+static const uint8_t BG_R = 236, BG_G = 240, BG_B = 244;
+static uint16_t mix(uint8_t r, uint8_t g, uint8_t b, uint8_t amount) {  // ground -> (r,g,b)
+  return M5.Display.color565(BG_R + (r - BG_R) * amount / 255, BG_G + (g - BG_G) * amount / 255, BG_B + (b - BG_B) * amount / 255);
 }
+// The role's accent, mixed into the ground: a faint amount for surfaces, more for rules.
+static uint16_t themeGlow(uint8_t amount) { return isVault ? mix(170, 52, 72, amount) : mix(28, 98, 150, amount); }
 static void drawSurface() {
-  for (int y = 0; y < H; y++) {
-    int glow = 27 * (H - y) / H;
-    canvas.drawFastHLine(0, y, W, isVault ? M5.Display.color565(18 + glow, 10 + glow / 3, 18 + glow / 2)
-                                        : M5.Display.color565(8 + glow / 3, 17 + glow / 2, 29 + glow));
-  }
+  // A shallow wash from the top keeps the tiny screen from looking flat.
+  for (int y = 0; y < H; y++) canvas.drawFastHLine(0, y, W, themeGlow(22 * (H - y) / H));
   canvas.drawRoundRect(1, 1, W - 2, H - 2, 9, themeGlow(70));
   canvas.drawFastHLine(12, 2, W - 24, themeGlow(110));
   canvas.drawFastHLine(12, H - 3, W - 24, C_BG);
@@ -502,8 +502,7 @@ static void drawIdle() {
   for (int i = 0; i < 3; i++) {
     float ph = fmodf(t01(2400) + i / 3.0f, 1.0f);
     int r = 6 + (int)(ph * 34);
-    uint8_t a = (uint8_t)(200 * (1 - ph));
-    canvas.drawCircle(cx, cy, r, M5.Display.color565(a, a, a));
+    canvas.drawCircle(cx, cy, r, mix(84, 94, 108, (uint8_t)(200 * (1 - ph))));  // fades into the ground
   }
   canvas.fillCircle(cx, cy, 5, C_ACCENT);
   statusIcons();
@@ -2495,14 +2494,14 @@ void setup() {
   canvas.setColorDepth(16);
   canvas.createSprite(W, H);
 
-  C_BG = M5.Display.color565(0, 0, 0);
-  C_TEXT = M5.Display.color565(236, 233, 225);
-  C_MUTED = M5.Display.color565(142, 147, 155);
-  C_FAINT = M5.Display.color565(88, 93, 101);
-  C_ACCENT = M5.Display.color565(255, 177, 59);
-  C_RED = M5.Display.color565(255, 90, 78);
-  C_CELL = M5.Display.color565(38, 41, 47);
-  C_PANEL = M5.Display.color565(17, 19, 22);
+  C_BG = M5.Display.color565(BG_R, BG_G, BG_B);
+  C_TEXT = M5.Display.color565(17, 24, 32);
+  C_MUTED = M5.Display.color565(84, 94, 108);
+  C_FAINT = M5.Display.color565(140, 148, 158);
+  C_ACCENT = M5.Display.color565(179, 95, 23);
+  C_RED = M5.Display.color565(196, 48, 38);
+  C_CELL = M5.Display.color565(214, 221, 229);
+  C_PANEL = M5.Display.color565(248, 250, 252);
 
   uint8_t mac[6];
   esp_efuse_mac_get_default(mac);
@@ -2528,10 +2527,9 @@ void setup() {
   ir::onRecvProgress(irOnRecv);
   loadShare();
   loadRoot();
-  C_BG = M5.Display.color565(7, 10, 16);
-  C_ACCENT = isVault ? M5.Display.color565(255, 132, 146) : M5.Display.color565(131, 214, 235);
-  C_PANEL = isVault ? M5.Display.color565(43, 22, 30) : M5.Display.color565(19, 37, 56);
-  C_CELL = isVault ? M5.Display.color565(82, 44, 53) : M5.Display.color565(41, 67, 90);
+  C_ACCENT = isVault ? M5.Display.color565(170, 52, 72) : M5.Display.color565(28, 98, 150);
+  C_PANEL = isVault ? M5.Display.color565(248, 232, 235) : M5.Display.color565(228, 238, 247);
+  C_CELL = isVault ? M5.Display.color565(236, 206, 212) : M5.Display.color565(204, 222, 238);
   // The wrist advertises all the time; the vault only while its window is open.
   ble::begin(String(isVault ? "Kagi vault-" : "Kagi wrist-") + deviceId.substring(6), !isVault);
 #ifndef KAGI_NO_WIFI

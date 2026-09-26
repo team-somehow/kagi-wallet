@@ -45,7 +45,7 @@ function Choice<T extends string | number>({
             }}
             style={[styles.choice, on && styles.choiceOn]}
           >
-            <Txt size={15} weight="medium" color={on ? colors.onLight : colors.text}>
+            <Txt size={15} weight="medium" color={on ? colors.onFill : colors.text}>
               {render(o)}
             </Txt>
           </Pressable>

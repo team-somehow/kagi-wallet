@@ -73,7 +73,7 @@ export default function RootLayout() {
       <ChainProvider>
       <ThemeProvider value={theme}>
       <PresentationProvider>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="onboarding" />

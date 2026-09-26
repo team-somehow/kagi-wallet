@@ -166,7 +166,7 @@ export default function WristSettings() {
                   }}
                   style={[styles.pick, on && styles.pickOn]}
                 >
-                  <Txt size={15} weight="medium" color={on ? colors.onLight : colors.text}>
+                  <Txt size={15} weight="medium" color={on ? colors.onFill : colors.text}>
                     {n.ssid.trim() || '(no name)'}
                   </Txt>
                 </Pressable>

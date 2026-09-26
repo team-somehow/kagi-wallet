@@ -17,9 +17,9 @@ interface Props {
 }
 
 const fill: Record<Variant, { bg: string; fg: string; border: string }> = {
-  primary: { bg: colors.text, fg: colors.onLight, border: colors.text },
+  primary: { bg: colors.text, fg: colors.onFill, border: colors.text },
   secondary: { bg: 'transparent', fg: colors.text, border: colors.line },
-  amber: { bg: colors.amber, fg: colors.onLight, border: colors.amber },
+  amber: { bg: colors.amber, fg: colors.onFill, border: colors.amber },
   danger: { bg: 'transparent', fg: colors.red, border: colors.red },
   ghost: { bg: 'transparent', fg: colors.muted, border: 'transparent' },
 };

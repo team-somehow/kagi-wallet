@@ -1,21 +1,22 @@
-// Kagi design tokens. True black ground (OLED, hardware), warm phosphor white
-// for everything that is fine, amber for anything that needs a human, red for
-// revoke. No green: quiet is the absence of colour.
+// Kagi design tokens, light. Cool aluminium ground (the sticks' own material, not cream), ink
+// for everything that is fine, deep amber for anything that needs a human, red for revoke.
+// Deep blue marks infrared and the wrist. No green: quiet is the absence of colour.
 export const colors = {
-  ground: '#0B0D11',
-  panel: '#15181E',
-  raised: '#24282F',
-  line: '#292D34',
-  text: '#F0EEE7',
-  muted: '#A0A6B0',
-  faint: '#585D65',
-  amber: '#FFAC70',
-  amberInk: '#36271F',
-  blue: '#83D6EB',
-  blueInk: '#152C36',
-  red: '#FF5A4E',
-  redInk: '#2C120F',
-  onLight: '#000000',
+  ground: '#E9EDF1',
+  panel: '#F8FAFC',
+  raised: '#DDE3EA',
+  line: '#CBD2DA',
+  text: '#111820',
+  muted: '#5C6674',
+  faint: '#8A939F',
+  amber: '#B35F17',
+  amberInk: '#F3E4D5',
+  blue: '#1C6296',
+  blueInk: '#DCE9F4',
+  red: '#C4302A',
+  redInk: '#F6DEDA',
+  /** Text on a filled button or chip (ink, amber or red fills). */
+  onFill: '#FFFFFF',
 } as const;
 
 export const fonts = {

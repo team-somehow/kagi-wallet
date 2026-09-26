@@ -59,14 +59,15 @@ export function StickModel({
           end={{ x: 1, y: 1 }}
           style={s.case}
         >
-          <LinearGradient colors={['#14202D', '#06111E']} style={s.lcd}>
-            <Txt size={9} mono color={colors.blue}>
+          {/* The screen matches the firmware's light mode: aluminium, ink, the role's accent. */}
+          <LinearGradient colors={['#F8FAFC', '#E4EBF2']} style={s.lcd}>
+            <Txt size={9} mono color={variant === 'red' ? '#AA3448' : colors.blue}>
               {title}
             </Txt>
-            <Txt size={value.length > 15 ? 12 : 17} mono color="#C0EAFF" numberOfLines={2}>
+            <Txt size={value.length > 15 ? 12 : 17} mono color={colors.text} numberOfLines={2}>
               {value}
             </Txt>
-            <Txt size={9} color="#90B4C9" numberOfLines={1}>
+            <Txt size={9} color={colors.muted} numberOfLines={1}>
               {detail}
             </Txt>
             <View style={[s.bar, active && { backgroundColor: colors.blue }]} />
@@ -162,7 +163,7 @@ export function SpatialDevices({
     >
       <View style={{ width: 320, height: 244, transform: [{ scale }] }}>
         <View style={s.orbit} />
-        <LinearGradient colors={['#FFAC7012', '#83D6EB04', '#0B0D1100']} style={s.glow} />
+        <LinearGradient colors={['#B35F1710', '#1C629608', '#E9EDF100']} style={s.glow} />
         <View style={s.phone}>
           <View style={s.phoneIcon} />
           <Txt size={10} color={focus === 'phone' ? colors.amber : colors.muted}>
@@ -273,7 +274,7 @@ const s = StyleSheet.create({
     elevation: 12,
   },
   lcd: { width: 137, borderRadius: 5, borderWidth: 2, borderColor: '#070D14', padding: 6, gap: 1 },
-  bar: { height: 1, marginTop: 3, backgroundColor: '#263B4F' },
+  bar: { height: 1, marginTop: 3, backgroundColor: colors.line },
   buttonHalo: { width: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 15 },
   buttonActive: {
     shadowColor: colors.blue,
@@ -291,7 +292,7 @@ const s = StyleSheet.create({
     height: 125,
     borderRadius: 145,
     borderWidth: 1,
-    borderColor: '#30394288',
+    borderColor: '#8A939F66',
     transform: [{ rotate: '-16deg' }],
   },
   glow: { position: 'absolute', left: 28, top: 63, width: 260, height: 149, borderRadius: 120 },

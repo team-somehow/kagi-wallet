@@ -1,42 +1,29 @@
-import React from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
-import { router } from "expo-router";
-import { Txt } from "../../components/Txt";
-import { StickModel } from "../../components/SpatialDevices";
-import { space } from "../../theme";
+import React from 'react';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { Txt } from '../../components/Txt';
+import { StickModel } from '../../components/SpatialDevices';
+import { colors, space } from '../../theme';
 
-// The welcome screen is the one light screen: the sticks sit on it like hardware on a desk.
-// Cool aluminium, not cream, so it reads as the devices' own material.
-const paper = "#E9EDF1";
-const ink = "#111820";
-const slate = "#5C6674";
-const rule = "#CBD2DA";
-const signer = "#B35F17"; // the app's amber, deepened to read on light: one of your devices signs
+// The sticks sit on the welcome screen like hardware on a desk.
+const paper = colors.ground;
+const ink = colors.text;
+const slate = colors.muted;
+const rule = colors.line;
+const signer = colors.amber; // one of your devices signs
 
 // Who has to agree, from the agent alone up to every device. The dots are how many of your
 // own devices sign: none, phone and wrist, then all three with the second stick.
 const LADDER: { when: string; who: string; signers: number }[] = [
-  { when: "Under the cap", who: "The agent’s own key", signers: 0 },
-  { when: "Over the cap", who: "Your phone and wrist", signers: 2 },
-  { when: "Higher limits", who: "Plus a second stick", signers: 3 },
+  { when: 'Under the cap', who: 'The agent’s own key', signers: 0 },
+  { when: 'Over the cap', who: 'Your phone and wrist', signers: 2 },
+  { when: 'Higher limits', who: 'Plus a second stick', signers: 3 },
 ];
 
 function Signers({ n }: { n: number }) {
   return (
-    <View
-      style={styles.dots}
-      accessibilityLabel={
-        n === 0 ? "none of your devices" : `${n} of your devices`
-      }
-    >
+    <View style={styles.dots} accessibilityLabel={n === 0 ? 'none of your devices' : `${n} of your devices`}>
       {[0, 1, 2].map((i) => (
         <View key={i} style={[styles.dot, i < n ? styles.dotOn : null]} />
       ))}
@@ -48,58 +35,26 @@ export default function Welcome() {
   const { width } = useWindowDimensions();
   const k = Math.min(1.2, Math.max(0.8, (width - 2 * space.l) / 340));
   return (
-    <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
-      <StatusBar style="dark" />
-      <ScrollView
-        contentContainerStyle={styles.body}
-        showsVerticalScrollIndicator={false}
-      >
+    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <Txt size={22} weight="bold" color={ink} style={styles.mark}>
           Kagi
         </Txt>
 
-        <View
-          style={[styles.stage, { height: 200 * k }]}
-          accessibilityLabel="Your wrist stick and a second stick"
-        >
+        <View style={[styles.stage, { height: 200 * k }]} accessibilityLabel="Your wrist stick and a second stick">
           <View style={[styles.at, { left: 204 * k, top: 0 }]}>
-            <StickModel
-              width={144 * k}
-              tilt={9}
-              variant="red"
-              title="SECOND STICK"
-              value="Ready"
-              detail="Infrared"
-            />
+            <StickModel width={144 * k} tilt={9} variant="red" title="SECOND STICK" value="Ready" detail="Infrared" />
           </View>
           <View style={[styles.at, { left: 0, top: 84 * k }]}>
-            <StickModel
-              width={190 * k}
-              tilt={-6}
-              title="WRIST"
-              value="Kagi"
-              detail="Hold A to approve"
-            />
+            <StickModel width={190 * k} tilt={-6} title="WRIST" value="Kagi" detail="Hold A to approve" />
           </View>
         </View>
 
         <View style={styles.hero}>
-          <Txt
-            size={40}
-            weight="bold"
-            lineHeight={42}
-            color={ink}
-            style={styles.headline}
-          >
+          <Txt size={40} weight="bold" lineHeight={42} color={ink} style={styles.headline}>
             Give your agent a spending key.
           </Txt>
-          <Txt
-            size={40}
-            weight="bold"
-            lineHeight={42}
-            color={slate}
-            style={styles.headline}
-          >
+          <Txt size={40} weight="bold" lineHeight={42} color={slate} style={styles.headline}>
             Keep the wallet.
           </Txt>
         </View>
@@ -115,11 +70,7 @@ export default function Welcome() {
                   {r.when}
                 </Txt>
                 <Signers n={r.signers} />
-                <Txt
-                  size={15}
-                  color={r.signers ? ink : slate}
-                  style={styles.who}
-                >
+                <Txt size={15} color={r.signers ? ink : slate} style={styles.who}>
                   {r.who}
                 </Txt>
               </View>
@@ -134,7 +85,7 @@ export default function Welcome() {
         </Txt>
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push("/onboarding/connect")}
+          onPress={() => router.push('/onboarding/connect')}
           style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
         >
           <Txt size={17} weight="medium" color={paper}>
@@ -155,7 +106,7 @@ const styles = StyleSheet.create({
   },
   mark: { letterSpacing: -0.6 },
   stage: { marginTop: space.l, marginBottom: space.m },
-  at: { position: "absolute" },
+  at: { position: 'absolute' },
   hero: { marginTop: space.s },
   headline: { letterSpacing: -1.6 },
   ladder: { marginTop: space.xl },
@@ -165,8 +116,8 @@ const styles = StyleSheet.create({
     borderTopColor: rule,
   },
   row: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: space.m,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -174,7 +125,7 @@ const styles = StyleSheet.create({
   },
   when: { width: 108 },
   who: { flex: 1 },
-  dots: { flexDirection: "row", gap: 5 },
+  dots: { flexDirection: 'row', gap: 5 },
   dot: {
     width: 9,
     height: 9,
@@ -194,8 +145,8 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     backgroundColor: ink,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   ctaPressed: { opacity: 0.85 },
 });
