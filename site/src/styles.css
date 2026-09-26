@@ -376,6 +376,8 @@ p { margin: 0; }
 .connect-try.try-held span b { color: var(--amber); }
 .connect-try.try-over { border-color: rgba(28, 98, 150, 0.35); }
 .connect-try.try-over span b { color: var(--blue); }
+.connect-try.try-vault { border-color: rgba(238, 33, 33, 0.3); }
+.connect-try.try-vault span b { color: var(--red, #c42020); }
 .connect-note { color: var(--faint); font-size: 14px; line-height: 1.5; max-width: 60ch; }
 .connect-run { padding: 24px; display: grid; align-content: start; align-self: start; gap: 2px; font-size: 14px; }
 .run-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }

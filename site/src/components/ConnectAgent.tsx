@@ -13,6 +13,10 @@ const PROMPTS = [
   // The default cap is 5 µETH. After the two above (the approved hold raises it to 7), 4 µETH is
   // spent and 3 µETH is left, so this one is over the allowance and needs a raise.
   { id: 'over', label: 'Over the limit, so it asks for more', text: `Send 0.000004 ETH to ${CLEAN}.` },
+  // A raise asks for double what's needed: (4 + 4) × 2 = 16 µETH. Approved, 8 µETH is spent and
+  // 8 µETH left. Adding a second Kagi Wallet keeps the wallet and the allowance, so 10 µETH is
+  // over again and asks for (8 + 10) × 2 = 36 µETH, now approved on all three devices.
+  { id: 'vault', label: 'After adding a second Kagi Wallet, it needs all three devices', text: `Send 0.00001 ETH to ${CLEAN}.` },
 ];
 const NAME = 'kagi';
 // Where the box starts: the public demo wallet, so every button works before anyone types.
@@ -103,7 +107,11 @@ const RUN: { who: 'you' | 'tool' | 'stick' | 'ai'; text: string; tone?: 'ok' | '
   { who: 'tool', text: 'wait_for_approval: approved, 0.000002 sent', tone: 'ok' },
   { who: 'you', text: `Send 0.000004 ETH to ${short(CLEAN)}.` },
   { who: 'tool', text: 'send_eth: only 0.000003 left of the allowance. Not sent; asked the owner to raise the limit', tone: 'wait' },
-  { who: 'ai', text: 'The first payment went straight through, the second waited for your Kagi Wallet, and the third is over my limit until you raise it.' },
+  { who: 'stick', text: 'Approve the raise to 0.000016 on the phone and Kagi Wallet. The 0.000004 is sent. Then add a second Kagi Wallet from the app.' },
+  { who: 'you', text: `Send 0.00001 ETH to ${short(CLEAN)}.` },
+  { who: 'tool', text: 'send_eth: only 0.000008 left. Not sent; asked the owner to raise the limit to 0.000036', tone: 'wait' },
+  { who: 'stick', text: 'Now the phone and both Kagi Wallets must approve.' },
+  { who: 'tool', text: 'wait_for_approval: approved, 0.00001 sent', tone: 'ok' },
 ];
 
 const WHO = { you: 'You', tool: 'Tool', stick: 'Kagi Wallet', ai: 'AI' } as const;
