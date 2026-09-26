@@ -18,9 +18,10 @@ import { goBack } from '../lib/nav';
 
 type Phase = 'form' | 'sign' | 'submitting' | 'done' | 'error' | 'pending';
 
-// The agent pays its own gas, so its key gets a little test ETH with the grant: enough for
-// a handful of transfers and limit requests at about 1 gwei.
-const AGENT_GAS = 500_000_000_000_000n; // 0.0005 ETH
+// The agent pays its own gas, so its key gets a little ETH with the grant. A payment is about
+// 53k gas and a limit request about 106k; the site's four demo prompts take about 530k. On
+// Sepolia (about 1 gwei, free test ETH) give it room for that twice over; mainnet is cheaper.
+const agentGas = () => (evm.network === 'mainnet' ? 500_000_000_000_000n : 1_500_000_000_000_000n); // 0.0005 / 0.0015 ETH
 // What the grant itself costs, with room to spare.
 const GRANT_GAS = 300_000_000_000_000n; // 0.0003 ETH
 
@@ -70,8 +71,8 @@ export default function NewAgentKey() {
       setError('This wallet has no on-chain account yet. Create it from Home first.');
       return;
     }
-    if (i.gasBalance < AGENT_GAS + GRANT_GAS) {
-      setError(`The phone's gas wallet needs at least ${fmtEth(AGENT_GAS + GRANT_GAS)}. It has ${fmtEth(i.gasBalance)}. Top it up from Home.`);
+    if (i.gasBalance < agentGas() + GRANT_GAS) {
+      setError(`The phone's gas wallet needs at least ${fmtEth(agentGas() + GRANT_GAS)}. It has ${fmtEth(i.gasBalance)}. Top it up from Home.`);
       return;
     }
     setKey(newSessionKey(name.trim()));
@@ -93,7 +94,7 @@ export default function NewAgentKey() {
       // Gas money for the agent's own key. The grant stands even if this fails.
       setGasStep('active');
       try {
-        const g = await evm.sendGas(key.address as `0x${string}`, AGENT_GAS);
+        const g = await evm.sendGas(key.address as `0x${string}`, agentGas());
         setGasStep(g.status === 'success' ? 'done' : 'failed');
       } catch {
         setGasStep('failed');
@@ -118,7 +119,7 @@ export default function NewAgentKey() {
       setHash(sentHash);
       setGasStep('active');
       try {
-        const gas = await evm.sendGas(key.address as `0x${string}`, AGENT_GAS);
+        const gas = await evm.sendGas(key.address as `0x${string}`, agentGas());
         setGasStep(gas.status === 'success' ? 'done' : 'failed');
       } catch { setGasStep('failed'); }
       setPhase('done'); void success(); void refresh();
@@ -201,7 +202,7 @@ export default function NewAgentKey() {
               },
               {
                 label: 'Gas for the agent',
-                detail: gasStep === 'active' ? `Sending ${fmtEth(AGENT_GAS)} so the agent can pay its own fees` : 'Next',
+                detail: gasStep === 'active' ? `Sending ${fmtEth(agentGas())} so the agent can pay its own fees` : 'Next',
                 state: gasStep === 'active' ? 'active' : 'todo',
               },
             ]}
