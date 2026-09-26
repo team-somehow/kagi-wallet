@@ -10,6 +10,9 @@ const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const PROMPTS = [
   { id: 'clean', label: 'Goes straight through', text: `Send 0.000002 ETH to ${CLEAN}.` },
   { id: 'held', label: 'Held by Intercepta for your Kagi Wallet', text: `Send 0.000002 ETH to ${FLAGGED}.` },
+  // The default cap is 5 µETH. After the two above (the approved hold raises it to 7), 4 µETH is
+  // spent and 3 µETH is left, so this one is over the allowance and needs a raise.
+  { id: 'over', label: 'Over the limit, so it asks for more', text: `Send 0.000004 ETH to ${CLEAN}.` },
 ];
 const NAME = 'kagi';
 // Where the box starts: the public demo wallet, so every button works before anyone types.
@@ -98,7 +101,9 @@ const RUN: { who: 'you' | 'tool' | 'stick' | 'ai'; text: string; tone?: 'ok' | '
   { who: 'tool', text: `send_eth: Intercepta flags a fake phishing transfer (risk 45). Not signed, held for the owner`, tone: 'wait' },
   { who: 'stick', text: 'The phone shows “Intercepta held this payment” with the reason. Hold the Kagi Wallet’s button to pay anyway, tap it to refuse.' },
   { who: 'tool', text: 'wait_for_approval: approved, 0.000002 sent', tone: 'ok' },
-  { who: 'ai', text: 'The first payment went straight through. The second was held until you approved it on your Kagi Wallet.' },
+  { who: 'you', text: `Send 0.000004 ETH to ${short(CLEAN)}.` },
+  { who: 'tool', text: 'send_eth: only 0.000003 left of the allowance. Not sent; asked the owner to raise the limit', tone: 'wait' },
+  { who: 'ai', text: 'The first payment went straight through, the second waited for your Kagi Wallet, and the third is over my limit until you raise it.' },
 ];
 
 const WHO = { you: 'You', tool: 'Tool', stick: 'Kagi Wallet', ai: 'AI' } as const;
@@ -198,7 +203,7 @@ export function ConnectAgent() {
             {PROMPTS.map((pr, i) => (
               <div key={pr.id} className={`connect-try try-${pr.id}`}>
                 <span>
-                  {i === 0 ? 'Then try' : 'And then'} · <b>{pr.label}</b>
+                  {i === 0 ? 'Then try' : i === PROMPTS.length - 1 ? 'Finally' : 'And then'} · <b>{pr.label}</b>
                 </span>
                 <q>{pr.text}</q>
                 <button
