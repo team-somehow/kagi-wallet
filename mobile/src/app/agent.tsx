@@ -70,8 +70,17 @@ export default function NewAgentKey() {
       setError('This wallet has no Sepolia account yet. Create it from Home first.');
       return;
     }
-    if (i.gasBalance < AGENT_GAS + GRANT_GAS) {
-      setError(`The phone's gas wallet needs at least ${fmtEth(AGENT_GAS + GRANT_GAS)}. It has ${fmtEth(i.gasBalance)}. Top it up from Home.`);
+    let gasBalance = i.gasBalance;
+    if (gasBalance < AGENT_GAS + GRANT_GAS && evm.hasSponsor) {
+      try {
+        await evm.seedGas();
+        gasBalance = await evm.pub.getBalance({ address: i.gasAddress as `0x${string}` });
+      } catch {
+        // Fall through to the message below.
+      }
+    }
+    if (gasBalance < AGENT_GAS + GRANT_GAS) {
+      setError(`The phone's gas wallet needs at least ${fmtEth(AGENT_GAS + GRANT_GAS)}. It has ${fmtEth(gasBalance)}. Top it up from Home.`);
       return;
     }
     setKey(newSessionKey(name.trim()));

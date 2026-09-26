@@ -55,6 +55,35 @@ async function walletClient() {
   return createWalletClient({ account: await gasWallet(), chain: sepolia, transport: http(RPC) });
 }
 
+// ---- the gas sponsor ------------------------------------------------------------------
+// A shared Sepolia key compiled into the build (EXPO_PUBLIC_GAS_SPONSOR_KEY in mobile/.env.local).
+// It tops up each phone's own gas wallet, so nobody has to find a faucet. Anyone with the APK
+// can read it: testnet only, keep its balance small. Each phone still sends from its own gas
+// wallet, so phones never race each other for the sponsor's nonce.
+
+/** What a sponsored top-up brings the gas wallet up to. */
+export const SEED_GAS = 3_000_000_000_000_000n; // 0.003 ETH
+const SPONSOR_KEY = process.env.EXPO_PUBLIC_GAS_SPONSOR_KEY;
+const sponsor = SPONSOR_KEY && /^0x[0-9a-fA-F]{64}$/.test(SPONSOR_KEY) ? privateKeyToAccount(SPONSOR_KEY as Hex) : null;
+export const hasSponsor = sponsor !== null;
+
+/**
+ * Tops the gas wallet up to `target` from the sponsor. Resolves null when this build has no
+ * sponsor or the wallet already has enough. Throws when the sponsor can't pay, so callers can
+ * fall back to asking for gas money by hand.
+ */
+export async function seedGas(target: bigint = SEED_GAS): Promise<Sent | null> {
+  if (!sponsor) return null;
+  const me = await gasWallet();
+  const have = await pub.getBalance({ address: me.address });
+  if (have >= target) return null;
+  const w = createWalletClient({ account: sponsor, chain: sepolia, transport: http(RPC) });
+  const hash = await w.sendTransaction({ to: me.address, value: target - have, chain: sepolia, ...(await fees()) });
+  const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
+  if (r.status !== 'success') throw new Error('The gas top-up failed on Sepolia.');
+  return { hash, status: r.status };
+}
+
 // Frugal fees: just above the current base fee, a tiny tip.
 async function fees() {
   const b = await pub.getBlock();
@@ -66,7 +95,7 @@ export function reason(e: unknown): string {
   if (e instanceof BaseError) {
     const r = e.walk((x) => x instanceof ContractFunctionRevertedError) as ContractFunctionRevertedError | null;
     if (r?.reason) return r.reason;
-    if (/insufficient funds/i.test(e.message)) return 'The phone gas wallet is out of Sepolia ETH. Top it up from Home.';
+    if (/insufficient funds/i.test(e.message)) return hasSponsor ? 'Out of Sepolia ETH for fees. Tap Top up on Home, or send Sepolia ETH to the gas wallet.' : 'The phone gas wallet is out of Sepolia ETH. Top it up from Home.';
     return e.shortMessage;
   }
   return e instanceof Error ? e.message : String(e);
