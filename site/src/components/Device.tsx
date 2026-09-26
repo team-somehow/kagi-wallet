@@ -11,10 +11,10 @@ export type Screen =
   | { kind: 'ring'; top: string; center: string; centerSub?: string; fill: number; label: string; big: string; sub: string };
 
 const THEME: Record<Variant, { top: string; bottom: string; edge: string; accent: string; panel: string; cell: string }> = {
-  blue: { top: '#111e38', bottom: '#08111d', edge: '#183446', accent: '#83d6eb', panel: '#132538', cell: '#29435a' },
-  red: { top: '#2d131f', bottom: '#120a12', edge: '#461c22', accent: '#ff8492', panel: '#2b161e', cell: '#522c35' },
+  blue: { top: '#e2eaf2', bottom: '#ecf0f4', edge: '#b6cadc', accent: '#1c6296', panel: '#e4eef7', cell: '#ccdeee' },
+  red: { top: '#efe2e6', bottom: '#ecf0f4', edge: '#dcb8c0', accent: '#aa3448', panel: '#f8e8eb', cell: '#ecced4' },
 };
-const C = { text: '#ece9e1', muted: '#8e939b', faint: '#585d65', red: '#ff5a4e', bg: '#070a10' };
+const C = { text: '#111820', muted: '#545e6c', faint: '#8c949e', red: '#c4302a', bg: '#ecf0f4' };
 const F = 'Helvetica Neue, Helvetica, Arial, sans-serif';
 
 function Lcd({ screen, v }: { screen: Screen; v: Variant }) {

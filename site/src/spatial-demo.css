@@ -1,13 +1,13 @@
 #kagi-studio {
-  --kg-bg: light-dark(#eeede7, #0b0d11);
-  --kg-paper: light-dark(#faf9f5, #15181e);
-  --kg-ink: light-dark(#26282a, #f0eee7);
-  --kg-muted: light-dark(#656966, #a0a6b0);
-  --kg-line: light-dark(#d9d9d1, #292d34);
-  --kg-accent: light-dark(#ae501c, #ffac70);
-  --kg-soft: light-dark(#efded0, #36271f);
-  --kg-blue: light-dark(#007b9b, #83d6eb);
-  --kg-shadow: light-dark(#25293222, #00000077);
+  --kg-bg: light-dark(#e9edf1, #0b0d11);
+  --kg-paper: light-dark(#f8fafc, #15181e);
+  --kg-ink: light-dark(#111820, #f0eee7);
+  --kg-muted: light-dark(#5c6674, #a0a6b0);
+  --kg-line: light-dark(#cbd2da, #292d34);
+  --kg-accent: light-dark(#b35f17, #ffac70);
+  --kg-soft: light-dark(#f3e4d5, #36271f);
+  --kg-blue: light-dark(#1c6296, #83d6eb);
+  --kg-shadow: light-dark(#11182024, #00000077);
   --kg-depth: 18deg;
   font:
     400 14px/1.5 var(--sans);
@@ -304,13 +304,13 @@
 #kagi-studio .kg-lcd {
   min-width: 0;
   border-radius: 5px;
-  background: linear-gradient(125deg, #121a23, #06101c 60%, #0b1420);
+  background: linear-gradient(125deg, #f8fafc, #e4ebf2 60%, #ecf0f4);
   box-shadow:
     0 0 0 3px #070b10,
     0 0 0 5px #6b737633,
-    inset 0 0 16px #08111f;
+    inset 0 0 12px #1c62961a;
   position: relative;
-  color: #bbe8ff;
+  color: #111820;
   padding: 7% 8%;
   overflow: hidden;
   font-family: var(--mono);
@@ -319,7 +319,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(140deg, #ffffff13, transparent 45%);
+  background: linear-gradient(140deg, #ffffff66, transparent 45%);
   pointer-events: none;
 }
 #kagi-studio .kg-lcd-top {
@@ -327,7 +327,7 @@
   justify-content: space-between;
   font-size: clamp(7px, 1.85cqw, 11px);
   line-height: 1.1;
-  color: #81b9d4;
+  color: #1c6296;
 }
 #kagi-studio .kg-lcd-value {
   font-size: clamp(16px, 5.3cqw, 31px);
@@ -341,23 +341,23 @@
 }
 #kagi-studio .kg-lcd-line {
   font-size: clamp(7px, 1.65cqw, 10px);
-  color: #80a5b8;
+  color: #5c6674;
   white-space: nowrap;
 }
 #kagi-studio .kg-lcd-bar {
   position: absolute;
   bottom: 7%;
   height: 2px;
-  background: #233645;
+  background: #cbd2da;
   left: 8%;
   right: 8%;
 }
 #kagi-studio .kg-lcd-bar span {
   display: block;
   height: 100%;
-  background: #98e2ff;
+  background: #1c6296;
   width: var(--kg-hold, 0%);
-  box-shadow: 0 0 10px #69d0ff;
+  box-shadow: 0 0 8px #1c629655;
 }
 #kagi-studio .kg-physical {
   min-width: 28px;
@@ -1001,7 +1001,7 @@
 }
 
 #kagi-studio {
-  color-scheme: dark;
+  color-scheme: light;
 }
 #kagi-studio .kg-tabs button[aria-pressed='true'] {
   border-color: var(--kg-accent);

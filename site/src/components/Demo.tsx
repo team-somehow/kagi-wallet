@@ -378,7 +378,7 @@ export function Demo() {
                           style={{
                             animation: 'kg-dash 4s linear infinite',
                             animationDirection: phase === 'ir-back' ? 'reverse' : 'normal',
-                            color: '#83d6eb',
+                            color: '#1c6296',
                           }}
                         />
                       </svg>
