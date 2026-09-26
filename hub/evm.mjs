@@ -46,7 +46,7 @@ function reason(e) {
   return e?.message ?? String(e);
 }
 
-async function send(address, functionName, args, gas) {
+async function send(address, functionName, args, gas, onHash) {
   const acct = relayer;
   // Simulate first so anything the contract would refuse costs nothing.
   try {
@@ -55,6 +55,8 @@ async function send(address, functionName, args, gas) {
     throw new Error(`The account refused it: ${reason(e)}`);
   }
   const hash = await wallet.writeContract({ address, abi: art.abi, functionName, args, gas, ...(await fees()) });
+  // Sent is not confirmed: let the caller show the hash while the receipt is pending.
+  onHash?.(hash);
   const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
   return { hash, status: r.status, gasUsed: r.gasUsed.toString(), block: r.blockNumber.toString() };
 }
@@ -112,9 +114,9 @@ export function agentKey(name) {
   return { t: 'evm_agent_key', agent: agent.newKey(), name };
 }
 
-export async function grant(gk, m) {
+export async function grant(gk, m, onHash) {
   const account = accountOf(gk);
-  const r = await send(account, 'grant', [m.agent, BigInt(m.cap), BigInt(m.expiry), ...split(m.sig)], 130_000n);
+  const r = await send(account, 'grant', [m.agent, BigInt(m.cap), BigInt(m.expiry), ...split(m.sig)], 130_000n, onHash);
   const st = load();
   st[gk].agents = [...(st[gk].agents ?? []).filter((a) => a.address.toLowerCase() !== m.agent.toLowerCase()), { address: m.agent, name: m.name ?? 'agent' }];
   save(st);

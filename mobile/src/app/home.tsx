@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import * as Clipboard from 'expo-clipboard';
 import { Screen } from '../components/Screen';
 import { Txt } from '../components/Txt';
 import { Button } from '../components/Button';
@@ -9,9 +8,8 @@ import { HoldButton } from '../components/HoldButton';
 import { LedBar } from '../components/LedBar';
 import { WristChip } from '../components/WristChip';
 import { useStore } from '../store/store';
-import { fmtEth, useChain } from '../store/chain';
-import { chatUrl, link, type Msg } from '../lib/link';
-import { loadSessionKey } from '../lib/session';
+import { fmtEth, useChain, type ChainSession } from '../store/chain';
+import { link, type Msg } from '../lib/link';
 import { loadShard } from '../lib/shard';
 import { phoneKey } from '../lib/frost';
 import { shortAddr } from '../lib/format';
@@ -24,8 +22,8 @@ const FUND = 50_000_000_000_000n; // 0.00005 ETH
 /** The wallet at a glance: the account, the agent's access, and what it did. */
 export default function Home() {
   const { state } = useStore();
-  const { info, hubUp, error, primary, activity, limits, refresh } = useChain();
-  const [copied, setCopied] = useState(false);
+  const { info, hubUp, error, live, sessions, totals, activity, limits, refresh } = useChain();
+  const earlier = sessions.filter((x) => x.status !== 'active');
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
   const waiting = Object.values(limits).filter((l) => l.status === 'waiting' || l.status === 'submitting');
@@ -49,31 +47,19 @@ export default function Home() {
     }
   };
 
-  const copy = async () => {
-    if (!primary) return;
-    const k = await loadSessionKey(primary.address);
-    if (!k) return;
-    await Clipboard.setStringAsync(k.privateKey);
-    setCopied(true);
-    void success();
-    setTimeout(() => setCopied(false), 2500);
-  };
-
   const revokeAll = () => {
     void revokeAllOnChain(state.address).then(() => refresh());
   };
 
-  const left = primary ? (primary.cap > primary.spent ? primary.cap - primary.spent : 0n) : 0n;
-  const ratio = primary && primary.cap > 0n ? Number(primary.spent) / Number(primary.cap) : 0;
-  const minutes = primary && info ? Math.max(0, Math.round(Number(primary.expiry - info.now) / 60)) : 0;
+  const ratio = totals.cap > 0n ? Number(totals.spent) / Number(totals.cap) : 0;
 
   return (
     <Screen
       scroll
       footer={
-        primary ? (
+        live.length > 0 ? (
           <View style={styles.footer}>
-            <HoldButton label="Hold to revoke agent access" onComplete={revokeAll} />
+            <HoldButton label={live.length === 1 ? 'Hold to revoke the agent key' : `Hold to revoke all ${live.length} keys`} onComplete={revokeAll} />
           </View>
         ) : null
       }
@@ -167,31 +153,14 @@ export default function Home() {
               </Txt>
             </Pressable>
           </View>
-          {primary ? (
-            <View style={styles.card}>
-              <View style={styles.row}>
-                <Txt size={18} weight="medium">
-                  {primary.name}
-                </Txt>
-                <Txt size={13} color={colors.muted}>
-                  {minutes} min left
-                </Txt>
-              </View>
+          {live.length > 0 ? (
+            <View style={styles.summary}>
               <Txt mono size={28} weight="bold" color={ratio >= 0.8 ? colors.amber : colors.text}>
-                {fmtEth(left)}
+                {fmtEth(totals.left)}
               </Txt>
-              <LedBar ratio={ratio} />
-              <Txt mono size={13} color={colors.muted}>
-                {fmtEth(primary.spent)} spent of {fmtEth(primary.cap)}
+              <Txt size={13} color={colors.muted}>
+                Agents can still spend, across {live.length} {live.length === 1 ? 'key' : 'keys'}
               </Txt>
-              {primary.local ? (
-                <>
-                  <Button label={copied ? 'Copied' : 'Copy session key'} variant="secondary" onPress={() => void copy()} />
-                  <Txt size={13} color={colors.faint}>
-                    Paste it into the agent chat at {chatUrl()}
-                  </Txt>
-                </>
-              ) : null}
             </View>
           ) : (
             <View style={styles.card}>
@@ -201,6 +170,19 @@ export default function Home() {
               <Button label="Give an agent a key" onPress={() => router.push('/agent')} />
             </View>
           )}
+          {live.map((k) => (
+            <KeyCard key={k.address} k={k} now={info.now} />
+          ))}
+          {earlier.length > 0 ? (
+            <>
+              <Txt size={15} weight="medium" color={colors.muted} style={styles.earlier}>
+                Earlier
+              </Txt>
+              {earlier.map((k) => (
+                <KeyCard key={k.address} k={k} now={info.now} />
+              ))}
+            </>
+          ) : null}
         </View>
       ) : null}
 
@@ -237,7 +219,46 @@ export default function Home() {
   );
 }
 
+function KeyCard({ k, now }: { k: ChainSession; now: bigint }) {
+  const on = k.status === 'active';
+  const left = k.cap > k.spent ? k.cap - k.spent : 0n;
+  const ratio = k.cap > 0n ? Number(k.spent) / Number(k.cap) : 0;
+  const minutes = Math.max(0, Math.round(Number(k.expiry - now) / 60));
+  return (
+    <Pressable onPress={() => router.push(`/session/${k.address}`)} style={({ pressed }) => [styles.card, !on && styles.off, pressed && styles.pressed]}>
+      <View style={styles.row}>
+        <Txt size={17} weight="medium" color={on ? colors.text : colors.muted}>
+          {k.name}
+        </Txt>
+        <Txt size={13} color={on ? colors.muted : colors.faint}>
+          {on ? `${minutes} min left` : k.status === 'expired' ? 'Expired' : 'Revoked'}
+        </Txt>
+      </View>
+      {on ? (
+        <>
+          <View style={styles.row}>
+            <Txt mono size={15}>
+              {fmtEth(left)} left
+            </Txt>
+            <Txt mono size={12} color={colors.muted}>
+              of {fmtEth(k.cap)}
+            </Txt>
+          </View>
+          <LedBar ratio={ratio} height={6} />
+        </>
+      ) : (
+        <Txt mono size={12} color={colors.faint}>
+          spent {fmtEth(k.spent)} of {fmtEth(k.cap)}  {shortAddr(k.address)}
+        </Txt>
+      )}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  summary: { gap: 2, marginBottom: space.xs },
+  earlier: { marginTop: space.m },
+  off: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.line },
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
   barRight: { flexDirection: 'row', alignItems: 'center', gap: space.s },
   mark: { letterSpacing: -0.5 },

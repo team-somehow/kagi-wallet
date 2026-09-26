@@ -308,7 +308,9 @@ async function handleEvm(ws, line) {
       case 'evm_agent_key?':
         return reply(evm.agentKey(msg.name));
       case 'evm_grant':
-        return await run(`granting a session key to ${msg.name ?? 'an agent'}`, () => evm.grant(gk, msg));
+        return await run(`granting a session key to ${msg.name ?? 'an agent'}`, () =>
+          evm.grant(gk, msg, (hash) => ws.readyState === 1 && ws.send(JSON.stringify({ t: 'evm_sent', src: 'hub', progressFor: msg.reqId, hash }))),
+        );
       case 'evm_revoke':
         return await run('revoking a session key (phone shard alone)', () => evm.revoke(gk, msg));
       case 'evm_agent_spend':

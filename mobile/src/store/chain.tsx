@@ -50,6 +50,7 @@ export interface Activity {
   kind: 'transfer' | 'limit' | 'grant' | 'account';
   status: string;
   name: string;
+  agent?: string;
   to?: string;
   value?: bigint;
   hash?: string | null;
@@ -65,7 +66,11 @@ interface Ctx {
   activity: Activity[];
   addActivity: (a: Activity) => void;
   limits: Record<string, LimitRequest>;
-  primary: ChainSession | null;
+  /** Every key this wallet ever granted, live ones first, newest first. */
+  sessions: ChainSession[];
+  live: ChainSession[];
+  /** Live allowance left, summed over every live key. */
+  totals: { left: bigint; cap: bigint; spent: bigint };
 }
 
 const ChainCtx = createContext<Ctx | null>(null);
@@ -182,6 +187,7 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
             kind: 'limit',
             status: r.status,
             name: r.name,
+            agent: r.agent,
             hash: r.hash,
             text: r.status === 'confirmed' ? `Limit raised to ${fmtEth(r.newCap)}` : `Declined a limit of ${fmtEth(r.newCap)}`,
             at: Date.now(),
@@ -195,6 +201,7 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
           kind: 'transfer',
           status: String(m.status),
           name: String(m.name),
+          agent: String(m.agent ?? ''),
           to: String(m.to),
           value,
           hash: (m.hash as string) ?? null,
@@ -221,21 +228,34 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
     };
   }, [groupKey, refresh]);
 
-  const primary = useMemo(() => {
-    const live = (info?.sessions ?? []).filter((s) => s.status === 'active');
-    return live[live.length - 1] ?? null;
+  const sessions = useMemo(() => {
+    const order = { active: 0, expired: 1, revoked: 2 } as const;
+    return [...(info?.sessions ?? [])].reverse().sort((a, b) => order[a.status] - order[b.status]);
   }, [info]);
+  const live = useMemo(() => sessions.filter((x) => x.status === 'active'), [sessions]);
+  const totals = useMemo(() => {
+    let cap = 0n;
+    let spent = 0n;
+    for (const x of live) {
+      cap += x.cap;
+      spent += x.spent < x.cap ? x.spent : x.cap;
+    }
+    return { cap, spent, left: cap - spent };
+  }, [live]);
 
-  // The wrist's allowance ring shows the real session, in ETH.
+  // The wrist's allowance ring shows every live key together, in ETH.
   const { wrist } = state;
   useEffect(() => {
     if (!wrist.connected || !groupKey) return;
-    const cap = primary ? Number(primary.cap) / 1e18 : 0;
-    const spent = primary ? Number(primary.spent) / 1e18 : 0;
-    link.send({ t: 'exposure', unit: 'ETH', left: Math.max(cap - spent, 0), cap, spent, keys: primary ? 1 : 0 });
-  }, [primary, wrist.connected, groupKey]);
+    const cap = Number(totals.cap) / 1e18;
+    const spent = Number(totals.spent) / 1e18;
+    link.send({ t: 'exposure', unit: 'ETH', left: Math.max(cap - spent, 0), cap, spent, keys: live.length });
+  }, [totals, live.length, wrist.connected, groupKey]);
 
-  const value = useMemo(() => ({ info, hubUp, error, refresh, activity, addActivity, limits, primary }), [info, hubUp, error, refresh, activity, addActivity, limits, primary]);
+  const value = useMemo(
+    () => ({ info, hubUp, error, refresh, activity, addActivity, limits, sessions, live, totals }),
+    [info, hubUp, error, refresh, activity, addActivity, limits, sessions, live, totals],
+  );
   return <ChainCtx.Provider value={value}>{children}</ChainCtx.Provider>;
 }
 

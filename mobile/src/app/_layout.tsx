@@ -85,6 +85,7 @@ export default function RootLayout() {
           <Stack.Screen name="chain" options={{ presentation: 'modal' }} />
           <Stack.Screen name="vault" options={{ presentation: 'modal' }} />
           <Stack.Screen name="agent" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="session/[address]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="limit/[id]" options={{ presentation: 'modal', gestureEnabled: false }} />
         </Stack>
         {AUTOTEST ? <AutotestBanner /> : null}
