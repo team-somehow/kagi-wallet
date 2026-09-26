@@ -1,18 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Linking, StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
-import { Screen } from '../components/Screen';
-import { TopBar } from '../components/TopBar';
-import { Txt } from '../components/Txt';
-import { Button } from '../components/Button';
-import { useChain } from '../store/chain';
-import { DEMO_RECIPIENT, restoreAgentDemo, runAgentDemo, useAgentDemo } from '../lib/agentDemo';
-import { EXPLORER } from '../lib/evm';
-import { usePresentation } from '../components/Presentation';
-import { resetEverything, type ResetStep } from '../lib/reset';
-import { useStore } from '../store/store';
-import { colors, radius, space } from '../theme';
-import { goBack } from '../lib/nav';
+import { Screen } from '../../components/Screen';
+import { TopBar } from '../../components/TopBar';
+import { Txt } from '../../components/Txt';
+import { Button } from '../../components/Button';
+import { useChain } from '../../store/chain';
+import { DEMO_RECIPIENT, restoreAgentDemo, runAgentDemo, useAgentDemo } from '../../lib/agentDemo';
+import { EXPLORER } from '../../lib/evm';
+import { usePresentation } from '../../components/Presentation';
+import { resetEverything, type ResetStep } from '../../lib/reset';
+import { useStore } from '../../store/store';
+import { colors, radius, space } from '../../theme';
 
 /** Presentation settings operate the real app, plus a reset that the Kagi Wallet has to confirm. */
 export default function PresentationSettings() {
@@ -42,7 +41,7 @@ export default function PresentationSettings() {
   };
   return (
     <Screen scroll>
-      <TopBar title="Presentation" left={{ label: 'Close', onPress: () => goBack() }} />
+      <TopBar title="More" />
       <View style={styles.body}>
         <Txt size={32}>Make it physical.</Txt>
         <Txt size={15} color={colors.muted}>

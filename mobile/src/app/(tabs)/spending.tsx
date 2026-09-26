@@ -1,15 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TopBar } from '../components/TopBar';
-import { Txt } from '../components/Txt';
-import { Fact } from '../components/Fact';
-import { InterceptaMark } from '../components/BrandMarks';
-import { fmtEth, useChain } from '../store/chain';
-import { MCP_URL } from '../lib/session';
-import { shortAddr } from '../lib/format';
-import { colors, radius, space } from '../theme';
-import { goBack } from '../lib/nav';
+import { TopBar } from '../../components/TopBar';
+import { Txt } from '../../components/Txt';
+import { Fact } from '../../components/Fact';
+import { InterceptaMark } from '../../components/BrandMarks';
+import { fmtEth, useChain } from '../../store/chain';
+import { MCP_URL } from '../../lib/session';
+import { shortAddr } from '../../lib/format';
+import { colors, radius, space } from '../../theme';
 
 /** What the agent server returns: this wallet's totals, from Curvegrid MultiBaas Event Queries. */
 interface Summary {
@@ -64,7 +63,7 @@ export default function Spending() {
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <View style={styles.bar}>
-        <TopBar title="Spending" left={{ label: 'Close', onPress: () => goBack() }} />
+        <TopBar title="Spending" />
       </View>
       <ScrollView contentContainerStyle={styles.body} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}>
         {!account ? (
@@ -166,9 +165,22 @@ export default function Spending() {
               </View>
             </Section>
 
-            <Txt size={12} color={colors.faint} style={styles.source}>
-              From your wallet’s on-chain events, indexed and totalled by Curvegrid MultiBaas.
-            </Txt>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="Indexed and totalled by Curvegrid MultiBaas"
+              onPress={() => void Linking.openURL('https://www.curvegrid.com/multibaas')}
+              style={styles.source}
+            >
+              <Txt size={12} color={colors.faint}>
+                Indexed and totalled by
+              </Txt>
+              <View style={styles.sourceRow}>
+                <Image source={require('../../../assets/partners/curvegrid.png')} style={styles.curvegrid} resizeMode="contain" />
+                <Txt size={13} weight="medium" color={colors.muted}>
+                  MultiBaas
+                </Txt>
+              </View>
+            </Pressable>
           </>
         )}
       </ScrollView>
@@ -196,5 +208,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.panel, borderRadius: radius.m, padding: space.m, gap: space.s },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   intercepta: { flexDirection: 'row', alignItems: 'center', gap: space.s, marginTop: space.xs },
-  source: { textAlign: 'center' },
+  source: { alignItems: 'center', gap: 6, paddingVertical: space.s },
+  sourceRow: { flexDirection: 'row', alignItems: 'center', gap: space.s },
+  curvegrid: { width: 104, height: 24 },
 });

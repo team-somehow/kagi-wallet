@@ -1,24 +1,24 @@
 import React, { useCallback, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { Screen } from '../components/Screen';
-import { Txt } from '../components/Txt';
-import { Button } from '../components/Button';
-import { HoldButton } from '../components/HoldButton';
-import { LedBar } from '../components/LedBar';
-import { Logo } from '../components/Logo';
-import { SpatialDevices } from '../components/SpatialDevices';
-import { WristChip } from '../components/WristChip';
-import { useStore } from '../store/store';
-import { fmtAmount, fmtEth, useChain, type ChainSession } from '../store/chain';
+import { Screen } from '../../components/Screen';
+import { Txt } from '../../components/Txt';
+import { Button } from '../../components/Button';
+import { HoldButton } from '../../components/HoldButton';
+import { LedBar } from '../../components/LedBar';
+import { Logo } from '../../components/Logo';
+import { SpatialDevices } from '../../components/SpatialDevices';
+import { WristChip } from '../../components/WristChip';
+import { useStore } from '../../store/store';
+import { fmtAmount, fmtEth, useChain, type ChainSession } from '../../store/chain';
 import * as Clipboard from 'expo-clipboard';
-import * as evm from '../lib/evm';
-import { loadRoot, loadShard } from '../lib/shard';
-import { phoneKey } from '../lib/frost';
-import { shortAddr } from '../lib/format';
-import { success, tap, warn } from '../lib/haptics';
-import { revokeAllOnChain } from '../lib/chainRevoke';
-import { colors, radius, space } from '../theme';
+import * as evm from '../../lib/evm';
+import { loadRoot, loadShard } from '../../lib/shard';
+import { phoneKey } from '../../lib/frost';
+import { shortAddr } from '../../lib/format';
+import { success, tap, warn } from '../../lib/haptics';
+import { revokeAllOnChain } from '../../lib/chainRevoke';
+import { colors, radius, space } from '../../theme';
 
 const FUND = 50_000_000_000_000n; // 0.00005 ETH
 // Below this the phone can do only a couple more transactions.
@@ -97,19 +97,6 @@ export default function Home() {
               </Txt>
             </Pressable>
           ) : null}
-          <Pressable
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={() => {
-              void tap();
-              router.push('/demo');
-            }}
-            style={({ pressed }) => [styles.more, pressed && styles.pressed]}
-          >
-            <Txt size={13} weight="medium" color={colors.muted}>
-              More
-            </Txt>
-          </Pressable>
         </View>
       </View>
 
@@ -238,22 +225,6 @@ export default function Home() {
             </>
           ) : null}
         </View>
-      ) : null}
-
-      {info?.account ? (
-        <Pressable accessibilityRole="button" onPress={() => router.push('/spending')} style={({ pressed }) => [styles.card, styles.sticks, pressed && styles.pressed]}>
-          <View style={styles.row}>
-            <Txt size={16} weight="medium">
-              Spending
-            </Txt>
-            <Txt size={16} color={colors.muted}>
-              ›
-            </Txt>
-          </View>
-          <Txt size={13} color={colors.muted}>
-            What each agent spent, who got paid, and every approval.
-          </Txt>
-        </Pressable>
       ) : null}
 
       {info?.account && twoSticks !== null ? (

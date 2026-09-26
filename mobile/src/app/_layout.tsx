@@ -77,13 +77,12 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="onboarding" />
-          <Stack.Screen name="home" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
           <Stack.Screen name="key/[id]" />
           <Stack.Screen name="request/[id]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="issue" options={{ presentation: 'modal' }} />
           <Stack.Screen name="sign/[id]" options={{ presentation: 'modal', gestureEnabled: false }} />
           <Stack.Screen name="revoke" options={{ presentation: 'modal', gestureEnabled: false }} />
-          <Stack.Screen name="demo" options={{ presentation: 'modal' }} />
           <Stack.Screen name="wrist" options={{ presentation: 'modal' }} />
           <Stack.Screen name="vault" options={{ presentation: 'modal' }} />
           <Stack.Screen name="agent" options={{ presentation: 'modal' }} />
