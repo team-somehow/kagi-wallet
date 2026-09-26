@@ -55,6 +55,7 @@ export function GetKagi() {
     <section className="section" id="get">
       <div className="wrap">
         <div className="section-head">
+          <span className="eyebrow section-index">07 / Get started</span>
           <h2>Get Kagi Wallet</h2>
           <p>The Android app, the open firmware, and a flasher that runs in your browser.</p>
         </div>
@@ -132,7 +133,7 @@ export function GetKagi() {
             <pre><code>{`# build and flash from source (PlatformIO)
 git clone ${REPO_URL}.git
 cd kagi-wallet/firmware/wrist
-pio run -e sticks3 -t upload
+pio run -e esp32s3 -t upload
 
 # or flash the release image with esptool
 esptool.py --chip esp32s3 write_flash 0x0 kagi-firmware-${FIRMWARE.version}.bin`}</code></pre>

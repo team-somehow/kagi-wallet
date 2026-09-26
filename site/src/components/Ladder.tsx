@@ -63,6 +63,7 @@ export function Ladder() {
     <section className="section" id="how">
       <div className="wrap">
         <div className="section-head">
+          <span className="eyebrow section-index">03 / The approval system</span>
           <h2>Same wallet. More protection.</h2>
           <p>Pick a level to see who has to sign.</p>
         </div>

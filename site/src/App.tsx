@@ -13,7 +13,6 @@ import { REPO_URL, sources } from './data';
 export function App() {
   return (
     <>
-      <div className="grain" aria-hidden="true" />
       <nav className="nav">
         <div className="wrap nav-inner">
           <a className="brand" href="#top">
@@ -21,11 +20,10 @@ export function App() {
           </a>
           <div className="nav-links">
             <a href="#demo">Demo</a>
-            <a href="#incidents">Why</a>
-            <a href="#how">How</a>
+            <a href="#how">How it works</a>
             <a href="#hardware">Hardware</a>
             <a href="#connect">Connect AI</a>
-            <a href="#partners">Integrations</a>
+            <a href="#sources">Sources</a>
             <a href={REPO_URL} target="_blank" rel="noreferrer">GitHub</a>
             <a className="btn btn-primary btn-sm" href="#get">Download</a>
           </div>
@@ -46,8 +44,13 @@ export function App() {
 
         <section className="section" id="sources">
           <div className="wrap">
-            <details className="sources">
-              <summary>Sources ({sources.length})</summary>
+            <div className="section-head">
+              <span className="eyebrow section-index">10 / References</span>
+              <h2>Follow the evidence.</h2>
+              <p>The research, incident reports, and technical references behind Kagi.</p>
+            </div>
+            <div className="sources">
+              <p className="sources-label">{sources.length} references</p>
               <ul>
                 {sources.map((s) => (
                   <li key={s.url + s.title}>
@@ -56,7 +59,7 @@ export function App() {
                   </li>
                 ))}
               </ul>
-            </details>
+            </div>
           </div>
         </section>
       </main>

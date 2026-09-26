@@ -302,6 +302,11 @@ export function Demo() {
   return (
     <section className="section" id="demo">
       <div className="wrap">
+        <div className="section-head">
+          <span className="eyebrow section-index">Try it / Interactive demo</span>
+          <h2>A little trust. A physical boundary.</h2>
+          <p>Follow a payment from your agent to the device in your hand.</p>
+        </div>
         <div id="kagi-studio" data-dual={dual} data-phase={phase}>
           <div className="kg-shell">
             <header className="kg-top">

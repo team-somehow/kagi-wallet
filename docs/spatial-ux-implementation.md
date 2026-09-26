@@ -1,6 +1,6 @@
 # ESP32 spatial UX
 
-The phone, interactive website and physical displays share a blue wrist / red second-device theme. The device illustrations have a screen and a round control on the right, labeled ESP32. The hardware target remains StickS3: use its actual A/B buttons. The production firmware does not approve automatically.
+The phone, interactive website and physical displays share a blue wrist / red second-device theme. The device illustrations have a screen and a round control on the right, labeled ESP32. The hardware target remains ESP32 S3 board: use its actual A/B buttons. The production firmware does not approve automatically.
 
 ## Try it on the phone
 
@@ -29,7 +29,7 @@ The connected wallet was already three-party. Disconnecting the red ESP32 does *
 
 ## Firmware and builds
 
-Firmware **0.3.1**, production `sticks3` environment. Both devices run the same binary; their saved role selects blue or red. Normal upload preserves wallet NVS. Do not use `sticks3-autotest`, erase-flash, or change roles on a joined wallet.
+Firmware **0.3.1**, production `esp32s3` environment. Both devices run the same binary; their saved role selects blue or red. Normal upload preserves wallet NVS. Do not use `esp32s3-autotest`, erase-flash, or change roles on a joined wallet.
 
 The website includes the matching factory firmware and SHA-256 in `site/src/data.ts`. The checked-in manifest points to it. The existing APK link is the earlier public release; this branch's Android build is installed on the connected phone and can also be built from `mobile/`.
 

@@ -17,14 +17,14 @@ const THEME: Record<Variant, { top: string; bottom: string; edge: string; accent
 const C = { text: '#111820', muted: '#545e6c', faint: '#8c949e', red: '#c4302a', bg: '#ecf0f4' };
 const F = 'Helvetica Neue, Helvetica, Arial, sans-serif';
 
-function Lcd({ screen, v }: { screen: Screen; v: Variant }) {
+function Lcd({ screen, v, lockupHref = '/lockup.png' }: { screen: Screen; v: Variant; lockupHref?: string }) {
   const t = THEME[v];
   if (screen.kind === 'home') {
     // The lockup image is the firmware's lockup.h at 3x, placed where drawLockupHome puts it.
     const tone = screen.tone === 'hot' ? t.accent : screen.tone === 'quiet' ? C.faint : C.muted;
     return (
       <>
-        <image href="/lockup.png" x="18" y="30" width="204" height="64.7" />
+        <image href={lockupHref} x="18" y="30" width="204" height="64.7" />
         <text x="120" y="118" fill={tone} fontSize="13" textAnchor="middle" fontFamily={F}>{screen.line}</text>
       </>
     );
@@ -78,22 +78,10 @@ export function Device({
   style?: CSSProperties;
   button?: ReactNode;
 }) {
-  const t = THEME[variant];
-  const id = `lcd-${variant}`;
   return (
     <div className={`device device-${variant} ${className}`} style={style}>
       <div className="device-face">
-        <svg className="lcd" viewBox="0 0 240 135" role="img" aria-label={describe(screen)}>
-          <defs>
-            <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor={t.top} />
-              <stop offset="1" stopColor={t.bottom} />
-            </linearGradient>
-          </defs>
-          <rect width="240" height="135" fill={`url(#${id})`} />
-          <rect x="1.5" y="1.5" width="237" height="132" rx="9" fill="none" stroke={t.edge} />
-          <Lcd screen={screen} v={variant} />
-        </svg>
+        <DeviceScreen screen={screen} variant={variant} />
         {button ?? <span className={`device-a ${pressed ? 'is-pressed' : ''}`} aria-hidden="true" />}
       </div>
     </div>
@@ -104,4 +92,23 @@ function describe(s: Screen) {
   if (s.kind === 'prompt') return `${s.title}: ${s.amount}, ${s.line1}. Hold the button to approve, tap it to decline.`;
   if (s.kind === 'home') return `Kagi Wallet. ${s.line}`;
   return `${s.top}: ${s.big}. ${s.sub}`;
+}
+
+// Shared unchanged SVG: used both by the page devices and the 3D screen texture.
+export function DeviceScreen({ screen, variant = 'blue', lockupHref }: { screen: Screen; variant?: Variant; lockupHref?: string }) {
+  const t = THEME[variant];
+  const id = `lcd-${variant}`;
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="lcd" viewBox="0 0 240 135" role="img" aria-label={describe(screen)}>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={t.top} />
+          <stop offset="1" stopColor={t.bottom} />
+        </linearGradient>
+      </defs>
+      <rect width="240" height="135" fill={`url(#${id})`} />
+      <rect x="1.5" y="1.5" width="237" height="132" rx="9" fill="none" stroke={t.edge} />
+      <Lcd screen={screen} v={variant} lockupHref={lockupHref} />
+    </svg>
+  );
 }

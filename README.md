@@ -152,7 +152,7 @@ Each phone deploys its own wallet, so every user's address is different; the app
 
 ### Prerequisites
 
-[Foundry](https://getfoundry.sh) · Node 20+ · [PlatformIO](https://platformio.org) (Python ≥ 3.10) · an Android phone with USB debugging on (the app uses Bluetooth, so it runs as a development build, not in Expo Go) · two [M5Stack StickS3](https://shop.m5stack.com/products/m5sticks3-esp32s3-mini-iot-dev-kit) ESP32-S3 devices (screen, buttons, IR transmitter + receiver)
+[Foundry](https://getfoundry.sh) · Node 20+ · [PlatformIO](https://platformio.org) (Python ≥ 3.10) · an Android phone with USB debugging on (the app uses Bluetooth, so it runs as a development build, not in Expo Go) · two ESP32 S3 boards (screen, buttons, IR transmitter + receiver)
 
 ```bash
 git clone --recurse-submodules https://github.com/team-somehow/kagi-wallet.git
@@ -185,7 +185,7 @@ To screen every payment with Intercepta, set `INTERCEPTA_API_KEY` (a free key fr
 ```bash
 cd firmware/wrist
 cp src/secrets.example.h src/secrets.h   # optional WiFi settings; the phone link is Bluetooth
-pio run -e sticks3 -t upload
+pio run -e esp32s3 -t upload
 pio device monitor
 ```
 

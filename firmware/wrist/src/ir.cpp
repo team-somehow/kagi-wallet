@@ -12,7 +12,7 @@ namespace {
 
 const int PIN_TX = 46;
 const int PIN_RX = 42;
-// NEC-style timing, which the StickS3 receiver's noise filter lets through reliably:
+// NEC-style timing, which the ESP32 S3 board receiver's noise filter lets through reliably:
 // 560 us marks, 560 us (0) or 1690 us (1) spaces, and a leader of a mark plus a 4.5 ms gap.
 // Long marks get chopped by the receiver, so even the leader mark is short.
 // Leader mark is half NEC's 9 ms: long bursts draw a lot from the stick's 5 V rail.
