@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🔑 Kagi Wallet
+<img src="mobile/assets/logo.png" alt="Kagi Wallet" width="360" />
 
 **A threshold wallet that gives AI agents a spending key, not yours.**
 
@@ -12,6 +12,12 @@ Everything above the cap climbs a ladder of physical devices: your wrist, then a
 ![Expo](https://img.shields.io/badge/Expo-SDK_57-000020?logo=expo)
 ![ESP32](https://img.shields.io/badge/ESP32--S3-PlatformIO-e7352c?logo=espressif)
 ![Network](https://img.shields.io/badge/network-on--chain-627eea?logo=ethereum)
+
+Integrated with
+
+<a href="https://intercepta.io"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/intercepta-light.png" /><img src="site/public/partners/intercepta-dark.png" alt="Intercepta" height="28" /></picture></a> &nbsp;&nbsp;&nbsp; <a href="https://www.curvegrid.com/multibaas"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/curvegrid-light.png" /><img src="site/public/partners/curvegrid-dark.png" alt="Curvegrid MultiBaas" height="28" /></picture></a>
+
+**[Website](https://kagiwallet.web.app)** · **[Download the Android app](https://github.com/team-somehow/kagi-wallet/releases/download/v0.2.0/kagi-1.0.0.apk)** · **[Flash a stick in the browser](https://kagiwallet.web.app/#get)** · **[Connect your AI](https://kagiwallet.web.app/#connect)** · **[Releases](https://github.com/team-somehow/kagi-wallet/releases)**
 
 </div>
 
@@ -77,7 +83,7 @@ firmware/    ESP32-S3 firmware (PlatformIO). One build runs as wrist or vault
   irprobe/     bench tool for the IR link
 mobile/      Expo / React Native app. The phone shard, the control surface, and its own on-chain client
 agent-mcp/   Node. A bare-bones MCP server that gives ChatGPT or Claude an agent wallet
-site/        the landing page
+site/        the landing page, live at https://kagiwallet.web.app
 IDEA.md      the full design, threat model and demo script
 ```
 
@@ -117,10 +123,10 @@ IDEA.md      the full design, threat model and demo script
 
 ### Prerequisites
 
-[Foundry](https://getfoundry.sh) · Node 20+ · [PlatformIO](https://platformio.org) (Python ≥ 3.10) · an Android phone with Expo Go · two ESP32-S3 devices with a screen, buttons and an IR transmitter + receiver
+[Foundry](https://getfoundry.sh) · Node 20+ · [PlatformIO](https://platformio.org) (Python ≥ 3.10) · an Android phone with USB debugging on (the app uses Bluetooth, so it runs as a development build, not in Expo Go) · two [M5Stack StickS3](https://shop.m5stack.com/products/m5sticks3-esp32s3-mini-iot-dev-kit) ESP32-S3 devices (screen, buttons, IR transmitter + receiver)
 
 ```bash
-git clone --recurse-submodules <repo>
+git clone --recurse-submodules https://github.com/team-somehow/kagi-wallet.git
 # already cloned?
 git submodule update --init
 ```
@@ -154,6 +160,8 @@ pio run -e sticks3 -t upload
 pio device monitor
 ```
 
+No toolchain? Flash a stick from Chrome or Edge at [kagiwallet.web.app](https://kagiwallet.web.app/#get).
+
 Flash the same build to both ESP32 devices, then give the second one the vault role (`set_role`, stored in NVS). See [`firmware/wrist/README.md`](firmware/wrist/README.md) for WiFi quirks and first-flash steps.
 
 ### 4. Phone
@@ -164,6 +172,8 @@ cd mobile
 npm install
 npx expo run:android
 ```
+
+Or skip the build and install the APK from the [latest release](https://github.com/team-somehow/kagi-wallet/releases).
 
 The phone talks to the ESP32 devices over **Bluetooth LE** and to the chain directly. It keeps a gas wallet in its secure store: fund its address, shown on Home, with a little test ETH.
 
@@ -179,6 +189,8 @@ The phone talks to the ESP32 devices over **Bluetooth LE** and to the chain dire
 The phone's `src/lib/frost.ts` and the firmware's `src/frost.cpp` must match byte for byte. The fixture test is what catches it when they drift.
 
 ## Intercepta: every payment screened before the agent signs
+
+<a href="https://intercepta.io"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/intercepta-light.png" /><img src="site/public/partners/intercepta-dark.png" alt="Intercepta" height="32" /></picture></a>
 
 The spending cap limits *how much* an agent can lose. Intercepta decides *who* it may pay. Before the session key signs anything, the agent MCP screens the recipient with the Intercepta API, and the verdict picks the step of Kagi's ladder the payment goes to:
 
@@ -216,6 +228,8 @@ The contract needs no changes: a held payment travels through the existing `requ
 - Missing: a single "should I pay this address?" endpoint that returns a recommended verdict (allow / review / deny) alongside the score, and a `chain` parameter to make clear which network the data covers.
 
 ## Curvegrid MultiBaas
+
+<a href="https://www.curvegrid.com/multibaas"><picture><source media="(prefers-color-scheme: dark)" srcset="site/public/partners/curvegrid-light.png" /><img src="site/public/partners/curvegrid-dark.png" alt="Curvegrid MultiBaas" height="32" /></picture></a>
 
 Kagi is a policy-aware transaction agent: the contract enforces the spending limit, and a person has to approve anything above it. The chain can tell you the current state, like how much allowance is left, but not the story behind it. **MultiBaas gives the agent a memory of what happened.**
 

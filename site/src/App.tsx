@@ -7,6 +7,7 @@ import { Hero } from './components/Hero';
 import { KeyStats } from './components/KeyStats';
 import { Ladder } from './components/Ladder';
 import { Losses } from './components/Losses';
+import { Partners } from './components/Partners';
 import { REPO_URL, sources } from './data';
 
 export function App() {
@@ -40,6 +41,7 @@ export function App() {
         <Compare />
         <GetKagi />
         <ConnectAgent />
+        <Partners />
 
         <section className="section" id="sources">
           <div className="wrap">
