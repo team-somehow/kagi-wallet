@@ -49,7 +49,7 @@ export function App() {
               <h2>Follow the evidence.</h2>
               <p>The research, incident reports, and technical references behind Kagi.</p>
             </div>
-            <details className="sources">
+            <details className="sources" open>
               <summary>Browse all {sources.length} sources</summary>
               <ul>
                 {sources.map((s) => (
