@@ -433,3 +433,10 @@ p { margin: 0; }
   .lcd-hold, .ir-beam path { animation: none; }
 }
 
+
+/* The recorded demo: a 16:9 player in a panel. */
+.video-frame { position: relative; aspect-ratio: 16 / 9; overflow: hidden; padding: 0; border-radius: 18px; background: var(--text); }
+.video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-link { margin: 14px 0 0; text-align: center; }
+.video-link a { color: var(--blue); font-size: 14px; text-decoration: none; }
+.video-link a:hover { text-decoration: underline; }

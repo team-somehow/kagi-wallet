@@ -131,5 +131,5 @@ The phone (TypeScript, `@noble/curves`) and the sticks (C++, mbedTLS) implement 
 ## 7. Limits worth saying out loud
 
 - **Shares at rest vs in use.** Secure storage on Android and the sticks protects shares at rest. The FROST maths runs in RAM, so a share is in memory for a few hundred milliseconds per signature.
-- **Development firmware.** No secure boot, no flash encryption. The production plan (eFuses, JTAG off, no OTA on the second stick) is in [IDEA.md](../IDEA.md).
+- **Development firmware.** No secure boot, no flash encryption. Production would burn eFuses, turn JTAG off and ship the second Kagi Wallet without OTA.
 - **ERC-1271 has no nonce.** As with any EOA signature, replay protection for signed orders and permits is the verifying app's job.

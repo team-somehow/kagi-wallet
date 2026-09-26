@@ -86,7 +86,6 @@ firmware/    ESP32-S3 firmware (PlatformIO). One build runs as the Kagi Wallet o
 mobile/      Expo / React Native app. The phone shard, the control surface, and its own on-chain client
 agent-mcp/   Node. A bare-bones MCP server that gives ChatGPT, Claude, Claude Code, Codex, Cursor or VS Code an agent wallet
 site/        the landing page, live at https://kagiwallet.com
-IDEA.md      the full design, threat model and demo script
 ```
 
 ## Smart contracts
@@ -321,11 +320,9 @@ _TODO: names, roles and social handles._
 
 This is a hackathon build. What isn't done yet:
 
-- **Development firmware:** no secure boot, no flash encryption, reflashable. The production plan (eFuses burned, JTAG and USB download off, no OTA on the vault) is in [IDEA.md](IDEA.md).
+- **Development firmware:** no secure boot, no flash encryption, reflashable. Production would burn eFuses, turn JTAG and USB download off, and ship the vault without OTA.
 - **Agent spends are plain ETH only.** A cap in USDC and a validator that measures balance changes are designed but not built.
 - **The Kagi Wallet has no ERC-1271 signing path yet.** It would need to decode EIP-712 (Permit2 first) so it never signs blind.
 - **FROST runs in RAM.** Secure storage protects shards at rest, but each shard is in memory for a few hundred ms per signature.
-
-See **[IDEA.md](IDEA.md)** for the full design, the threat model and the two-act demo.
 
 **Papers:** [the Kagi Wallet Protocol whitepaper](whitepaper.md), [the contracts in depth](docs/kagi-protocol.md) (the contracts, the spending ladder, the standards) and [The cryptography behind Kagi](docs/kagi-cryptography.md) (FROST, BIP340 on Ethereum via `ecrecover`, and how the ERCs fit).

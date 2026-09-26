@@ -268,7 +268,7 @@ Screening happens in the agent server, so a compromised server could skip it; th
 ## 12. Limits
 
 - **Unaudited.** The contracts and firmware have not been audited. Keep only small amounts in a mainnet wallet.
-- **Development firmware.** No secure boot or flash encryption; the production plan (eFuses burned, JTAG off, no OTA on the second Kagi Wallet) is in [IDEA.md](IDEA.md).
+- **Development firmware.** No secure boot or flash encryption; production would burn eFuses, turn JTAG off and ship the second Kagi Wallet without OTA.
 - **Shares in memory.** Secure storage protects shares at rest, but each share is in RAM for a few hundred milliseconds per signature.
 - **ETH only.** Caps count ETH value; a token cap and a balance-delta validator are designed, not built.
 - **ERC-1271 has no nonce.** Replay protection for signed orders is the verifying app's job, as with any EOA.

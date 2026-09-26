@@ -8,6 +8,7 @@ import { KeyStats } from './components/KeyStats';
 import { Ladder } from './components/Ladder';
 import { Losses } from './components/Losses';
 import { Partners } from './components/Partners';
+import { VideoDemo } from './components/VideoDemo';
 import { REPO_URL, sources } from './data';
 
 export function App() {
@@ -19,6 +20,7 @@ export function App() {
             <img src="./logo.png" alt="Kagi Wallet" width="81" height="34" />
           </a>
           <div className="nav-links">
+            <a href="#video">Video</a>
             <a href="#demo">Demo</a>
             <a href="#how">How it works</a>
             <a href="#hardware">Hardware</a>
@@ -32,6 +34,7 @@ export function App() {
 
       <main>
         <div className="wrap"><Hero /></div>
+        <VideoDemo />
         <Demo />
         <Losses />
         <KeyStats />
