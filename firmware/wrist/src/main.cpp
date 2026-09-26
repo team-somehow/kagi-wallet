@@ -23,6 +23,7 @@
 #include <lwip/dns.h>
 #include <bootloader_random.h>
 
+#include "lockup.h"
 #include "frost.h"
 #include "ir.h"
 #include "ble.h"
@@ -33,7 +34,7 @@
 #include "secrets.example.h"
 #endif
 
-static const char* FW = "0.5.0";
+static const char* FW = "0.6.0";
 
 // ---- look -----------------------------------------------------------------
 
@@ -570,36 +571,36 @@ static void drawKeygen() {
   canvas.drawString("Neither side holds the whole key", W / 2, H - 6);
 }
 
+// The Kagi Wallet lockup (lockup.h), in the app's colours, blended onto whatever is behind it.
+static void drawLockup(int ox, int oy) {
+  static const uint8_t PART[5][3] = {{0, 0, 0}, {0, 97, 218}, {17, 24, 32}, {1, 117, 250}, {184, 192, 202}};
+  for (int y = 0; y < LOCKUP_H; y++)
+    for (int x = 0; x < LOCKUP_W; x++) {
+      uint8_t b = LOCKUP[y * LOCKUP_W + x];
+      if (!b) continue;
+      const uint8_t* c = PART[b >> 5];
+      int a = b & 31;
+      uint16_t under = canvas.readPixel(ox + x, oy + y);
+      int ur = ((under >> 11) & 31) * 255 / 31, ug = ((under >> 5) & 63) * 255 / 63, ub = (under & 31) * 255 / 31;
+      canvas.drawPixel(ox + x, oy + y, M5.Display.color565(ur + (c[0] - ur) * a / 31, ug + (c[1] - ug) * a / 31, ub + (c[2] - ub) * a / 31));
+    }
+}
+
+// Both sticks rest on the lockup, with one quiet line of state under it.
+static void drawLockupHome(const String& line, uint16_t color) {
+  drawLockup((W - LOCKUP_W) / 2, 30);
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextDatum(middle_center);
+  canvas.setTextColor(color);
+  canvas.drawString(line, W / 2, 114);
+  statusIcons();
+}
+
 static void drawHome() {
   bool hot = expCap > 0 && expSpent / expCap >= 0.8;
-  int cx = 52, cy = 72, r = 40;
-  canvas.fillCircle(cx + 2, cy + 4, r + 1, C_BG);
-  canvas.fillCircle(cx, cy, r - 1, C_PANEL);
-  canvas.drawCircle(cx, cy, r, C_CELL);
-  canvas.drawCircle(cx, cy, r - 7, C_CELL);
-  if (expCap > 0) {
-    float left = std::max(0.0, std::min(1.0, expLeft / expCap));
-    // The ring sweeps in when the screen appears.
-    float shown = left * easeOut(since(700));
-    arcRing(cx, cy, r, 8, 0, 360 * shown, hot ? C_ACCENT : C_TEXT);
-  }
-  canvas.setFont(&fonts::FreeSansBold9pt7b);
-  canvas.setTextDatum(middle_center);
-  canvas.setTextColor(expCap > 0 ? (hot ? C_ACCENT : C_TEXT) : C_FAINT);
-  canvas.drawString(expCap > 0 ? String((int)round(100 * expLeft / expCap)) + "%" : "-", cx, cy);
-  int x = 106;
-  title("ESP32 / WRIST", C_ACCENT);
-  canvas.setFont(&fonts::FreeSans9pt7b);
-  canvas.setTextDatum(top_left);
-  canvas.setTextColor(C_MUTED);
-  canvas.drawString(expCap > 0 ? "Remaining" : "No keys yet", x, 38);
-  canvas.setFont(&fonts::FreeSansBold12pt7b);
-  canvas.setTextColor(expCap == 0 ? C_FAINT : hot ? C_ACCENT : C_TEXT);
-  canvas.drawString(expUnit == "ETH" ? ethStr(expCap > 0 ? expLeft : 0) : dollars(expCap > 0 ? expLeft : 0), x, 60);
-  canvas.setFont(&fonts::FreeSans9pt7b);
-  canvas.setTextColor(C_FAINT);
-  canvas.drawString(expCap > 0 ? String(expKeys) + (expKeys == 1 ? " live key" : " live keys") : "Issue one in the app", x, 94);
-  statusIcons();
+  if (expCap <= 0) return drawLockupHome("No agent keys yet", C_FAINT);
+  String left = expUnit == "ETH" ? ethStr(expLeft) : dollars(expLeft);
+  drawLockupHome(left + " left, " + String(expKeys) + (expKeys == 1 ? " key" : " keys"), hot ? C_ACCENT : C_MUTED);
 }
 
 static void drawPrompt() {
@@ -1835,37 +1836,12 @@ static void drawVault() {
     return;
   }
 
-  // Joined: a closed ring, and what it is for. Held still: it is listening for the wrist.
-  title("ESP32 / SECOND", C_ACCENT);
-  int cx = 50, cy = 72, r = 38;
-  float sweep = easeOut(since(700));
-  canvas.fillCircle(cx + 2, cy + 4, r + 1, C_BG);
-  canvas.fillCircle(cx, cy, r - 1, C_PANEL);
-  canvas.drawCircle(cx, cy, r, C_CELL);
-  canvas.drawCircle(cx, cy, r - 7, C_CELL);
-  arcRing(cx, cy, r, 7, 0, 360 * sweep, C_ACCENT);
-  canvas.setFont(&fonts::FreeSansBold12pt7b);
-  canvas.setTextDatum(middle_center);
-  canvas.setTextColor(C_TEXT);
-  canvas.drawString("3", cx, cy - 8);
-  canvas.setFont(&fonts::Font0);
-  canvas.setTextColor(C_MUTED);
-  canvas.drawString("of 3", cx, cy + 12);
-  int x = 102;
-  canvas.setFont(&fonts::FreeSansBold9pt7b);
-  canvas.setTextDatum(top_left);
-  canvas.setTextColor(C_TEXT);
-  canvas.drawString("Guarding your", x, 34);
-  canvas.drawString("wallet", x, 54);
+  // Joined: the same resting lockup as the wrist, and what this stick is for.
+  drawLockup((W - LOCKUP_W) / 2, 30);
   canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextDatum(middle_center);
   canvas.setTextColor(C_MUTED);
-  canvas.drawString("Signs only by IR", x, 80);
-  // IR ready: a small beam mark pointing out toward the wrist
-  int iy = 108;
-  canvas.fillCircle(x + 4, iy, 3, C_ACCENT);
-  for (int i = 1; i <= 3; i++) canvas.drawArc(x + 4, iy, 4 + i * 5, 3 + i * 5, 300, 60, i == 1 ? C_ACCENT : C_FAINT);
-  canvas.setTextColor(C_FAINT);
-  canvas.drawString("Align", x + 30, iy - 8);
+  canvas.drawString("Signs by infrared", W / 2, 114);
 }
 
 static void approveRoot() {
