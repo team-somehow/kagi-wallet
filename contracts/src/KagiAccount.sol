@@ -6,7 +6,7 @@ import {KagiBase} from "./KagiBase.sol";
 
 /// @title KagiAccount
 /// @notice The agent-facing smart account. Three kinds of signer:
-///   manager key  2-of-2 threshold Schnorr (phone + wrist), BIP340. Moves anything, grants keys.
+///   manager key  2-of-2 threshold Schnorr (phone + Kagi Wallet), BIP340. Moves anything, grants keys.
 ///   phone key    the phone's shard on its own, BIP340. Can only revoke.
 ///   session key  an agent's ephemeral ECDSA key. Spends plain ETH under its cap until it expires.
 ///
@@ -18,7 +18,7 @@ import {KagiBase} from "./KagiBase.sol";
 ///   decline  sha256("KAGI/decline"|| chainid || this || nonce || agent || newCap)
 ///   spend    keccak256("KAGI/spend" || chainid || this || agent || sessionNonce || to || value)
 ///   1271     sha256("KAGI/1271"   || chainid || this || hash), signature = rx || s (64 bytes)
-/// The wrist rebuilds the manager messages itself from what it shows before it signs.
+/// The Kagi Wallet rebuilds the manager messages itself from what it shows before it signs.
 ///
 /// Limits: the cap counts ETH value only, a session can't call contracts or this account,
 /// and one session lives at most as long as its expiry (so one cap per key lifetime).
@@ -102,7 +102,7 @@ contract KagiAccount is KagiBase {
         emit LimitDeclined(agent, newCap);
     }
 
-    /// Any single shard can stop a key: the phone alone, or phone and wrist together.
+    /// Any single shard can stop a key: the phone alone, or phone and Kagi Wallet together.
     function revoke(address agent, uint256 rx, uint256 s) external {
         uint256 n = nonce;
         bytes32 m = sha256(abi.encodePacked("KAGI/revoke", block.chainid, address(this), n, agent));

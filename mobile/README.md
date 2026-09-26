@@ -33,12 +33,12 @@ wallet with a small balance.
 
 - Phone shard: generated on the phone, stored in the Android Keystore backed
   secure store, unlocked with biometrics before each signature.
-- Pairing: both screens show the same code. Press A on the wrist and tap on the phone.
-- Key generation: 2-of-2 between phone and wrist with proofs of possession.
-- Signing: grants and over-cap transactions are signed by both shards. The wrist
+- Pairing: both screens show the same code. Press A on the Kagi Wallet and tap on the phone.
+- Key generation: 2-of-2 between phone and Kagi Wallet with proofs of possession.
+- Signing: grants and over-cap transactions are signed by both shards. The Kagi Wallet
   rebuilds the message from the calldata it displays, signs only on a press of A,
-  and the phone checks the wrist's half and the final BIP340 signature.
-- Revoke: hold B on the wrist for 2 seconds, or hold the button on Home.
+  and the phone checks the Kagi Wallet's half and the final BIP340 signature.
+- Revoke: hold B on the Kagi Wallet for 2 seconds, or hold the button on Home.
 
 Protocol notes are at the top of `src/lib/frost.ts`. It must match
 `firmware/wrist/src/frost.cpp` byte for byte.

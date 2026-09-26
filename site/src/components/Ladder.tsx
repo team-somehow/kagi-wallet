@@ -5,7 +5,7 @@ type Who = 'agent' | 'phone' | 'wrist' | 'vault';
 const DEVICES: { id: Who; name: string }[] = [
   { id: 'agent', name: 'Agent' },
   { id: 'phone', name: 'Phone' },
-  { id: 'wrist', name: 'Wrist' },
+  { id: 'wrist', name: 'Kagi Wallet' },
   { id: 'vault', name: 'Second stick' },
 ];
 const TIERS: { title: string; you: string; signs: Who[]; tone: 'quiet' | 'human' | 'stop' }[] = [
@@ -28,7 +28,7 @@ function Icon({ id }: { id: Who }) {
   }
 }
 
-// The line that joins the devices that sign together. Wrist to second stick is infrared, drawn dashed in blue.
+// The line that joins the devices that sign together. Kagi Wallet to second stick is infrared, drawn dashed in blue.
 function Links({ signs, tone }: { signs: Who[]; tone: string }) {
   const idx = signs.map((s) => DEVICES.findIndex((d) => d.id === s)).sort();
   if (idx.length < 2) return null;

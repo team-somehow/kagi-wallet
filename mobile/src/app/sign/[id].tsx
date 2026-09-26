@@ -84,7 +84,7 @@ export default function Sign() {
           {shortAddr(req.to, 10, 8)}
         </Txt>
         <Txt size={13} color={colors.faint}>
-          The wrist shows this amount and recipient decoded from the raw bytes. Check they match.
+          The Kagi Wallet shows this amount and recipient decoded from the raw bytes. Check they match.
         </Txt>
       </View>
 
@@ -92,7 +92,7 @@ export default function Sign() {
         <Fact label="Key" value={req.agent} mono={false} />
         <Fact label="Left under its cap" value={usdc(headroom)} />
         <Fact label="Chain said" value="rejected, over cap" mono={false} color={colors.red} />
-        <Fact label="Needs" value="phone and wrist" mono={false} />
+        <Fact label="Needs" value="phone and Kagi Wallet" mono={false} />
       </View>
 
       <Pressable
@@ -113,7 +113,7 @@ export default function Sign() {
             {req.calldata}
           </Txt>
           <Txt size={13} color={colors.faint}>
-            The wrist renders its readout from these bytes, not from what the agent claims.
+            The Kagi Wallet renders its readout from these bytes, not from what the agent claims.
           </Txt>
         </View>
       ) : null}

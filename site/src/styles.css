@@ -1,6 +1,6 @@
 /* Kagi tokens, from the app (mobile/src/theme.ts): cool aluminium ground (the sticks' own
    material), ink for what is fine, deep amber only where a person acts, deep blue for devices
-   talking to each other, red only for money lost or a key stopped. The wrist stick is blue,
+   talking to each other, red only for money lost or a key stopped. The Kagi Wallet is blue,
    the second stick red. Light, matching the phone app and the sticks' screens. */
 :root {
   color-scheme: light;
@@ -199,7 +199,7 @@ p { margin: 0; }
 .stage-phone i { width: 12px; height: 20px; border-radius: 4px; border: 1.5px solid currentColor; background: var(--raised); }
 .stage-cap { position: absolute; bottom: 1%; left: 0; right: 0; text-align: center; color: var(--muted); font: 11px var(--mono); letter-spacing: 0.08em; }
 
-/* ---- the device: the Kagi stick from the logo, blue on the wrist, red for the second one ---- */
+/* ---- the device: the Kagi stick from the logo, blue on the Kagi Wallet, red for the second one ---- */
 .device { position: relative; container-type: inline-size; filter: drop-shadow(0 30px 26px rgba(17, 24, 32, 0.28)); }
 .device-face {
   position: relative; display: flex; align-items: center; gap: 6%;

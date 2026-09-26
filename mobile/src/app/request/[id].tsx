@@ -58,7 +58,7 @@ export default function Request() {
       </Txt>
       <Txt size={17} color={colors.muted} style={styles.lead}>
         {issued
-          ? `${req.agent} can spend up to ${usdc(req.capUsdc)} for the next ${hours(req.durationH)} without asking. Over that, the wrist buzzes.`
+          ? `${req.agent} can spend up to ${usdc(req.capUsdc)} for the next ${hours(req.durationH)} without asking. Over that, the Kagi Wallet buzzes.`
           : 'The agent made its own keypair. You are deciding how much it may spend before you hear about it.'}
       </Txt>
 

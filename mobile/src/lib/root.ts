@@ -1,12 +1,12 @@
 /**
- * The 3-of-3 root key: phone (id 1), wrist (id 2), vault (id 3).
+ * The 3-of-3 root key: phone (id 1), Kagi Wallet (id 2), vault (id 3).
  *
- * It starts as a 2-of-2 between phone and wrist (the same key generation as the manager
+ * It starts as a 2-of-2 between phone and Kagi Wallet (the same key generation as the manager
  * key), then the vault joins with an additive reshare that keeps the group key:
- *   phone picks r1, wrist picks r2, each encrypts its piece to the vault's device key.
- *   vault share x3 = r1 + r2, phone x1' = x1 - r1, wrist x2' = x2 - r2.
+ *   phone picks r1, Kagi Wallet picks r2, each encrypts its piece to the vault's device key.
+ *   vault share x3 = r1 + r2, phone x1' = x1 - r1, Kagi Wallet x2' = x2 - r2.
  *   The phone checks X1' + X2' + X3 = P before anyone commits the new shares.
- * The phone never sees r2, so phone and wrist together cannot rebuild the vault's share.
+ * The phone never sees r2, so phone and Kagi Wallet together cannot rebuild the vault's share.
  *
  * Signing is FROST for n parties with compressed points, matching firmware/wrist/src/frost.cpp:
  *   rho_i = H("KAGI/rhoN" || i || m || D_1 || E_1 || ... || D_n || E_n) mod n

@@ -5,7 +5,7 @@
 **A threshold wallet that gives AI agents a spending key, not yours.**
 
 Agents get a capped, expiring key they can spend freely under.
-Everything above the cap climbs a ladder of physical devices: your wrist, then a vault you can only reach by light.
+Everything above the cap climbs a ladder of physical devices: your Kagi Wallet, then a vault you can only reach by light.
 
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.30-363636?logo=solidity)
 ![Foundry](https://img.shields.io/badge/tested_with-Foundry-f26b1d)
@@ -23,7 +23,7 @@ Integrated with
 
 ---
 
-> **In one sentence:** Kagi gives an AI agent a capped, expiring on-chain spending key, and anything above the cap needs you to approve on your phone and press a button on a device on your wrist.
+> **In one sentence:** Kagi gives an AI agent a capped, expiring on-chain spending key, and anything above the cap needs you to approve on your phone and press a button on a device on your Kagi Wallet.
 
 ## The problem
 
@@ -37,7 +37,7 @@ Kagi splits the wallet's authority across devices with **FROST threshold Schnorr
 flowchart LR
     subgraph You
         P["📱 Phone<br/>biometric-gated shard"]
-        W["⌚ Wrist ESP32 device<br/>press A to co-sign"]
+        W["⌚ Kagi Wallet (ESP32)<br/>press A to co-sign"]
         V["🏠 Vault ESP32 device<br/>IR only"]
     end
     A["🤖 Agent<br/>ephemeral key"]
@@ -59,16 +59,16 @@ flowchart LR
 | Action | Who signs | Human in the loop |
 |---|---|---|
 | Spend under the cap | the agent's ephemeral key | none |
-| Grant a key, spend over the cap | phone + wrist ESP32 device (manager key) | face on the phone, press A on the wrist |
-| Treasury moves, anything beyond the manager's reach | phone + wrist + vault ESP32 device (root key) | walk to the vault, point the wrist at it |
-| Revoke an agent key | the phone's shard alone, or the manager key | one tap, or hold B on the wrist for 2 s |
+| Grant a key, spend over the cap | phone + Kagi Wallet (ESP32) (manager key) | face on the phone, press A on the Kagi Wallet |
+| Treasury moves, anything beyond the manager's reach | phone + Kagi Wallet + vault ESP32 device (root key) | walk to the vault, point the Kagi Wallet at it |
+| Revoke an agent key | the phone's shard alone, or the manager key | one tap, or hold B on the Kagi Wallet for 2 s |
 
 ### Keys
 
 | Key | Type | Held by | Can do |
 |---|---|---|---|
-| **Manager** | FROST 2-of-2 | phone + wrist ESP32 device | anything on `KagiAccount`: grant, execute, sign ERC-1271 |
-| **Root** | FROST 3-of-3 (reshared from 2-of-2) | phone + wrist + vault ESP32 device | anything on `RootTreasury` |
+| **Manager** | FROST 2-of-2 | phone + Kagi Wallet (ESP32) | anything on `KagiAccount`: grant, execute, sign ERC-1271 |
+| **Root** | FROST 3-of-3 (reshared from 2-of-2) | phone + Kagi Wallet + vault ESP32 device | anything on `RootTreasury` |
 | **Phone** | the phone's shard on its own | phone | revoke only |
 | **Session** | ECDSA, made by the agent | the agent, never leaves it | plain ETH transfers under its cap until it expires |
 
@@ -78,8 +78,8 @@ One FROST key has one threshold, and its signature doesn't say who signed. That'
 
 ```
 contracts/   Solidity + Foundry. KagiAccount, RootTreasury, BIP340 verifier, forge tests
-firmware/    ESP32-S3 firmware (PlatformIO). One build runs as wrist or vault
-  wrist/       the shard firmware: FROST, display, buttons, BLE, WiFi, IR
+firmware/    ESP32-S3 firmware (PlatformIO). One build runs as the Kagi Wallet or the second stick (vault)
+  wrist/       the device firmware: FROST, display, buttons, BLE, WiFi, IR
   irprobe/     bench tool for the IR link
 mobile/      Expo / React Native app. The phone shard, the control surface, and its own on-chain client
 agent-mcp/   Node. A bare-bones MCP server that gives ChatGPT, Claude, Claude Code, Codex, Cursor or VS Code an agent wallet
@@ -197,7 +197,7 @@ The spending cap limits *how much* an agent can lose. Intercepta decides *who* i
 | Verdict | When | What happens |
 |---|---|---|
 | **Pass** | clean address | the agent pays on its own, within its cap |
-| **Hold** | risk score ≥ 30, or exposure traits such as phishing transfers, mixer use or contact with sanctioned addresses | the agent doesn't sign. It files an on-chain request for exactly that payment, with Intercepta's reasons in it. The phone shows **"Intercepta held this payment"** with the reasons, and it only goes out if the owner approves with fingerprint + wrist press. **This applies even when the payment is under the cap** |
+| **Hold** | risk score ≥ 30, or exposure traits such as phishing transfers, mixer use or contact with sanctioned addresses | the agent doesn't sign. It files an on-chain request for exactly that payment, with Intercepta's reasons in it. The phone shows **"Intercepta held this payment"** with the reasons, and it only goes out if the owner approves with fingerprint + a hold on the Kagi Wallet. **This applies even when the payment is under the cap** |
 | **Refuse** | the recipient itself is sanctioned, a known scammer, blacklisted, or ran a rug pull | refused before signing: no signature, no request to the owner. The AI is told why and not to route around it |
 
 If Intercepta can't be reached, the payment is **held**, never passed. Intercepta's data covers mainnet, so the recipient is screened as a mainnet address while the payment itself runs on a testnet.
@@ -217,9 +217,9 @@ If Intercepta can't be reached, the payment is **held**, never passed. Intercept
 | Quick Scan Address, then Deep Scan (`toxic-score`) on anything flagged, and the pass / hold / refuse policy | [`agent-mcp/intercepta.mjs`](agent-mcp/intercepta.mjs), `screen()` |
 | The check inside the payment flow, before the key signs | [`agent-mcp/server.mjs`](agent-mcp/server.mjs), `transfer()` |
 | A held payment becomes an on-chain request for the owner | [`agent-mcp/server.mjs`](agent-mcp/server.mjs), the `send_eth` tool |
-| The owner sees the verdict before approving on the wrist | [`mobile/src/app/limit/[id].tsx`](mobile/src/app/limit/[id].tsx) |
+| The owner sees the verdict before approving on the Kagi Wallet | [`mobile/src/app/limit/[id].tsx`](mobile/src/app/limit/[id].tsx) |
 
-The contract needs no changes: a held payment travels through the existing `requestLimit` → `raiseLimit` path, so it still needs the 2-of-2 threshold signature from phone and wrist.
+The contract needs no changes: a held payment travels through the existing `requestLimit` → `raiseLimit` path, so it still needs the 2-of-2 threshold signature from phone and Kagi Wallet.
 
 **Feedback on the API:**
 - Time to first call: under five minutes. It's one GET with an `X-API-KEY` header, and the response (`toxicScore` + named `traits` with descriptions) is easy to turn into a reason a person can read.
@@ -233,7 +233,7 @@ The contract needs no changes: a held payment travels through the existing `requ
 
 Kagi is a policy-aware transaction agent: the contract enforces the spending limit, and a person has to approve anything above it. The chain can tell you the current state, like how much allowance is left, but not the story behind it. **MultiBaas gives the agent a memory of what happened.**
 
-The agent MCP's `get_activity` tool reads the wallet's history from the MultiBaas event index: every payment an agent sent, every higher limit it asked for and why, and whether the owner approved it (phone + wrist), declined it or revoked the key. You can ask your AI *"what did my agent spend today, and who approved the raise?"* and get an answer drawn from indexed events, not guesses.
+The agent MCP's `get_activity` tool reads the wallet's history from the MultiBaas event index: every payment an agent sent, every higher limit it asked for and why, and whether the owner approved it (phone + Kagi Wallet), declined it or revoked the key. You can ask your AI *"what did my agent spend today, and who approved the raise?"* and get an answer drawn from indexed events, not guesses.
 
 | What | Where |
 |---|---|
@@ -269,8 +269,8 @@ _TODO: names, roles and social handles._
 |---|---|
 | an agent's ephemeral key | at most the cap, for at most 24 h |
 | the phone, or the server and its credentials | one shard: they can't grant or raise limits. They can revoke, which is only a nuisance |
-| the wrist ESP32 device | nothing without the phone, and it stops signing after 2 minutes without motion |
-| phone **and** wrist | the manager key. Everything behind the root key still needs the vault |
+| the Kagi Wallet (ESP32) | nothing without the phone, and it stops signing after 2 minutes without motion |
+| phone **and** Kagi Wallet | the manager key. Everything behind the root key still needs the vault |
 | any remote access at all | still no path to the vault: it has no network after the reshare |
 
 ## Status
@@ -279,7 +279,7 @@ This is a hackathon build. What isn't done yet:
 
 - **Development firmware:** no secure boot, no flash encryption, reflashable. The production plan (eFuses burned, JTAG and USB download off, no OTA on the vault) is in [IDEA.md](IDEA.md).
 - **Agent spends are plain ETH only.** A cap in USDC and a validator that measures balance changes are designed but not built.
-- **The wrist has no ERC-1271 signing path yet.** It would need to decode EIP-712 (Permit2 first) so it never signs blind.
+- **The Kagi Wallet has no ERC-1271 signing path yet.** It would need to decode EIP-712 (Permit2 first) so it never signs blind.
 - **FROST runs in RAM.** Secure storage protects shards at rest, but each shard is in memory for a few hundred ms per signature.
 
 See **[IDEA.md](IDEA.md)** for the full design, the threat model and the two-act demo.

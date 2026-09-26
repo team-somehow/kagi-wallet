@@ -228,7 +228,7 @@ export default function Connect() {
       </View>
       {phase === 'search' ? (
         <Txt size={14} color={colors.faint} align="center">
-          {state.wrist.connected ? 'Found it. Connecting…' : 'Looking for your Kagi stick'}
+          {state.wrist.connected ? 'Found it. Connecting…' : 'Looking for your Kagi Wallet'}
         </Txt>
       ) : null}
     </Screen>

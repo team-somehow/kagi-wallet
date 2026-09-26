@@ -31,7 +31,7 @@ export async function deleteShard(): Promise<void> {
 
 const ROOT_KEY = 'kagi.root-shard.v1';
 
-/** The phone's share of the root key (3-of-3 with wrist and vault once the vault joins). */
+/** The phone's share of the root key (3-of-3 with Kagi Wallet and vault once the vault joins). */
 export async function loadRoot(): Promise<import('./root').RootShare | null> {
   try {
     const v = await SecureStore.getItemAsync(ROOT_KEY);

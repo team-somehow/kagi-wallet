@@ -81,7 +81,7 @@ function reducer(state: State, a: Action): State {
   }
 }
 
-/** Stand-ins for the agent, the chain and the wrist. Swap for real transport later. */
+/** Stand-ins for the agent, the chain and the Kagi Wallet. Swap for real transport later. */
 export interface Sim {
   requestKey: (agent?: string, capUsdc?: number, durationH?: number) => string;
   /** Agent spends under its cap. Returns null when no key can absorb it. */
@@ -122,7 +122,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const sim = useMemo<Sim>(() => {
     const liveKeys = () => ref.current.keys.filter((k) => k.status === 'live');
     const spendWith = (key: AgentKey, amount: number, escalate: boolean): string | null => {
-      // The wrist decodes transfer and approve calldata, so the agent sticks to those.
+      // The Kagi Wallet decodes transfer and approve calldata, so the agent sticks to those.
       const kind = pick<TxKind>(['transfer', 'transfer', 'approve']);
       if (key.spentUsdc + amount > key.capUsdc) {
         if (!escalate) return null;

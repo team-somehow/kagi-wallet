@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {KagiAccount} from "../src/KagiAccount.sol";
 
-/// Signatures from the real phone + wrist FROST code (hub/gen-fixtures.ts), checked on the
+/// Signatures from the real phone + Kagi Wallet FROST code (hub/gen-fixtures.ts), checked on the
 /// contract. Fails if the TypeScript message builders and the Solidity digests drift apart.
 contract FrostFixtureTest is Test {
     string json;

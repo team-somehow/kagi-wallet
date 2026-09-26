@@ -10,7 +10,7 @@ forge test            # unit, fuzz, official BIP340 vectors, real FROST fixtures
 forge fmt && forge lint
 ```
 
-- `test/fixtures/frost.json` holds signatures from the real phone + wrist code. Regenerate it
+- `test/fixtures/frost.json` holds signatures from the real phone + Kagi Wallet code. Regenerate it
   with `cd ../mobile && npx tsx ../contracts/scripts/gen-fixtures.mts` whenever a signed message format changes.
 - `node scripts/export.mjs` runs `forge build` and writes the ABI and bytecode the apps use:
   `mobile/src/lib/contracts.ts` and `agent-mcp/abi.json`.

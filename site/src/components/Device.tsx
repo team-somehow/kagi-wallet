@@ -1,6 +1,6 @@
 // An ESP32 stick. The screen is drawn in the firmware's own 240 x 135 px coordinates and colours
 // (firmware/wrist/src/main.cpp: drawSurface, drawHome, drawPrompt, the vault screen), so it matches
-// what the real device shows. The wrist stick is blue, the second stick red.
+// what the real device shows. The Kagi Wallet is blue, the second stick red.
 import type { CSSProperties, ReactNode } from 'react';
 
 export type Variant = 'blue' | 'red';

@@ -7,7 +7,7 @@ import {Bip340} from "./Bip340.sol";
 /// @notice An account owned by one x-only threshold Schnorr key. Every call needs a BIP340
 /// signature over
 ///   m = sha256("KAGI/evm" || chainid || this || nonce || to || value || data)
-/// The wrist rebuilds m itself from what it shows on screen before it signs. Anyone may
+/// The Kagi Wallet rebuilds m itself from what it shows on screen before it signs. Anyone may
 /// submit a signed call and pay its gas (in practice the phone's gas wallet).
 ///
 /// Storage: slot 0 nonce, slot 1 groupKey. Children append after these; the phone and the

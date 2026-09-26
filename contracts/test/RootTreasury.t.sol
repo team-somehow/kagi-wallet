@@ -6,7 +6,7 @@ import {SchnorrTest} from "./utils/Schnorr.sol";
 import {Reverter, Target} from "./utils/Mocks.sol";
 
 contract RootTreasuryTest is SchnorrTest {
-    uint256 constant ROOT = 0x7007; // stands in for the phone + wrist + vault group secret
+    uint256 constant ROOT = 0x7007; // stands in for the phone + Kagi Wallet + vault group secret
     uint256 constant MANAGER = 0xA11CE;
 
     RootTreasury t;
@@ -33,7 +33,7 @@ contract RootTreasuryTest is SchnorrTest {
         assertEq(tg.last(), 9);
     }
 
-    /// The manager key (phone + wrist) can't touch the treasury: it needs the vault.
+    /// The manager key (phone + Kagi Wallet) can't touch the treasury: it needs the vault.
     function test_RevertWhen_SignedByManagerKey() public {
         (uint256 rx, uint256 s) = schnorrSign(MANAGER, t.digest(to, 1, ""));
         vm.expectRevert(bytes("bad signature"));

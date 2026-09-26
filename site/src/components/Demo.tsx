@@ -36,7 +36,7 @@ const after: Partial<Record<Phase, Phase>> = {
 };
 const labels: Record<Phase, string> = {
   request: 'Unlock phone',
-  unlocked: 'Hold the button on your wrist',
+  unlocked: 'Hold the button on your Kagi Wallet',
   'ir-out': 'Sending by infrared',
   second: 'Hold the second stick’s button',
   'ir-back': 'Returning signature',
@@ -195,7 +195,7 @@ export function Demo() {
     phoneOK = !['request', 'join', 'joining', 'declined'].includes(phase);
   const proof: [string, boolean][] = [
     ['Phone', phoneOK],
-    ['Wrist', wristOK],
+    ['Kagi Wallet', wristOK],
     ...(dual ? [['2nd stick', secondOK] as [string, boolean]] : []),
   ];
   const currentSpent = done ? spent + payment : spent;
@@ -265,7 +265,7 @@ export function Demo() {
           </div>
           <button
             className="kg-physical"
-            aria-label={`Hold the button on the ${second ? 'second' : 'wrist'} stick to approve`}
+            aria-label={`Hold the button on the ${second ? 'second stick' : 'Kagi Wallet'} to approve`}
             disabled={!active}
             data-held={active && hold > 0}
             onPointerDown={(e) => {
@@ -295,7 +295,7 @@ export function Demo() {
             <span className="kg-target" />
           </button>
         </div>
-        <div className="kg-device-caption">{second ? '02 / SECOND STICK' : '01 / YOUR WRIST'}</div>
+        <div className="kg-device-caption">{second ? '02 / SECOND STICK' : '01 / YOUR KAGI WALLET'}</div>
       </div>
     );
   }
@@ -483,7 +483,7 @@ export function Demo() {
                     {join ? (
                       <>
                         <Row label="Phone" value="Connected" />
-                        <Row label="Wrist stick" value="Connected" />
+                        <Row label="Kagi Wallet" value="Connected" />
                         <Row
                           label="Second stick"
                           value={phase === 'joined' ? 'Joined' : phase === 'joining' ? 'Joining…' : 'Ready to join'}
@@ -554,7 +554,7 @@ export function Demo() {
             </section>
             <footer className="kg-bottom">
               <span>SIMULATION · NO REAL TRANSACTIONS</span>
-              <span>{dual ? 'PHONE + TWO STICKS / 3 OF 3' : 'PHONE + WRIST / 2 OF 2'}</span>
+              <span>{dual ? 'PHONE + TWO STICKS / 3 OF 3' : 'PHONE + KAGI WALLET / 2 OF 2'}</span>
             </footer>
           </div>
         </div>

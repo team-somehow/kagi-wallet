@@ -45,7 +45,7 @@ function Lockup() {
 
 /** Decorative only: approvals always happen on the physical hardware. Without a value it shows the standby lockup. */
 export function StickModel({
-  title = 'WRIST',
+  title = 'KAGI WALLET',
   value,
   detail = 'Your approval device',
   active = false,
@@ -188,7 +188,7 @@ export function SpatialDevices({
   return (
     <View
       style={[s.sceneWrap, { height: 244 * scale }]}
-      accessibilityLabel={two ? 'Phone, wrist and second stick' : 'Phone and wrist stick'}
+      accessibilityLabel={two ? 'Phone, Kagi Wallet and second stick' : 'Phone and Kagi Wallet'}
     >
       <View style={{ width: 320, height: 244, transform: [{ scale }] }}>
         <View style={s.orbit} />
@@ -209,7 +209,7 @@ export function SpatialDevices({
         <View style={[s.position, first]}>
           <StickModel
             width={w}
-            title="WRIST"
+            title="KAGI WALLET"
             value={!connected ? 'Reconnect' : beam === 'out' ? 'Sending →' : beam === 'back' ? 'Reading ←' : value}
             detail={
               detail ??

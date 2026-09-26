@@ -14,7 +14,7 @@ import { colors, fonts, radius, space } from '../theme';
 
 type AddState = 'idle' | 'waiting' | 'saved' | 'rejected' | 'failed';
 
-/** The wrist's connection, and the WiFi networks it knows. */
+/** The Kagi Wallet's connection, and the WiFi networks it knows. */
 export default function WristSettings() {
   const { state } = useStore();
   const { wrist } = state;
@@ -47,7 +47,7 @@ export default function WristSettings() {
   }, [wrist.connected]);
 
   const save = async () => {
-    // Names are sent exactly as the wrist saw them. Spaces at the ends are real.
+    // Names are sent exactly as the Kagi Wallet saw them. Spaces at the ends are real.
     const name = ssid;
     setAdd('waiting');
     setMessage(null);
@@ -61,19 +61,19 @@ export default function WristSettings() {
       const m = await reply;
       if (m.t === 'wifi_added') {
         setAdd('saved');
-        setMessage(`Saved ${name}. The wrist joins it whenever it is in range.`);
+        setMessage(`Saved ${name}. The Kagi Wallet joins it whenever it is in range.`);
         setSsid('');
         setPass('');
         void success();
         link.send({ t: 'wifi_list?' });
       } else {
         setAdd('rejected');
-        setMessage(m.reason === 'user' ? 'You tapped the wrist’s button, so it was not saved.' : 'The wrist refused that network name or password.');
+        setMessage(m.reason === 'user' ? 'You tapped the Kagi Wallet’s button, so it was not saved.' : 'The Kagi Wallet refused that network name or password.');
         void warn();
       }
     } catch {
       setAdd('failed');
-      setMessage('The wrist did not answer. Nothing was saved.');
+      setMessage('The Kagi Wallet did not answer. Nothing was saved.');
       void warn();
     }
   };
@@ -119,7 +119,7 @@ export default function WristSettings() {
         </Txt>
         {networks === null ? (
           <Txt size={15} color={colors.faint} style={styles.row}>
-            {wrist.connected ? 'Asking the wrist' : 'Connect the wrist to see its networks.'}
+            {wrist.connected ? 'Asking the Kagi Wallet' : 'Connect the Kagi Wallet to see its networks.'}
           </Txt>
         ) : networks.length === 0 ? (
           <Txt size={15} color={colors.faint} style={styles.row}>
@@ -144,12 +144,12 @@ export default function WristSettings() {
           Add a network
         </Txt>
         <Txt size={14} color={colors.faint}>
-          It has to be 2.4 GHz and the same network as the laptop running the hub. The wrist asks you to hold its button
+          It has to be 2.4 GHz and the same network as the laptop running the hub. The Kagi Wallet asks you to hold its button
           before it saves anything.
         </Txt>
         {nearby === null ? (
           <Txt size={14} color={colors.faint}>
-            {wrist.connected ? 'Looking for networks near the wrist' : 'Connect the wrist to see nearby networks.'}
+            {wrist.connected ? 'Looking for networks near the Kagi Wallet' : 'Connect the Kagi Wallet to see nearby networks.'}
           </Txt>
         ) : (
           <View style={styles.nearby}>
@@ -215,11 +215,11 @@ export default function WristSettings() {
         ) : null}
         {add === 'waiting' ? (
           <Txt size={15} color={colors.amber}>
-            Hold the wrist’s button to save {ssid}.
+            Hold the Kagi Wallet’s button to save {ssid}.
           </Txt>
         ) : (
           <Button
-            label="Send to the wrist"
+            label="Send to the Kagi Wallet"
             onPress={() => void save()}
             disabled={!wrist.connected || ssid.length === 0 || (pass.length > 0 && pass.length < 8)}
           />

@@ -1,4 +1,4 @@
-// Writes contracts/test/fixtures/frost.json: signatures made by the real phone + wrist FROST
+// Writes contracts/test/fixtures/frost.json: signatures made by the real phone + Kagi Wallet FROST
 // code (mobile/src/lib/frost), for the forge tests to check against the Solidity contracts.
 // This is what keeps the TypeScript message builders and the contracts' digests in step.
 // Run from mobile/ (for its node_modules): npx tsx ../contracts/scripts/gen-fixtures.mts

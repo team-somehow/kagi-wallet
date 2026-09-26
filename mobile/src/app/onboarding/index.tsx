@@ -15,10 +15,10 @@ const rule = colors.line;
 const signer = colors.amber; // one of your devices signs
 
 // Who has to agree, from the agent alone up to every device. The dots are how many of your
-// own devices sign: none, phone and wrist, then all three with the second stick.
+// own devices sign: none, phone and Kagi Wallet, then all three with the second stick.
 const LADDER: { when: string; who: string; signers: number }[] = [
   { when: 'Under the cap', who: 'The agent’s own key', signers: 0 },
-  { when: 'Over the cap', who: 'Your phone and wrist', signers: 2 },
+  { when: 'Over the cap', who: 'Your phone and Kagi Wallet', signers: 2 },
   { when: 'Higher limits', who: 'Plus a second stick', signers: 3 },
 ];
 
@@ -40,12 +40,12 @@ export default function Welcome() {
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <Logo height={32} />
 
-        <View style={[styles.stage, { height: 200 * k }]} accessibilityLabel="Your wrist stick and a second stick">
+        <View style={[styles.stage, { height: 200 * k }]} accessibilityLabel="Your Kagi Wallet and a second stick">
           <View style={[styles.at, { left: 204 * k, top: 0 }]}>
             <StickModel width={144 * k} tilt={9} variant="red" title="SECOND STICK" value="Ready" detail="Infrared" />
           </View>
           <View style={[styles.at, { left: 0, top: 84 * k }]}>
-            <StickModel width={190 * k} tilt={-6} title="WRIST" detail="Hold to approve" />
+            <StickModel width={190 * k} tilt={-6} title="KAGI WALLET" detail="Hold to approve" />
           </View>
         </View>
 
@@ -80,7 +80,7 @@ export default function Welcome() {
 
       <View style={styles.footer}>
         <Txt size={14} color={slate} lineHeight={20}>
-          Have your wrist stick nearby. It takes a minute.
+          Have your Kagi Wallet nearby. It takes a minute.
         </Txt>
         <Pressable
           accessibilityRole="button"

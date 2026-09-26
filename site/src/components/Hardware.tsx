@@ -18,7 +18,7 @@ export function Hardware() {
       <div className="wrap">
         <div className="section-head">
           <h2>Two sticks for $43</h2>
-          <p>An off-the-shelf ESP32 stick at $21.50. Start with one on your wrist. Add a second to the same wallet whenever you want a stronger boundary.</p>
+          <p>An off-the-shelf ESP32 stick at $21.50. Start with one on your Kagi Wallet. Add a second to the same wallet whenever you want a stronger boundary.</p>
         </div>
 
         <div className="hw">
@@ -27,7 +27,7 @@ export function Hardware() {
               <div className="hw-unit">
                 <Device screen={{ kind: 'home', line: '11 µETH left, 1 key' }} />
                 <span className="hw-tag">$21.50</span>
-                <small className="hw-role">Wrist · BLE to your phone</small>
+                <small className="hw-role">Kagi Wallet · BLE to your phone</small>
               </div>
               <span className="hw-plus" aria-hidden="true">+</span>
               <div className="hw-unit">

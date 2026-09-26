@@ -29,7 +29,7 @@ class Link {
     } catch {
       return;
     }
-    // The wrist can address the vault directly (its reshare piece). Pass it on.
+    // The Kagi Wallet can address the vault directly (its reshare piece). Pass it on.
     if (role === 'wrist' && m.to === 'vault') {
       this.send(m);
       return;
@@ -44,7 +44,7 @@ class Link {
     this.listeners.forEach((l) => l(s));
   }
 
-  /** Send to the wrist, or to the vault when m.to is "vault". False if that stick is not connected. */
+  /** Send to the Kagi Wallet, or to the vault when m.to is "vault". False if that stick is not connected. */
   send(m: Msg): boolean {
     const role: Role = m.to === 'vault' ? 'vault' : 'wrist';
     if (!ble.state()[role]) return false;
@@ -62,7 +62,7 @@ class Link {
   }
 
   /** Resolve with the first message matching pred, reject after ms. */
-  waitFor<T extends Msg = Msg>(pred: (m: Msg) => boolean, ms: number, what = 'the wrist'): Promise<T> {
+  waitFor<T extends Msg = Msg>(pred: (m: Msg) => boolean, ms: number, what = 'the Kagi Wallet'): Promise<T> {
     const promise = new Promise<T>((resolve, reject) => {
       const off = this.on((m) => {
         if (m.t === 'delivery_error') {

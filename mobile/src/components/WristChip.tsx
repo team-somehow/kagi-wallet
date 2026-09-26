@@ -9,7 +9,7 @@ export function wristStatus(wrist: Wrist, address: string | null): { text: strin
   if (!wrist.connected) return { text: 'Stick not connected', color: colors.red, ok: false };
   if (address && !wristMatches(wrist.groupKey, address)) return { text: 'Other wallet', color: colors.red, ok: false };
   if (!wrist.onArm) return { text: 'Off the arm', color: colors.amber, ok: false };
-  return { text: 'On wrist', color: colors.text, ok: true };
+  return { text: 'Connected', color: colors.text, ok: true };
 }
 
 export function WristChip({ wrist, address, onPress }: { wrist: Wrist; address: string | null; onPress?: () => void }) {
@@ -17,7 +17,7 @@ export function WristChip({ wrist, address, onPress }: { wrist: Wrist; address: 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${status.text}. Wrist settings`}
+      accessibilityLabel={`${status.text}. Kagi Wallet settings`}
       onPress={onPress}
       style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
     >

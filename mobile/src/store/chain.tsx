@@ -238,7 +238,7 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
       if (opened.current.has(r.id)) continue;
       opened.current.add(r.id);
       void buzz();
-      // The stick is on the owner's wrist even when the phone is in a pocket: buzz it too.
+      // The Kagi Wallet is with the owner even when the phone is in a pocket: buzz it too.
       const flag = interceptaFlag(r.reason);
       link.send({
         t: 'alert',
@@ -288,7 +288,7 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
     return { cap, spent, left: cap - spent };
   }, [live]);
 
-  // The wrist's allowance ring shows every live key together, in ETH.
+  // The Kagi Wallet's allowance ring shows every live key together, in ETH.
   const { wrist } = state;
   useEffect(() => {
     if (!wrist.connected || !groupKey) return;

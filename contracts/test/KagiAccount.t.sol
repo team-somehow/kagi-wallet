@@ -11,7 +11,7 @@ contract KagiAccountTest is SchnorrTest {
     event Revoked(address indexed agent);
     event Spent(address indexed agent, address indexed to, uint256 value);
 
-    uint256 constant MANAGER = 0xA11CE; // stands in for the phone + wrist group secret
+    uint256 constant MANAGER = 0xA11CE; // stands in for the phone + Kagi Wallet group secret
     uint256 constant PHONE = 0xB0B;
     uint256 constant AGENT_PK = 0xA6E17;
     uint256 constant CAP = 1 ether;

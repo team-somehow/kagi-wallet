@@ -109,7 +109,7 @@ export default function Issue() {
       </Txt>
       <Txt size={17} color={colors.muted} style={styles.lead}>
         {phase === 'issued' && agent && chosenCap !== null
-          ? `${agent} can spend up to ${usdc(chosenCap)} for the next ${hours(life)} without asking. Over that, the wrist buzzes.`
+          ? `${agent} can spend up to ${usdc(chosenCap)} for the next ${hours(life)} without asking. Over that, the Kagi Wallet buzzes.`
           : 'Decide how much an agent may spend before you hear about it. The agent makes its own key. You only ever sign the limit.'}
       </Txt>
 
@@ -156,8 +156,8 @@ export default function Issue() {
             />
             <Txt size={13} color={tooHigh ? colors.red : colors.faint}>
               {tooHigh
-                ? `Above ${usdc(state.managerRaiseLimit)} needs the vault, not just phone and wrist.`
-                : `Phone and wrist can grant up to ${usdc(state.managerRaiseLimit)}. Beyond that is a vault trip.`}
+                ? `Above ${usdc(state.managerRaiseLimit)} needs the vault, not just phone and Kagi Wallet.`
+                : `Phone and Kagi Wallet can grant up to ${usdc(state.managerRaiseLimit)}. Beyond that is a vault trip.`}
             </Txt>
           </View>
 

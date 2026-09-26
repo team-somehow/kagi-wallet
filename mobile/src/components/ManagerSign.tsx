@@ -71,7 +71,7 @@ interface Props {
   onPhoneSigned?: () => void;
   /** Start as soon as the screen shows, for requests the owner is already expecting. */
   autoStart?: boolean;
-  /** The owner declined on the wrist (B, or the hold timed out). */
+  /** The owner declined on the Kagi Wallet (B, or the hold timed out). */
   onReject?: (reason: string) => void;
   /** Called with the verified 64 byte BIP340 signature, hex. */
   onDone: (signature: string) => void;
@@ -84,32 +84,32 @@ const PHONE_ERRORS = [
 ];
 
 const REJECT_TEXT: Record<string, string> = {
-  user: 'You rejected it on the wrist.',
-  timeout: 'The wrist timed out. Nothing was signed.',
-  off_arm: 'The wrist is off your arm. Put it on and try again.',
-  not_paired: 'The wrist has no shard. Pair it again from a fresh wallet.',
-  busy: 'The wrist is showing another request. Finish that one first.',
-  bad_calldata: 'The wrist could not read this transaction, so it refused.',
+  user: 'You rejected it on the Kagi Wallet.',
+  timeout: 'The Kagi Wallet timed out. Nothing was signed.',
+  off_arm: 'The Kagi Wallet was set down. Pick it up and try again.',
+  not_paired: 'The Kagi Wallet has no shard. Pair it again from a fresh wallet.',
+  busy: 'The Kagi Wallet is showing another request. Finish that one first.',
+  bad_calldata: 'The Kagi Wallet could not read this transaction, so it refused.',
   // With the second stick
   ir_failed: 'The sticks could not see each other. Face them, at least 30 cm apart, and try again.',
   vault_rejected: 'You said no on the second stick. Nothing was signed.',
   vault_timeout: 'The second stick did not answer. Face the sticks and try again.',
-  root_not_3_of_3: 'The wrist is not set up with a second stick yet.',
-  nothing_to_retry: 'The wrist no longer has this request. Start over.',
+  root_not_3_of_3: 'The Kagi Wallet is not set up with a second stick yet.',
+  nothing_to_retry: 'The Kagi Wallet no longer has this request. Start over.',
   expired: 'The request waited too long and was dropped. Start over.',
   needs_second_stick: 'This wallet needs both sticks now.',
 };
 
 /**
- * The manager key is 2 of 2: phone shard, then wrist shard.
- * Biometrics unlock the phone's share. The wrist shows what it is signing, decoded
+ * The manager key is 2 of 2: phone shard, then Kagi Wallet shard.
+ * Biometrics unlock the phone's share. The Kagi Wallet shows what it is signing, decoded
  * from the raw bytes, and signs its half only when you hold its button. The phone checks
- * the wrist's half and the final signature before anything counts as signed.
+ * the Kagi Wallet's half and the final signature before anything counts as signed.
  */
 export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneSigned, onReject, onDone, autoStart }: Props) {
   const { state } = useStore();
   const [phase, setPhase] = useState<Phase>('idle');
-  // With a second stick the wallet key is 3 of 3, and the wrist asks it over infrared.
+  // With a second stick the wallet key is 3 of 3, and the Kagi Wallet asks it over infrared.
   const [three, setThree] = useState<RootShare | null>(null);
   const [lostAt, setLostAt] = useState(0);
   const [now, setNow] = useState(0);
@@ -126,7 +126,7 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
   const pendingId = useRef<string | null>(null);
   const status = wristStatus(state.wrist, state.address);
 
-  // Leaving the screen mid-request clears it off the wrist.
+  // Leaving the screen mid-request clears it off the Kagi Wallet.
   useEffect(
     () => () => {
       if (pendingId.current) {
@@ -220,18 +220,18 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
                 }
               : { kind: 'tx', agent: payload.agent, to: payload.contract, calldata: payload.calldata };
     if (!link.send({ t: 'sign', id, ...wire, D: mine.D, E: mine.E }))
-      return fail('Lost the wrist connection. Nothing was signed.');
+      return fail('Lost the Kagi Wallet connection. Nothing was signed.');
 
     let reply: Msg;
     try {
       reply = await answer;
     } catch (e) {
-      return fail(e instanceof Error ? e.message : 'No answer from the wrist.');
+      return fail(e instanceof Error ? e.message : 'No answer from the Kagi Wallet.');
     }
     pendingId.current = null;
     if (reply.t === 'sign_reject') {
       onReject?.(String(reply.reason));
-      return fail(REJECT_TEXT[String(reply.reason)] ?? `The wrist refused: ${String(reply.reason)}.`);
+      return fail(REJECT_TEXT[String(reply.reason)] ?? `The Kagi Wallet refused: ${String(reply.reason)}.`);
     }
 
     setPhase('combining');
@@ -248,9 +248,9 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
     }
   };
 
-  // Phone, then wrist, then the second stick over infrared, then back. Every part is checked.
-  // If the infrared leg fails, the job is paused on the wrist and on the phone, and a retry
-  // sends it again: no new fingerprint, no new press on the wrist.
+  // Phone, then Kagi Wallet, then the second stick over infrared, then back. Every part is checked.
+  // If the infrared leg fails, the job is paused on the Kagi Wallet and on the phone, and a retry
+  // sends it again: no new fingerprint, no new press on the Kagi Wallet.
   const job = useRef<{
     id: string;
     n1: ReturnType<typeof rootNonces>;
@@ -363,7 +363,7 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
             : null;
     if (!wire || !link.send({ t: 'root_sign', id, ...wire, D: n1.D, E: n1.E })) {
       endJob();
-      return fail('The wrist is not connected. Nothing was signed.');
+      return fail('The Kagi Wallet is not connected. Nothing was signed.');
     }
     await waitThree();
   };
@@ -375,7 +375,7 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
     setLostAt(0);
     setPhase('ir_out');
     if (!link.send({ t: 'root_retry', id: j.id })) {
-      setError('The wrist is not connected. Reconnect it and retry.');
+      setError('The Kagi Wallet is not connected. Reconnect it and retry.');
       setPhase('retry');
       return;
     }
@@ -433,18 +433,18 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
       : three && wristState === 'done' && phase !== 'done'
         ? 'Signed its part and passed it on over infrared'
         : phase === 'wrist'
-          ? 'It buzzed. Check the amount on the wrist, then hold its button to sign, or tap it to reject.'
+          ? 'It buzzed. Check the amount on the Kagi Wallet, then hold its button to sign, or tap it to reject.'
           : phase === 'combining'
             ? 'Pressed. Checking both halves.'
             : phase === 'done' && sig
               ? `Signature ${sig.slice(0, 8)}…${sig.slice(-8)} verified`
               : !status.ok
                 ? `${status.text}.`
-                : 'Hold the wrist’s button when it chimes';
+                : 'Hold the Kagi Wallet’s button when it chimes';
 
   const stickText =
     phase === 'retry'
-      ? `${error ?? 'The infrared step did not finish.'} Your phone and wrist parts are kept.`
+      ? `${error ?? 'The infrared step did not finish.'} Your phone and Kagi Wallet parts are kept.`
       : wristFailed
         ? (error ?? 'Something went wrong.')
         : lost
@@ -459,17 +459,17 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
                   ? 'Checking all three parts'
                   : phase === 'done'
                     ? 'All three parts verified'
-                    : 'Signs over infrared after the wrist';
+                    : 'Signs over infrared after the Kagi Wallet';
 
   const steps: Step[] = three
     ? [
         { label: 'Phone', detail: phoneText, state: phoneState },
-        { label: 'Wrist', detail: wristText, state: wristState },
+        { label: 'Kagi Wallet', detail: wristText, state: wristState },
         { label: 'Second stick', detail: stickText, state: stickState },
       ]
     : [
         { label: 'Phone shard', detail: phoneText, state: phoneState },
-        { label: 'Wrist shard', detail: wristText, state: wristState },
+        { label: 'Kagi Wallet share', detail: wristText, state: wristState },
       ];
   const focus = phase === 'unlocking' ? 'phone' : phase === 'wrist' ? 'wrist' : phase === 'stick' ? 'stick' : null;
 
@@ -502,7 +502,7 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
       {phase !== 'idle' ? <Steps steps={steps} /> : null}
       {phase === 'wrist' ? (
         <Txt size={14} color={colors.muted} align="center">
-          Waiting for the wrist
+          Waiting for the Kagi Wallet
         </Txt>
       ) : null}
       {phase === 'retry' ? (
@@ -520,7 +520,7 @@ export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneS
   );
 }
 
-// Errors raised before anything reached the wrist belong on the phone step.
+// Errors raised before anything reached the Kagi Wallet belong on the phone step.
 function phaseBeforeWrist(error: string | null): boolean {
   return error !== null && PHONE_ERRORS.includes(error);
 }

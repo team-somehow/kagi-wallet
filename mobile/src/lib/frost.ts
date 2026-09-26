@@ -1,5 +1,5 @@
 /**
- * Two-party threshold Schnorr for the Kagi manager key (phone + wrist, 2 of 2).
+ * Two-party threshold Schnorr for the Kagi manager key (phone + Kagi Wallet, 2 of 2).
  *
  * The output is a plain BIP340 Schnorr signature over the group key, so any
  * standard verifier accepts it. The protocol is FROST specialised to n = t = 2
@@ -13,7 +13,7 @@
  *   pop_i = (R, s) with c = H("KAGI/pop" || R || X_i), s = k + c x_i.
  *   P = X_1 + X_2. If P has odd y, both negate x_i and X_i, so P is even-y.
  *
- * Signing message m (32 bytes), participant ids 1 (phone) and 2 (wrist)
+ * Signing message m (32 bytes), participant ids 1 (phone) and 2 (Kagi Wallet)
  *   each party picks nonces d_i, e_i and publishes D_i, E_i.
  *   rho_i = H("KAGI/rho" || i || m || D_1 || E_1 || D_2 || E_2) mod n
  *   R_i = D_i + rho_i E_i,  R = R_1 + R_2.  If R has odd y, negate every k_i.
@@ -52,7 +52,7 @@ function randomScalar(rand: RandomBytes): bigint {
   }
 }
 
-/** The message both sides sign. The wrist rebuilds this itself from what it shows. */
+/** The message both sides sign. The Kagi Wallet rebuilds this itself from what it shows. */
 export function messageFor(canonical: string): Uint8Array {
   return sha256(utf8ToBytes(canonical));
 }
@@ -68,7 +68,7 @@ export function txCanonical(to: string, calldata: string): string {
 /**
  * Bytes the Kagi smart account hashes (see contracts/KagiAccount.sol):
  *   "KAGI/evm" || chainid (32) || account (20) || nonce (32) || to (20) || value (32) || data
- * The wrist builds the same bytes from the fields it displays.
+ * The Kagi Wallet builds the same bytes from the fields it displays.
  */
 export interface EvmCall {
   chainId: number;
@@ -221,7 +221,7 @@ export interface Share {
 }
 
 export function dkgFinish(mine: DkgStart, wristX: Hex, wristPop: Pop): Share {
-  if (!popVerify(wristX, wristPop)) throw new Error('The wrist sent a key it cannot prove it holds.');
+  if (!popVerify(wristX, wristPop)) throw new Error('The Kagi Wallet sent a key it cannot prove it holds.');
   let X1 = parsePoint(mine.X);
   let X2 = parsePoint(wristX);
   let x = mine.x;
@@ -269,7 +269,7 @@ export interface WristShare {
 }
 
 /**
- * Finish a signature once the wrist has answered. Checks the wrist's partial
+ * Finish a signature once the Kagi Wallet has answered. Checks the Kagi Wallet's partial
  * signature on its own, then the combined signature with a stock BIP340 verifier.
  */
 export function combine(s: Share, m: Uint8Array, mine: Nonces, w: WristShare): Hex {
@@ -289,7 +289,7 @@ export function combine(s: Share, m: Uint8Array, mine: Nonces, w: WristShare): H
 
   const z2 = toBig(hexToBytes(w.z2));
   if (!G.multiply(z2 === 0n ? N : z2).equals(R2.add(parsePoint(s.X2).multiply(c))) || z2 === 0n) {
-    throw new Error('The wrist signed with a share that does not match this wallet.');
+    throw new Error('The Kagi Wallet signed with a share that does not match this wallet.');
   }
   const z1 = mod(k1 + c * toBig(hexToBytes(s.share)));
   const sig = bytesToHex(concatBytes(Rx, hexToBytes(scalarHex(mod(z1 + z2)))));
@@ -299,9 +299,9 @@ export function combine(s: Share, m: Uint8Array, mine: Nonces, w: WristShare): H
   return sig;
 }
 
-// ---- reference wrist, for tests only ---------------------------------------
+// ---- reference Kagi Wallet, for tests only ---------------------------------------
 
-/** The wrist half, written the same way the firmware does it. Used by the protocol test. */
+/** The Kagi Wallet half, written the same way the firmware does it. Used by the protocol test. */
 export const reference = {
   dkg(rand: RandomBytes, phoneX: Hex, phonePop: Pop) {
     if (!popVerify(phoneX, phonePop)) throw new Error('bad phone pop');

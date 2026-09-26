@@ -246,7 +246,7 @@ export default function Home() {
             {twoSticks ? 'Protected by two sticks' : 'Add a second stick'}
           </Txt>
           <Txt size={13} color={colors.muted}>
-            {twoSticks ? 'Every approval needs the wrist and the second stick, by infrared.' : 'Then every approval needs both sticks. Your account stays the same.'}
+            {twoSticks ? 'Every approval needs the Kagi Wallet and the second stick, by infrared.' : 'Then every approval needs both sticks. Your account stays the same.'}
           </Txt>
         </Pressable>
       ) : null}

@@ -23,7 +23,7 @@ The connected wallet was already three-party. Disconnecting the red ESP32 does *
 - Presentation settings control wrist sound. Legacy fake-wallet controls and destructive reset are removed from this menu.
 - Session key copy is primary. Product screens and connector choices no longer reference Claude or Claude Code; no external client configuration was changed.
 - BLE sends complete frames in sequence. Failed writes reject outstanding waits. Biometric failures cannot silently unlock the phone share.
-- Second-device joining persists the phone's new share before committing the wrist, validates the operation ID and public share, and can resume an interrupted commit. The firmware's durable commit journal finishes interrupted writes on reboot.
+- Second-device joining persists the phone's new share before committing the Kagi Wallet, validates the operation ID and public share, and can resume an interrupted commit. The firmware's durable commit journal finishes interrupted writes on reboot.
 - Limit/grant submissions retain transaction hashes and distinguish pending confirmation from failure. Contract calls track saved pending hashes on retry. Revocation reports confirmed results instead of assuming immediate success.
 - The in-app agent saves its plan, progress and pending transaction hashes; **Resume saved run** reconciles them. It never has manager authority and still needs physical signatures for a limit increase.
 

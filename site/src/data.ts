@@ -100,7 +100,7 @@ export const keyStats = [
 ];
 
 export const prices = [
-  { name: 'Kagi', note: 'wrist + second stick', usd: 43, ours: true },
+  { name: 'Kagi', note: 'Kagi Wallet + second stick', usd: 43, ours: true },
   { name: 'Trezor Safe 3', note: 'one device', usd: 59 },
   { name: 'Trezor Safe 5', note: 'one device', usd: 129 },
   { name: 'Trezor Safe 7', note: 'one device', usd: 249 },

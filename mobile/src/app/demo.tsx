@@ -13,7 +13,7 @@ import { resetEverything, type ResetStep } from '../lib/reset';
 import { useStore } from '../store/store';
 import { colors, radius, space } from '../theme';
 
-/** Presentation settings operate the real app, plus a reset that the wrist has to confirm. */
+/** Presentation settings operate the real app, plus a reset that the Kagi Wallet has to confirm. */
 export default function PresentationSettings() {
   const p = usePresentation();
   const demo = useAgentDemo();
@@ -45,7 +45,7 @@ export default function PresentationSettings() {
       <View style={styles.body}>
         <Txt size={32}>Make it physical.</Txt>
         <Txt size={15} color={colors.muted}>
-          One wallet. Start with your phone and wrist, then add a second stick for infrared approvals.
+          One wallet. Start with your phone and Kagi Wallet, then add a second stick for infrared approvals.
         </Txt>
         <View style={styles.row}>
           <View style={styles.copy}>
@@ -58,12 +58,12 @@ export default function PresentationSettings() {
         </View>
         <View style={styles.row}>
           <View style={styles.copy}>
-            <Txt>Wrist sounds</Txt>
+            <Txt>Kagi Wallet sounds</Txt>
             <Txt size={13} color={colors.muted}>
               Soft approval cues. Infrared reception stays quiet.
             </Txt>
           </View>
-          <Switch accessibilityLabel="Wrist sounds" value={p.sound} onValueChange={(sound) => p.update({ sound })} />
+          <Switch accessibilityLabel="Kagi Wallet sounds" value={p.sound} onValueChange={(sound) => p.update({ sound })} />
         </View>
         <View style={styles.testAgent}>
           <Txt size={22}>In-app test agent</Txt>
@@ -116,14 +116,14 @@ export default function PresentationSettings() {
         <View style={styles.reset}>
           <Txt size={22}>Reset everything</Txt>
           <Txt size={14} color={colors.muted}>
-            Erases the wallet key share on the wrist and on this phone, and forgets every agent key, so you can set up a new
-            wallet from the start. The wrist has to confirm first; until it does, nothing is erased.
+            Erases the wallet key share on the Kagi Wallet and on this phone, and forgets every agent key, so you can set up a new
+            wallet from the start. The Kagi Wallet has to confirm first; until it does, nothing is erased.
           </Txt>
           {!resetOpen ? (
             <Button label="Reset everything" variant="danger" onPress={() => setResetOpen(true)} />
           ) : resetStep === 'confirm_on_wrist' ? (
             <Txt size={15} color={colors.amber}>
-              Hold the wrist’s button to erase its share. Tap it to keep everything.
+              Hold the Kagi Wallet’s button to erase its share. Tap it to keep everything.
             </Txt>
           ) : resetStep ? (
             <Txt size={15} color={colors.muted}>
@@ -134,7 +134,7 @@ export default function PresentationSettings() {
               <Txt size={14} color={colors.red}>
                 The current wallet can’t be used again after this. Any ETH still in it stays there.
               </Txt>
-              <Button label="Erase wrist and phone" variant="danger" onPress={() => void startReset()} />
+              <Button label="Erase Kagi Wallet and phone" variant="danger" onPress={() => void startReset()} />
               <Button label="Cancel" variant="ghost" onPress={() => { setResetOpen(false); setResetError(null); }} />
             </>
           )}

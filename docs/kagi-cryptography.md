@@ -27,7 +27,7 @@ flowchart TB
     subgraph KG["1 · Key generation (once, at pairing)"]
         direction LR
         P1["Phone<br/>random share x₁<br/>X₁ = x₁·G + proof of possession"]
-        W1["Wrist<br/>random share x₂<br/>X₂ = x₂·G + proof of possession"]
+        W1["Kagi Wallet<br/>random share x₂<br/>X₂ = x₂·G + proof of possession"]
         GK(["Group key P = X₁ + X₂<br/>forced to even y · only P.x is public"])
         P1 --> GK
         W1 --> GK
@@ -35,7 +35,7 @@ flowchart TB
 
     subgraph SG["2 · FROST signing (every approval)"]
         direction TB
-        M["Message m = sha256(KAGI/tag ‖ chainid ‖ account ‖ nonce ‖ fields)<br/>the wrist rebuilds m from what it shows"]
+        M["Message m = sha256(KAGI/tag ‖ chainid ‖ account ‖ nonce ‖ fields)<br/>the Kagi Wallet rebuilds m from what it shows"]
         C["Round 1: each device commits two nonces<br/>Dᵢ = dᵢ·G, Eᵢ = eᵢ·G"]
         B["Binding factor ρᵢ = H(KAGI/rho ‖ i ‖ m ‖ all D, E)<br/>Rᵢ = Dᵢ + ρᵢ·Eᵢ · R = Σ Rᵢ"]
         Z["Round 2: challenge c = H_BIP340(R.x ‖ P.x ‖ m)<br/>partial zᵢ = dᵢ + ρᵢ·eᵢ + c·xᵢ<br/>phone checks zᵢ·G = Rᵢ + c·Xᵢ"]
@@ -70,7 +70,7 @@ flowchart TB
 
 ### Key generation (distributed, at pairing)
 
-Pairing runs a two-party distributed key generation between the phone and the wrist:
+Pairing runs a two-party distributed key generation between the phone and the Kagi Wallet:
 
 1. Each device picks a random secret share `xᵢ` and publishes `Xᵢ = xᵢ·G`.
 2. Each publishes a **proof of possession** with it: a Schnorr signature `(R, s)` proving it knows `xᵢ`, under the challenge `H("KAGI/pop" ‖ R ‖ Xᵢ)`. Without it, a malicious device could pick `X₂ = Y − X₁` and end up owning the group key alone (a rogue-key attack). Each side rejects a public share whose proof fails.
@@ -91,15 +91,15 @@ Kagi runs FROST with all parties signing (n-of-n), so shares are plain additive 
 
 The result is an ordinary BIP340 signature. Nothing on-chain reveals that two or three devices made it, or which.
 
-The wrist never signs a hash it was handed. For every action it rebuilds the preimage `m` from the fields on its screen (amount, recipient, cap, expiry, nonce) and signs only that.
+The Kagi Wallet never signs a hash it was handed. For every action it rebuilds the preimage `m` from the fields on its screen (amount, recipient, cap, expiry, nonce) and signs only that.
 
 ### The second stick: resharing 2-of-2 into 3-of-3
 
 Adding the second stick keeps the same group key, so the same wallet address:
 
-1. The phone picks a random `r₁` and the wrist picks `r₂`. Each encrypts its piece to the second stick's device key with **ECIES** (ECDH on secp256k1, key `sha256("KAGI/ecies" ‖ shared x)`, AES-256-GCM).
+1. The phone picks a random `r₁` and the Kagi Wallet picks `r₂`. Each encrypts its piece to the second stick's device key with **ECIES** (ECDH on secp256k1, key `sha256("KAGI/ecies" ‖ shared x)`, AES-256-GCM).
 2. The new shares are `x₁' = x₁ − r₁`, `x₂' = x₂ − r₂`, `x₃ = r₁ + r₂`, so `x₁' + x₂' + x₃ = x₁ + x₂` and `P` does not move.
-3. The phone checks `X₁' + X₂' + X₃ = P` before anyone commits. The phone never sees `r₂`, so the phone and wrist together still cannot rebuild the second stick's share.
+3. The phone checks `X₁' + X₂' + X₃ = P` before anyone commits. The phone never sees `r₂`, so the phone and Kagi Wallet together still cannot rebuild the second stick's share.
 
 This happens in a two-minute radio window with a fingerprint compared on both screens. From then on the second stick signs only over infrared, with the same FROST rounds for three parties (`ρᵢ = H("KAGI/rhoN" ‖ i ‖ m ‖ D₁ ‖ E₁ ‖ … ‖ D₃ ‖ E₃)`).
 
@@ -107,9 +107,9 @@ This happens in a two-minute radio window with a fingerprint compared on both sc
 
 A FROST key has exactly one threshold, and its signatures don't say who signed. So each role gets its own key rather than one key with rules:
 
-- **Manager, 2-of-2 (phone + wrist):** the `groupKey` of `KagiAccount`.
+- **Manager, 2-of-2 (phone + Kagi Wallet):** the `groupKey` of `KagiAccount`.
 - **Phone key, the phone's share alone:** `phoneKey`, allowed only to revoke and decline. Stopping should need one device; starting should need two.
-- **Root, 3-of-3 (phone + wrist + second stick):** owns `RootTreasury`.
+- **Root, 3-of-3 (phone + Kagi Wallet + second stick):** owns `RootTreasury`.
 
 ## 3. BIP340 on Ethereum with `ecrecover`
 
@@ -138,7 +138,7 @@ The session key is an ordinary Ethereum key held by the agent MCP server. For ea
 | **ERC-165** `supportsInterface(id)` | "Which interfaces do you implement?" | ERC-165 itself, ERC-721 receiver, ERC-1155 receiver, ERC-1271. |
 | **ERC-721 / ERC-1155 receivers** | `onERC721Received`, `onERC1155Received`, `onERC1155BatchReceived` | Accept, so NFTs can be sent with `safeTransferFrom`. Only the manager's `execute` moves them out. |
 
-Not used, deliberately: **ERC-4337** (no bundler or EntryPoint; anyone can submit a signed call and pay its gas) and **EIP-712** (fixed preimages the wrist can rebuild and show instead of generic typed data).
+Not used, deliberately: **ERC-4337** (no bundler or EntryPoint; anyone can submit a signed call and pay its gas) and **EIP-712** (fixed preimages the Kagi Wallet can rebuild and show instead of generic typed data).
 
 ## 6. Keeping the two implementations honest
 

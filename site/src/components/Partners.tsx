@@ -63,7 +63,7 @@ const PARTNERS: Partner[] = [
       },
       {
         h: 'Fail towards a person.',
-        p: 'If Intercepta can’t be reached, the payment is held, never passed. A held payment travels the contract’s existing request → raise path, so it still needs the phone and wrist to sign.',
+        p: 'If Intercepta can’t be reached, the payment is held, never passed. A held payment travels the contract’s existing request → raise path, so it still needs the phone and Kagi Wallet to sign.',
       },
     ],
     record: {

@@ -1,6 +1,6 @@
 // Kagi design tokens, light. Cool aluminium ground (the sticks' own material, not cream), ink
 // for everything that is fine, deep amber for anything that needs a human, red for revoke.
-// Deep blue marks infrared and the wrist. No green: quiet is the absence of colour.
+// Deep blue marks infrared and the Kagi Wallet. No green: quiet is the absence of colour.
 export const colors = {
   ground: '#E9EDF1',
   panel: '#F8FAFC',

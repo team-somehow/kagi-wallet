@@ -46,7 +46,7 @@ export function KeyStats() {
               <path d="M90 20 A70 70 0 0 1 90 160" className="split-a" />
               <path d="M90 160 A70 70 0 0 1 90 20" className="split-b" />
               <text x="90" y="86" textAnchor="middle" className="split-t">phone</text>
-              <text x="90" y="106" textAnchor="middle" className="split-t is-blue">+ wrist</text>
+              <text x="90" y="106" textAnchor="middle" className="split-t is-blue">+ Kagi Wallet</text>
             </svg>
             <p>Kagi splits every key. Each half is useless alone.</p>
             <small>FROST, RFC 9591 · add a second stick for 3 of 3</small>

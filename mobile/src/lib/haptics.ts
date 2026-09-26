@@ -8,7 +8,7 @@ export const thud = () => quiet(Haptics.impactAsync(Haptics.ImpactFeedbackStyle.
 export const success = () => quiet(Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
 export const warn = () => quiet(Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning));
 
-/** Three heavy pulses: the phone echo of the wrist buzz. */
+/** Three heavy pulses: the phone echo of the Kagi Wallet buzz. */
 export async function buzz() {
   for (let i = 0; i < 3; i++) {
     await thud();

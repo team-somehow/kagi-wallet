@@ -7,7 +7,7 @@ import { useStore } from '../store/store';
 
 /**
  * Keeps the store in step with the real wrist: link state, battery, wear, pairing,
- * and revokes started on the wrist. The allowance readout comes from the chain store.
+ * and revokes started on the Kagi Wallet. The allowance readout comes from the chain store.
  */
 export function WristBridge() {
   const { state, dispatch } = useStore();
@@ -24,8 +24,8 @@ export function WristBridge() {
   useEffect(() => {
     link.start();
     const off = link.on((m) => {
-      // The second stick answers too (hello, status). It is not the wrist: never let it overwrite
-      // the wrist's pairing, or the wrist looks like it belongs to another wallet.
+      // The second stick answers too (hello, status). It is not the Kagi Wallet: never let it overwrite
+      // the Kagi Wallet's pairing, or the Kagi Wallet looks like it belongs to another wallet.
       if (m.from === 'vault') return;
       switch (m.t) {
         case 'hub':
@@ -64,7 +64,7 @@ export function WristBridge() {
           dispatch({ type: 'WRIST', patch: { paired: true, groupKey: String(m.groupKey) } });
           break;
         case 'revoke_all':
-          // The wrist asked; the phone's shard alone signs the on-chain revokes.
+          // The Kagi Wallet asked; the phone's shard alone signs the on-chain revokes.
           void revokeAllOnChain(addressRef.current);
           void buzz();
           if (readyRef.current) router.push('/revoke');
@@ -76,12 +76,12 @@ export function WristBridge() {
     };
   }, [dispatch]);
 
-  // Pairing state can change on the wrist, so ask again whenever it comes back.
+  // Pairing state can change on the Kagi Wallet, so ask again whenever it comes back.
   useEffect(() => {
     if (state.wrist.connected) link.send({ t: 'hello?' });
   }, [state.wrist.connected]);
 
-  // The allowance readout on the wrist comes from the real session (store/chain.tsx).
+  // The allowance readout on the Kagi Wallet comes from the real session (store/chain.tsx).
 
   return null;
 }
@@ -90,7 +90,7 @@ function parseVia(v: unknown): 'ble' | 'relay' | 'wifi' | 'usb' | null {
   return v === 'ble' || v === 'relay' || v === 'wifi' || v === 'usb' ? v : null;
 }
 
-/** True when the wrist holds a share of this phone's wallet. */
+/** True when the Kagi Wallet holds a share of this phone's wallet. */
 export function wristMatches(wristKey: string | null, address: string | null): boolean {
   return Boolean(wristKey && address && wristKey.toLowerCase() === address.toLowerCase());
 }

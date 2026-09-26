@@ -75,7 +75,7 @@ export function GetKagi() {
               <svg viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="10" rx="2.5" /><rect x="6.5" y="9" width="8" height="6" rx="1" /><circle cx="17.5" cy="12" r="1.2" /></svg>
             </div>
             <h3>Firmware</h3>
-            <p>One build for both sticks. Its saved role picks the blue wrist or red second-stick screens. C++ on PlatformIO, open on GitHub.</p>
+            <p>One build for both sticks. Its saved role picks the blue Kagi Wallet or red second-stick screens. C++ on PlatformIO, open on GitHub.</p>
             <div className="get-actions">
               <a className="btn btn-ghost" href={FIRMWARE_SRC_URL} target="_blank" rel="noreferrer">View source</a>
               <a className="btn btn-ghost" href={FIRMWARE.bin} download>Download .bin</a>

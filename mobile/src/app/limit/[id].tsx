@@ -114,7 +114,7 @@ export default function LimitRequestScreen() {
   const extra = r.newCap - r.oldCap;
   // The agent server screens every recipient with Intercepta before its key signs. A flagged
   // one comes here as a request for exactly that payment, with the reasons in the text. Paying
-  // it anyway is a bypass: it takes every device that holds the wallet key (phone and wrist,
+  // it anyway is a bypass: it takes every device that holds the wallet key (phone and Kagi Wallet,
   // and the second stick over infrared once it has joined).
   const flag = interceptaFlag(r.reason);
   const held = flag !== null;

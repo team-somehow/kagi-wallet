@@ -23,7 +23,7 @@ const wait = <T extends Msg>(pred: (m: Msg) => boolean, ms: number, what: string
 
 /**
  * Add a second stick. The wallet key is split again, three ways, and keeps the same public key,
- * so the account on-chain does not change. From then on every approval goes phone, wrist,
+ * so the account on-chain does not change. From then on every approval goes phone, Kagi Wallet,
  * then the second stick over infrared.
  */
 export default function SecondStick() {
@@ -48,7 +48,7 @@ export default function SecondStick() {
       setThree(is3);
       if (is3) setPhase('done');
       else void loadPendingJoin().then((join) => {
-        if (join && join.root.groupKey === state.address) { setPending(join); setPhase('error'); setError('Setup paused. Your new share is safely saved. Reconnect the wrist and resume setup.'); }
+        if (join && join.root.groupKey === state.address) { setPending(join); setPhase('error'); setError('Setup paused. Your new share is safely saved. Reconnect the Kagi Wallet and resume setup.'); }
       }).catch(() => { setError('Could not read saved setup. Try again.'); setPhase('error'); });
     });
   }, [state.address]);
@@ -82,10 +82,10 @@ export default function SecondStick() {
     });
 
   const finishJoin = async (join: PendingJoin) => {
-    const answer = wait((m) => m.t === 'root_committed' && m.id === join.id && !m.from, 30000, 'the wrist');
+    const answer = wait((m) => m.t === 'root_committed' && m.id === join.id && !m.from, 30000, 'the Kagi Wallet');
     link.send({ t: 'root_commit', id: join.id, groupKey: join.root.groupKey, X2: join.root.pub['2'] });
     const reply = await answer;
-    if (reply.error || Number(reply.parties) !== 3 || reply.groupKey !== join.root.groupKey) throw new Error(String(reply.error ?? 'The wrist has not confirmed this setup. Reconnect and resume.'));
+    if (reply.error || Number(reply.parties) !== 3 || reply.groupKey !== join.root.groupKey) throw new Error(String(reply.error ?? 'The Kagi Wallet has not confirmed this setup. Reconnect and resume.'));
     await saveRoot(join.root);
     await clearPendingJoin();
     setPending(null); setFocus(null); setThree(true); setPhase('done'); void success();
@@ -97,7 +97,7 @@ export default function SecondStick() {
       const u = await unlockShard('Resume second-stick setup');
       if (!u.ok) throw new Error(u.reason);
       await finishJoin(pending);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Reconnect the wrist and resume.'); setPhase('error'); }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Reconnect the Kagi Wallet and resume.'); setPhase('error'); }
     finally { running.current = false; }
   };
 
@@ -118,31 +118,31 @@ export default function SecondStick() {
       if (!shard) throw new Error('This phone has no wallet key.');
       step('Phone', 'Unlocked', 'done');
 
-      // 1. The wrist starts from the wallet key itself, so the account's key stays the same.
-      const adopted = wait((m) => m.t === 'root_adopted' && !m.from, 15000, 'the wrist');
-      if (!link.send({ t: 'root_adopt' })) throw new Error('The wrist is not connected.');
+      // 1. The Kagi Wallet starts from the wallet key itself, so the account's key stays the same.
+      const adopted = wait((m) => m.t === 'root_adopted' && !m.from, 15000, 'the Kagi Wallet');
+      if (!link.send({ t: 'root_adopt' })) throw new Error('The Kagi Wallet is not connected.');
       const a = await adopted;
-      if (a.joinProtocol !== 1) throw new Error('Update the wrist firmware before adding another stick.');
-      if (a.error) throw new Error(a.error === 'already_3_of_3' ? 'This wallet already uses a second stick.' : `The wrist refused: ${String(a.error)}.`);
-      if (String(a.groupKey) !== shard.groupKey) throw new Error('The wrist holds a different wallet. Nothing was changed.');
+      if (a.joinProtocol !== 1) throw new Error('Update the Kagi Wallet firmware before adding another stick.');
+      if (a.error) throw new Error(a.error === 'already_3_of_3' ? 'This wallet already uses a second stick.' : `The Kagi Wallet refused: ${String(a.error)}.`);
+      if (String(a.groupKey) !== shard.groupKey) throw new Error('The Kagi Wallet holds a different wallet. Nothing was changed.');
       const root: RootShare = { share: shard.share, groupKey: shard.groupKey, parties: 2, pub: { '1': cpt(pt(shard.X1)), '2': cpt(pt(shard.X2)) } };
 
-      // 2. Phone and wrist each seal a random piece to the second stick; together they make its share.
+      // 2. Phone and Kagi Wallet each seal a random piece to the second stick; together they make its share.
       const ph = phoneReshare(root, vault.devPub, rand);
       const vaultDone = wait((m) => m.from === 'vault' && (m.t === 'reshare_vault' || m.t === 'reshare_error'), 120000, 'the second stick');
       stopProgress = link.on((m) => {
         if (m.from === 'vault' && m.t === 'reshare_progress') setPieces((n) => Math.max(n, 1));
       });
-      const wristDone = wait((m) => (m.t === 'root_reshare' || (m.t === 'sign_reject' && m.id === 'root_reshare')) && !m.from, 120000, 'the wrist');
+      const wristDone = wait((m) => (m.t === 'root_reshare' || (m.t === 'sign_reject' && m.id === 'root_reshare')) && !m.from, 120000, 'the Kagi Wallet');
       link.send({ t: 'reshare_piece', to: 'vault', from: 'phone', ct: ph.sealed, groupKey: root.groupKey });
       setPieces(1);
       step('Second stick', 'Received the phone’s sealed piece');
       link.send({ t: 'root_reshare', id: joinId, vaultPub: vault.devPub });
       setFocus('wrist');
-      step('Wrist', `Check it shows ${vault.fingerprint}, then hold the wrist’s button`);
+      step('Kagi Wallet', `Check it shows ${vault.fingerprint}, then hold the Kagi Wallet’s button`);
       const w = await wristDone;
-      if (w.t !== 'root_reshare') throw new Error(String(w.reason) === 'user' ? 'You said no on the wrist. Nothing was changed.' : `The wrist refused: ${String(w.reason)}.`);
-      step('Wrist', 'Sent its sealed piece', 'done');
+      if (w.t !== 'root_reshare') throw new Error(String(w.reason) === 'user' ? 'You said no on the Kagi Wallet. Nothing was changed.' : `The Kagi Wallet refused: ${String(w.reason)}.`);
+      step('Kagi Wallet', 'Sent its sealed piece', 'done');
       setFocus('stick');
       setPieces(2);
       const v = await vaultDone;
@@ -184,7 +184,7 @@ export default function SecondStick() {
             Add a second stick
           </Txt>
           <Txt size={15} color={colors.muted} lineHeight={22}>
-            Your wallet key gets split three ways: phone, wrist and a second stick. Every approval then needs all three, and the sticks talk to each other only by infrared, so someone would need both in hand.
+            Your wallet key gets split three ways: phone, Kagi Wallet and a second stick. Every approval then needs all three, and the sticks talk to each other only by infrared, so someone would need both in hand.
           </Txt>
           <Txt size={15} color={colors.muted} lineHeight={22}>
             Your account and its address stay the same. Revoking a key still needs only this phone.
@@ -192,7 +192,7 @@ export default function SecondStick() {
           <Button label="Start" variant="amber" onPress={() => setPhase('wake')} disabled={!state.wrist.connected} />
           {!state.wrist.connected ? (
             <Txt size={13} color={colors.red}>
-              Connect your wrist stick first.
+              Connect your Kagi Wallet first.
             </Txt>
           ) : null}
         </View>
@@ -239,7 +239,7 @@ export default function SecondStick() {
           </Txt>
           <Steps steps={steps} />
           <Txt size={13} color={colors.faint} lineHeight={19}>
-            Neither the phone nor the wrist ever sees the second stick’s share. They each seal a random piece to it, and it adds them up.
+            Neither the phone nor the Kagi Wallet ever sees the second stick’s share. They each seal a random piece to it, and it adds them up.
           </Txt>
         </View>
       ) : null}

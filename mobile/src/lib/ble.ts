@@ -3,7 +3,7 @@
  *
  * Each stick runs one GATT service (see firmware/wrist/src/ble.h): the phone writes lines to
  * RX, the stick notifies lines on TX. Lines are the same JSON as every other link, chunked to
- * the MTU and newline-terminated. The wrist advertises all the time; the vault only while its
+ * the MTU and newline-terminated. The Kagi Wallet advertises all the time; the vault only while its
  * 2-minute window is open.
  */
 import { PermissionsAndroid, Platform } from 'react-native';

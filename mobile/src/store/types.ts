@@ -59,16 +59,16 @@ export interface Wrist {
   id: string | null;
   /** The laptop hub is reachable. */
   hub: boolean;
-  /** The wrist is on the hub's USB port and talking. */
+  /** The Kagi Wallet is on the hub's USB port and talking. */
   connected: boolean;
   onArm: boolean;
   battery: number;
   paired: boolean;
-  /** Group key the wrist holds a share of, if any. */
+  /** Group key the Kagi Wallet holds a share of, if any. */
   groupKey: string | null;
-  /** How the wrist reaches the hub right now. */
+  /** How the Kagi Wallet reaches the hub right now. */
   via: 'ble' | 'relay' | 'wifi' | 'usb' | null;
-  /** WiFi network the wrist is on, if any. */
+  /** WiFi network the Kagi Wallet is on, if any. */
   ssid: string | null;
 }
 

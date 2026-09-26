@@ -1,11 +1,11 @@
-// Kagi wrist shard, M5StickS3.
+// Kagi Wallet: the ESP32 (M5StickS3) that holds one share of the wallet key. One build runs as
+// the Kagi Wallet or as the second stick (the vault role, saved in NVS).
 //
-// Talks newline-delimited JSON to the hub on the laptop, which relays to the phone app.
-// Over WiFi the wrist dials out to the hub (it never listens). USB serial still works as
-// a fallback. The wrist never initiates anything except a revoke and status reports.
+// Talks newline-delimited JSON to the phone app over Bluetooth LE (USB serial works too, for
+// the bench). It never initiates anything except a revoke and status reports.
 //
-// One button, on G10: hold to approve, tap to say no. On the wrist's home screen, hold for 3 seconds
-// to revoke every key. (The built-in A and B keys still work where a stick has them.)
+// One button, on G10: hold to approve, tap to say no. On the Kagi Wallet's home screen, hold for
+// 3 seconds to revoke every key. (The built-in A and B keys still work where a stick has them.)
 
 #include <Arduino.h>
 #include <algorithm>
@@ -34,7 +34,7 @@
 #include "secrets.example.h"
 #endif
 
-static const char* FW = "0.6.0";
+static const char* FW = "0.6.1";
 
 // ---- look -----------------------------------------------------------------
 
@@ -686,7 +686,7 @@ static void drawResult() {
 }
 
 static void drawRevoked() {
-  title("ESP32 / WRIST", C_ACCENT);
+  title("KAGI WALLET", C_ACCENT);
   canvas.setFont(&fonts::FreeSansBold12pt7b);
   canvas.setTextDatum(top_left);
   canvas.setTextColor(C_RED);
@@ -817,7 +817,7 @@ static void irOnRecv(size_t bytes, bool bad) {
   if (mode != Mode::Beam) {
     if (bad) return;  // stray infrared, a TV remote say: not ours to warn about
     irui = IrUi{};
-    irui.label = isVault ? "From your wrist" : "From your 2nd stick";
+    irui.label = isVault ? "From your Kagi Wallet" : "From your 2nd stick";
     irui.sending = false;
     mode = Mode::Beam;
     draw();  // one still frame; the screen stays quiet until the message is in
@@ -1649,7 +1649,7 @@ static void vaultRequest(const std::vector<uint8_t>& m) {
 static void vaultApprove() {
   // The hand that just held A is usually over the stick. Wait for it to let go and give it a
   // moment to settle, so the reply goes out with the window clear and pointing at the wrist.
-  irSending("Let go, aim at the wrist");
+  irSending("Aim at the Kagi Wallet");
   uint32_t t0 = millis();
   while (btnA.isPressed() && millis() - t0 < 4000) {
     pollButtons();
@@ -1663,7 +1663,7 @@ static void vaultApprove() {
     }
     delay(20);
   }
-  irui.label = "Back to your wrist";
+  irui.label = "Back to Kagi Wallet";
   frost::commit(vjob.n, vjob.D[2], vjob.E[2]);
   uint8_t ids[3] = {1, 2, 3};
   uint8_t z3[32];
@@ -1678,7 +1678,7 @@ static void vaultApprove() {
   memcpy(pkt + 67, z3, 32);
   bool ok = ir::send(pkt, sizeof pkt, 60000);
   if (!ok) buzz(3);
-  showResult(ok ? "Signed" : "Wrist not in sight", ok ? C_TEXT : C_RED, 2600, ok ? Fx::Burst : Fx::Shake);
+  showResult(ok ? "Signed" : "Wallet not in sight", ok ? C_TEXT : C_RED, 2600, ok ? Fx::Burst : Fx::Shake);
 }
 
 static void vaultReject() {
@@ -2085,7 +2085,7 @@ static void handle(const String& line) {
   } else if (t == "beep") {
     // Find which stick is which: it beeps and flashes its name.
     buzz(2);
-    showResult(isVault ? "This is the vault" : "This is the wrist", C_ACCENT, 3000);
+    showResult(isVault ? "This is the vault" : "This is the Kagi Wallet", C_ACCENT, 3000);
   } else if (t == "ir_bench_rx") {
     benchInbound = in["inbound"] | false;
     irRxAnimate = in["animate"] | false;
@@ -2521,7 +2521,7 @@ void setup() {
   uint8_t mac[6];
   esp_efuse_mac_get_default(mac);
   char id[16];
-  snprintf(id, sizeof id, "wrist-%02X%02X", mac[4], mac[5]);
+  snprintf(id, sizeof id, "kagi-%02X%02X", mac[4], mac[5]);
   deviceId = id;
 
   frost::init();
@@ -2546,7 +2546,7 @@ void setup() {
   C_PANEL = isVault ? M5.Display.color565(248, 232, 235) : M5.Display.color565(228, 238, 247);
   C_CELL = isVault ? M5.Display.color565(236, 206, 212) : M5.Display.color565(204, 222, 238);
   // The wrist advertises all the time; the vault only while its window is open.
-  ble::begin(String(isVault ? "Kagi vault-" : "Kagi wrist-") + deviceId.substring(6), !isVault);
+  ble::begin(String(isVault ? "Kagi vault-" : "Kagi Wallet-") + deviceId.substring(5), !isVault);
 #ifndef KAGI_NO_WIFI
   if (!isVault) startWifi();  // the vault keeps its radio off except during the reshare window
 #endif
