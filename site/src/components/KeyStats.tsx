@@ -1,55 +1,40 @@
 import { motion, useReducedMotion } from 'motion/react';
 import { keyStats } from '../data';
 
-function Ring({ pct }: { pct: number }) {
-  const reduce = useReducedMotion();
-  const r = 70;
-  const c = 2 * Math.PI * r;
-  return (
-    <svg className="ring" viewBox="0 0 180 180" aria-hidden="true">
-      <circle cx="90" cy="90" r={r} className="ring-track" />
-      <motion.circle
-        cx="90" cy="90" r={r}
-        className="ring-fill"
-        strokeDasharray={c}
-        initial={reduce ? false : { strokeDashoffset: c }}
-        whileInView={{ strokeDashoffset: c * (1 - pct / 100) }}
-        viewport={{ once: true, amount: 0.6 }}
-        transition={{ duration: 1.4, ease: [0.2, 0.7, 0.2, 1] }}
-        style={reduce ? { strokeDashoffset: c * (1 - pct / 100) } : undefined}
-        transform="rotate(-90 90 90)"
-      />
-      <text x="90" y="100" textAnchor="middle" className="ring-num">{pct}%</text>
-    </svg>
-  );
-}
-
 export function KeyStats() {
+  const reduce = useReducedMotion();
   return (
     <section className="section" id="keys">
       <div className="wrap keys">
         <div className="section-head">
-          <h2>Most theft is a stolen key</h2>
-          <p>So no single device, server or phone holds one.</p>
+          <span className="eyebrow section-index">02 / The principle</span>
+          <h2>A stolen key should not be enough.</h2>
+          <p>Kagi splits signing authority across your phone and wallet.</p>
         </div>
-        <div className="key-rings">
-          {keyStats.map((s) => (
-            <a className="key-ring" key={s.who} href={s.source} target="_blank" rel="noreferrer">
-              <Ring pct={s.pct} />
-              <p>{s.what}</p>
-              <small>{s.who}</small>
-            </a>
-          ))}
-          <div className="key-split" aria-label="Kagi splits each key across devices">
-            <svg viewBox="0 0 180 180" aria-hidden="true">
-              <circle cx="90" cy="90" r="70" className="ring-track" />
-              <path d="M90 20 A70 70 0 0 1 90 160" className="split-a" />
-              <path d="M90 160 A70 70 0 0 1 90 20" className="split-b" />
-              <text x="90" y="86" textAnchor="middle" className="split-t">phone</text>
-              <text x="90" y="106" textAnchor="middle" className="split-t is-blue">+ Kagi Wallet</text>
-            </svg>
-            <p>Kagi splits every key. Each half is useless alone.</p>
-            <small>FROST, RFC 9591 · add a second Kagi Wallet for 3 of 3</small>
+        <div className="key-evidence panel">
+          <div className="key-evidence-chart">
+            <span className="eyebrow">Share of stolen crypto</span>
+            {keyStats.map((s, index) => (
+              <a className="key-evidence-row" key={s.who} href={s.source} target="_blank" rel="noreferrer" aria-label={`${s.pct}% ${s.what}. Source: ${s.who}`}>
+                <div className="key-evidence-meta"><span>{index === 0 ? '2024 · Compromised private keys' : '2025 · Infrastructure attacks'}</span><strong>{s.pct}<small>%</small></strong></div>
+                <div className="key-evidence-track" aria-hidden="true">
+                  <motion.span initial={reduce ? false : { scaleX: 0 }} whileInView={{ scaleX: s.pct / 100 }} style={reduce ? { scaleX: s.pct / 100 } : undefined} viewport={{ once: true }} transition={{ duration: .8 }} />
+                </div>
+                <div className="key-evidence-source"><span>{s.who} ↗</span>{index === 1 && <span>Mostly keys and seeds</span>}</div>
+              </a>
+            ))}
+            <p className="key-evidence-note">Different years and categories; shown separately, not as a trend.</p>
+          </div>
+          <div className="key-principle">
+            <span className="eyebrow">The Kagi approach</span>
+            <div className="key-parts" aria-hidden="true">
+              <div><svg viewBox="0 0 64 64"><rect x="19" y="7" width="26" height="50" rx="5"/><path d="M28 49h8"/></svg><span>Phone</span></div>
+              <span className="key-parts-plus">+</span>
+              <div><svg viewBox="0 0 64 64"><rect x="5" y="18" width="54" height="28" rx="4"/><rect x="11" y="24" width="30" height="16" rx="1"/><circle cx="49" cy="32" r="4"/></svg><span>Kagi Wallet</span></div>
+            </div>
+            <h3>Two shares.<br />One signature.</h3>
+            <p>Neither device can sign alone.</p>
+            <a className="key-principle-link" href="#how">Explore the approval system <span>↗</span></a>
           </div>
         </div>
       </div>

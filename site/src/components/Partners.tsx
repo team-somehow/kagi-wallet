@@ -61,7 +61,7 @@ const PARTNERS: Partner[] = [
     ],
     links: [
       { label: 'Screening code', href: src('agent-mcp/intercepta.mjs') },
-      { label: 'Held-payment screen', href: src('mobile/src/app/limit/[id].tsx') },
+      { label: 'Held-payment screen', href: src('mobile/src/app/limit/%5Bid%5D.tsx') },
     ],
   },
   {
@@ -90,6 +90,7 @@ export function Partners() {
     <section className="section" id="partners">
       <div className="wrap">
         <div className="section-head">
+          <span className="eyebrow section-index">09 / The ecosystem</span>
           <h2>Two integrations. One boundary.</h2>
           <p>Intercepta screens who an agent pays. Curvegrid’s MultiBaas remembers what it did.</p>
         </div>

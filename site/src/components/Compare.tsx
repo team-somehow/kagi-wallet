@@ -13,6 +13,7 @@ export function Compare() {
     <section className="section" id="compare">
       <div className="wrap">
         <div className="section-head">
+          <span className="eyebrow section-index">06 / The comparison</span>
           <h2>How others do it</h2>
         </div>
         <div className="compare panel">

@@ -1,6 +1,9 @@
+import { lazy, Suspense } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { DEVICE_URL, PRICES_URL, prices } from '../data';
 import { Device } from './Device';
+
+const WalletModel = lazy(() => import('./WalletModel'));
 
 const MAX = 260;
 const SPECS = [
@@ -16,7 +19,10 @@ export function Hardware() {
   return (
     <section className="section" id="hardware">
       <div className="wrap">
+        <Suspense fallback={<div style={{ minHeight: "100vh" }}>Loading 3D wallet…</div>}><WalletModel /></Suspense>
+
         <div className="section-head">
+          <span className="eyebrow section-index">05 / The hardware</span>
           <h2>Two Kagi Wallets for $43</h2>
           <p>Each Kagi Wallet is an off-the-shelf ESP32 at $21.50. Start with one. Add a second to the same wallet whenever you want a stronger boundary.</p>
         </div>

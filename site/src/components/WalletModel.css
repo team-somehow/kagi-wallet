@@ -1,0 +1,76 @@
+.wallet-film { overflow-anchor: none; position: relative; height: 440svh; margin-bottom: 80px; }
+.wallet-film-sticky { position: sticky; top: 82px; height: calc(100svh - 82px); min-height: 560px; display: flex; flex-direction: column; background: var(--ground); }
+.wallet-film-header { display: flex; justify-content: space-between; padding: 18px 0; border-top: 1px solid var(--line-2); color: var(--muted); font: 10px var(--mono); letter-spacing: .12em; }
+.wallet-film-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); align-items: center; }
+.wallet-film-copy { position: relative; z-index: 2; padding: 24px 24px 24px 0; animation: wallet-copy-in .35s ease both; }
+.wallet-film-copy .eyebrow { font-size: 10px; color: var(--blue); }
+.wallet-film-copy h3 { font-size: clamp(30px, 3.6vw, 46px); font-weight: 500; letter-spacing: -.04em; line-height: 1.04; margin: 18px 0; }
+.wallet-film-copy h3 span { display: block; }
+.wallet-film-copy h3 span:last-child { color: var(--blue); }
+.wallet-film-copy > p { max-width: 39ch; color: var(--muted); font-size: clamp(14px, 1.4vw, 17px); line-height: 1.6; }
+.wallet-film-copy dl { margin: 20px 0 16px; border-block: 1px solid var(--line-2); font-size: 12px; }
+.wallet-film-copy dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; padding: 13px 0; }
+.wallet-film-copy dl > div + div { border-top: 1px solid var(--line); }
+.wallet-film-copy dt { color: var(--muted); font-size: 10px; font-family: var(--mono); }
+.wallet-film-copy dd { margin: 0; text-align: right; }
+.wallet-film-copy .wallet-film-foot { font-size: 11px; line-height: 1.5; max-width: 48ch; }
+.wallet-film-stage { position: relative; height: 100%; min-height: 0; isolation: isolate; }
+.wallet-film-stage::before { content: ''; position: absolute; width: 86%; aspect-ratio: 1; left: 7%; top: 50%; transform: translateY(-50%); border-radius: 50%; background: transparent; border: 1px solid var(--line); opacity: .8; z-index: -1; }
+.wallet-film-word { position: absolute; left: 0; right: 0; top: 18%; text-align: center; font-size: clamp(60px, 10vw, 145px); line-height: 1; letter-spacing: -.08em; font-weight: 800; color: #1c629609; z-index: -1; }
+.wallet-film-canvas, .wallet-film-leaders { position: absolute; inset: 0; width: 100%; height: 100%; }
+.wallet-film-canvas canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; }
+.wallet-film-leaders { pointer-events: none; overflow: visible; }
+.wallet-film-leaders line { stroke: #61829a; stroke-width: .75; opacity: 0; }
+.wallet-film-callout { position: absolute; top: 0; left: 0; width: 158px; padding: 9px 10px; opacity: 0; pointer-events: none; border: 1px solid #b5c8d880; background: #f8fafce8; border-radius: 3px; box-shadow: 0 4px 20px #1c38530a; }
+.wallet-film-callout b, .wallet-film-callout span { display: block; }
+.wallet-film-callout b { font-size: 10px; font-weight: 700; }
+.wallet-film-callout span { font-size: 9px; color: var(--muted); margin-top: 3px; }
+.wallet-film-footer { padding: 20px 0; display: flex; align-items: center; justify-content: space-between; gap: 20px; font-size: 10px; }
+.wallet-film-scroll { color: var(--muted); font-family: var(--mono); font-size: 9px; }
+.wallet-film-footer > a { color: var(--muted); text-decoration: none; white-space: nowrap; }
+.wallet-film-footer > a:hover { color: var(--blue); }
+.wallet-film-chapters { display: flex; gap: 6px; }
+.wallet-film-chapters button { display: flex; gap: 6px; align-items: baseline; padding: 10px 12px; border: 1px solid transparent; background: transparent; border-radius: 5px; color: var(--muted); font-size: 11px; cursor: pointer; }
+.wallet-film-chapters button span { font: 9px var(--mono); opacity: .5; }
+.wallet-film-chapters button[aria-current] { border-color: #1c629640; color: var(--blue); background: #1c629609; }
+.wallet-film-chapters button:hover { background: #1c629610; }
+.wallet-film-progress { height: 2px; background: var(--line); }
+.wallet-film-progress > span { display: block; height: 100%; background: var(--blue); transform: scaleX(0); transform-origin: left; }
+.wallet-film-fallback { position: absolute; inset: 30% 10% auto; padding: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+.wallet-film-fallback p { font-size: 13px; color: var(--muted); margin-top: 10px; }
+@keyframes wallet-copy-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 760px) {
+  .wallet-film { height: 420svh; margin-bottom: 56px; }
+  .wallet-film-sticky { top: 70px; height: calc(100svh - 70px); min-height: 540px; }
+  .wallet-film-header { padding: 12px 0; font-size: 8px; }
+  .wallet-film-layout { grid-template-columns: 1fr; grid-template-rows: minmax(180px, 1fr) auto; }
+  .wallet-film-stage { grid-row: 1; }
+  .wallet-film-copy { padding: 8px 0; }
+  .wallet-film-copy h3 { font-size: clamp(26px, 5.8vw, 36px); margin: 10px 0; }
+  .wallet-film-copy h3 span { display: inline; }
+  .wallet-film-copy h3 span + span::before { content: ' '; }
+  .wallet-film-copy > p { font-size: 12px; line-height: 1.55; max-width: none; }
+  .wallet-film-copy dl { margin: 12px 0 6px; }
+  .wallet-film-copy dl > div { padding: 6px 0; }
+  .wallet-film-copy .wallet-film-foot { font-size: 9px; }
+  .wallet-film-callout, .wallet-film-leaders { display: none; }
+  .wallet-film-word { font-size: 80px; top: 25%; }
+  .wallet-film-stage::before { width: auto; height: 95%; left: 50%; transform: translate(-50%, -50%); }
+  .wallet-film-footer { flex-wrap: wrap; gap: 8px; padding: 10px 0; }
+  .wallet-film-chapters { order: -1; width: 100%; justify-content: space-between; gap: 0; }
+  .wallet-film-chapters button { font-size: 10px; padding: 8px 6px; gap: 4px; }
+}
+@media (max-height: 650px) and (min-width: 761px) {
+  .wallet-film-sticky { min-height: 460px; }
+  .wallet-film-copy h3 { font-size: 34px; margin: 12px 0; }
+  .wallet-film-copy > p { font-size: 13px; }
+  .wallet-film-copy dl { margin: 12px 0; }
+}
+@media (prefers-reduced-motion: reduce) { .wallet-film-copy { animation: none; } }
+
+@media (min-width: 761px) and (max-height: 800px) {
+  .wallet-film-copy h3 { font-size: 36px; margin: 14px 0; }
+  .wallet-film-copy > p { font-size: 14px; }
+  .wallet-film-copy dl { margin: 16px 0 12px; }
+  .wallet-film-copy dl > div { padding: 9px 0; }
+}

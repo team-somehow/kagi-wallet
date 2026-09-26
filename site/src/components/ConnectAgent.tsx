@@ -132,6 +132,7 @@ export function ConnectAgent() {
     <section className="section" id="connect">
       <div className="wrap">
         <div className="section-head">
+          <span className="eyebrow section-index">08 / Connect your agent</span>
           <h2>Connect your AI</h2>
           <p>Give an agent a key of its own. It spends within the allowance you set, and anything more waits for a hold on your Kagi Wallet.</p>
         </div>

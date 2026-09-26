@@ -35,6 +35,7 @@ export function Hero() {
   return (
     <header className="hero" id="top">
       <div className="hero-copy">
+        <p className="eyebrow hero-eyebrow">A physical boundary for digital money</p>
         <h1>
           Give your agent a spending key.
           <span>Keep the wallet.</span>

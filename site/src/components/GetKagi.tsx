@@ -55,6 +55,7 @@ export function GetKagi() {
     <section className="section" id="get">
       <div className="wrap">
         <div className="section-head">
+          <span className="eyebrow section-index">07 / Get started</span>
           <h2>Get Kagi Wallet</h2>
           <p>The Android app, the open firmware, and a flasher that runs in your browser.</p>
         </div>
