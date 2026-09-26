@@ -27,6 +27,17 @@ export function connectionString(k: SessionKey, account: string): string {
   return `kagi:${account}:${k.privateKey}`;
 }
 
+/** The shared Kagi MCP server. Anyone's connector link points here. */
+export const MCP_URL = (process.env.EXPO_PUBLIC_MCP_URL ?? 'https://13-235-16-182.sslip.io').replace(/\/+$/, '');
+
+/**
+ * A link that connects ChatGPT, Claude or any MCP client to this key: paste it as a connector.
+ * It carries the account and the key, so it is as secret as the key itself.
+ */
+export function connectorLink(k: SessionKey, account: string): string {
+  return `${MCP_URL}/k/${account.replace(/^0x/, '')}${k.privateKey.replace(/^0x/, '')}`;
+}
+
 export function newSessionKey(name: string): SessionKey {
   let priv: Uint8Array;
   do priv = rand(32);

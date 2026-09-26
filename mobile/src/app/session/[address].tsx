@@ -14,7 +14,7 @@ import * as evm from '../../lib/evm';
 import { evmRevokeMessage, phoneOnlySign } from '../../lib/frost';
 import { loadShard, rand } from '../../lib/shard';
 import { unlockShard } from '../../lib/biometrics';
-import { connectionString, loadSessionKey } from '../../lib/session';
+import { connectionString, connectorLink, loadSessionKey } from '../../lib/session';
 import { shortAddr } from '../../lib/format';
 import { success, warn } from '../../lib/haptics';
 import { colors, radius, space } from '../../theme';
@@ -26,7 +26,7 @@ export default function SessionDetail() {
   const { address } = useLocalSearchParams<{ address: string }>();
   const { info, sessions, activity, refresh } = useChain();
   const s = sessions.find((x) => x.address.toLowerCase() === String(address).toLowerCase());
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'link' | 'key' | null>(null);
   const [revoke, setRevoke] = useState<RevokeState>({ phase: 'idle' });
 
   useEffect(() => {
@@ -50,13 +50,13 @@ export default function SessionDetail() {
   const minutes = Math.max(0, Math.round(Number(s.expiry - info.now) / 60));
   const mine = activity.filter((a) => a.agent?.toLowerCase() === s.address.toLowerCase());
 
-  const copy = async () => {
+  const copy = async (what: 'link' | 'key') => {
     const k = await loadSessionKey(s.address);
     if (!k) return;
-    await Clipboard.setStringAsync(connectionString(k, String(info.account)));
-    setCopied(true);
+    await Clipboard.setStringAsync(what === 'link' ? connectorLink(k, String(info.account)) : connectionString(k, String(info.account)));
+    setCopied(what);
     void success();
-    setTimeout(() => setCopied(false), 2500);
+    setTimeout(() => setCopied(null), 2500);
   };
 
   // Revoking needs only the phone's share: cutting access off must never wait on the stick.
@@ -144,9 +144,10 @@ export default function SessionDetail() {
 
         {s.status === 'active' && s.local ? (
           <View style={styles.gap}>
-            <Button label={copied ? 'Copied' : 'Copy session key'} variant="secondary" onPress={() => void copy()} />
+            <Button label={copied === 'link' ? 'Copied' : 'Copy connector link'} variant="secondary" onPress={() => void copy('link')} />
+            <Button label={copied === 'key' ? 'Copied' : 'Copy session key only'} variant="ghost" onPress={() => void copy('key')} />
             <Txt size={13} color={colors.faint}>
-              Paste it into your agent, for example the Kagi MCP server. It spends only this allowance.
+              Add the link to ChatGPT, Claude, Codex or Cursor as an MCP server. It spends only this allowance, so keep it private.
             </Txt>
           </View>
         ) : null}

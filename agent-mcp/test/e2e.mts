@@ -52,7 +52,14 @@ const srv = spawn('node', ['server.mjs'], {
 srv.stdout.on('data', (d) => process.stdout.write(`  [mcp] ${d}`));
 await new Promise((r) => setTimeout(r, 1500));
 const c = new Client({ name: 'e2e', version: '0' });
-await c.connect(new StreamableHTTPClientTransport(new URL('http://127.0.0.1:8795/mcp/t')));
+// The shared endpoint: the connector link carries the account and the key.
+const link = `http://127.0.0.1:8795/k/${account.slice(2)}${agentKey}`;
+await c.connect(new StreamableHTTPClientTransport(new URL(link)));
+const own = new Client({ name: 'own', version: '0' });
+await own.connect(new StreamableHTTPClientTransport(new URL('http://127.0.0.1:8795/mcp/t')));
+check((await own.listTools()).tools.length === 4, 'single-key endpoint still serves its tools');
+const bad = await fetch('http://127.0.0.1:8795/k/not-a-key', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+check(bad.status === 404, `a bad connector link gets ${bad.status}`);
 const call = async (name: string, args: Record<string, unknown> = {}) => (await c.callTool({ name, arguments: args })).structuredContent as Record<string, any>;
 
 // The phone: watch for limit requests and answer them.
@@ -84,8 +91,9 @@ async function phoneAnswers(approve: boolean) {
 try {
   const w0 = await call('get_wallet');
   check(w0.ok && w0.allowance_left === '0.000005 ETH', `get_wallet: ${w0.allowance_left} left, gas ${w0.gas_left}`);
-  const s1 = await call('send_eth', { to: 'ABC', amount_eth: '0.000002' });
-  check(s1.status === 'confirmed', `first transfer ${s1.status}`);
+  const TO = '0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E';
+  const s1 = await call('send_eth', { to: TO, amount_eth: '0.000002' });
+  check(s1.status === 'confirmed' && (await pub.getBalance({ address: TO })) === parseEther('0.000002'), `first transfer, to a raw address: ${s1.status}`);
   const s2 = await call('send_eth', { to: 'ABC', amount_eth: '0.000008' });
   check(s2.status === 'waiting_for_owner' && s2.requested_total === '0.00002 ETH', `second transfer asks for ${s2.requested_total} (${s2.status})`);
   const answered = phoneAnswers(true);
@@ -104,7 +112,7 @@ try {
   const w4 = await call('get_wallet');
   check(w4.allowance_total === '0.00002 ETH' && w4.spent === '0.00001 ETH', `decline kept the limit (${w4.allowance_total}) and sent nothing more (${w4.spent} spent)`);
   const bal = await pub.getBalance({ address: ABC });
-  check(bal >= parseEther('0.00001'), `ABC received ${formatEther(bal)} ETH`);
+  check(bal === parseEther('0.000008'), `ABC received ${formatEther(bal)} ETH`);
   const s4 = await call('send_eth', { to: 'Bob', amount_eth: '0.000001' });
   check(s4.status === 'unknown_recipient', `unknown contact: ${s4.status}`);
 } finally {

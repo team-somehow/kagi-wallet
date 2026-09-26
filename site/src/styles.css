@@ -400,22 +400,35 @@ p { margin: 0; }
 .cli code { font-family: var(--mono); font-size: 12.5px; line-height: 1.7; color: var(--text); }
 
 /* ---- connect your AI ---- */
-.steps-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.steps-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.connect-field { display: grid; gap: 8px; }
+.connect-field > span { font-size: 14px; font-weight: 600; }
+.connect-field input {
+  font: inherit; font-family: var(--mono); font-size: 13px; color: var(--text); width: 100%;
+  height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line-2); background: rgba(0, 0, 0, 0.45);
+}
+.connect-field input:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; border-color: transparent; }
+.connect-field input[aria-invalid='true'] { border-color: var(--red); }
+.connect-field small { color: var(--faint); font-size: 13px; }
+.connect-field small.is-bad { color: var(--red); }
+.connect-targets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.connect-target {
+  font: inherit; color: var(--text); text-align: left; cursor: pointer; display: grid; gap: 2px;
+  padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, 0.02);
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.connect-target b { font-size: 15px; }
+.connect-target span { color: var(--faint); font-size: 13px; }
+.connect-target:hover:not(:disabled) { border-color: var(--amber); background: rgba(255, 177, 59, 0.06); }
+.connect-target:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.connect-target:disabled { cursor: not-allowed; opacity: 0.45; }
+.connect-after { color: var(--amber); font-size: 14px; line-height: 1.5; }
 .steps code, .connect code { font-family: var(--mono); font-size: 12px; color: var(--text); }
 .connect { margin-top: 20px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; }
 .connect-setup { padding: 28px; display: grid; align-content: start; gap: 20px; }
-.connect-tabs { display: inline-flex; justify-self: start; padding: 4px; gap: 4px; border-radius: 999px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.35); }
-.connect-tabs button {
-  font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); background: none; border: 0; cursor: pointer;
-  height: 34px; padding: 0 16px; border-radius: 999px;
-}
-.connect-tabs button.is-on { color: var(--amber-ink); background: var(--amber); }
-.connect-tabs button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-.connect-list { margin: 0; padding-left: 20px; display: grid; gap: 10px; color: var(--muted); line-height: 1.5; }
-.connect-list li::marker { color: var(--faint); font-family: var(--mono); font-size: 13px; }
 .connect-try { display: grid; gap: 10px; justify-items: start; padding: 18px; border-radius: 14px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); }
 .connect-try span { color: var(--faint); font-size: 13px; }
-.connect-try q { font-size: 17px; quotes: none; color: var(--text); }
+.connect-try q { font-size: 17px; quotes: none; color: var(--text); overflow-wrap: anywhere; }
 .connect-note { color: var(--faint); font-size: 14px; line-height: 1.5; max-width: 60ch; }
 .connect-run { padding: 24px; display: grid; align-content: start; align-self: start; gap: 2px; font-size: 14px; }
 .run-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
@@ -459,6 +472,7 @@ p { margin: 0; }
   .get { grid-template-columns: minmax(0, 1fr); }
   .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .connect { grid-template-columns: minmax(0, 1fr); }
+  .connect-targets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   body { font-size: 16px; }

@@ -15,23 +15,20 @@ and the owner approves on their Kagi stick or declines.
 | `wait_for_approval` | Waits up to 45 s for the owner. Once the new limit confirms, it sends the waiting payment |
 | `request_higher_limit` | Asks for a higher total without a payment attached |
 
-## Run it
+## Use the shared server
 
-1. In the Kagi phone app, create an agent key and tap **Copy session key**. It copies
-   `kagi:<account>:<key>`, which carries the wallet address with the key.
-2. Run:
+One server serves everyone at `https://13-235-16-182.sslip.io`. Each person's connector link carries
+their own key: `https://13-235-16-182.sslip.io/k/<account><key>`.
 
-   ```sh
-   SESSION_KEY='kagi:0x…:0x…' ./run-local.sh
-   ```
+1. In the Kagi phone app, create an agent key and tap **Copy connector link**.
+2. Add the link as an MCP server. The website's Connect your AI section has a button for each app:
+   - **Claude Code:** `claude mcp add --transport http kagi <link>`
+   - **Codex:** `codex mcp add kagi --url <link>`
+   - **Cursor, VS Code:** one-click install links built from the link
+   - **Claude, ChatGPT:** add a custom connector with the link and no authentication
+3. Try: "Send 0.000002 ETH to 0x7aa25897BB2457F46109EF1886b3F0EBB6E5f67E, then send 0.000008 ETH to the same address."
 
-   It prints a public `https://…trycloudflare.com/mcp/<token>` URL.
-
-3. Connect a client:
-   - **ChatGPT:** Settings, Apps and Connectors, Advanced, turn on Developer mode. Then create a connector with the URL above and "No authentication". In a chat, pick the connector from the tools menu.
-   - **Claude:** Settings, Connectors, Add custom connector, paste the URL.
-
-4. Try: "Send 0.000002 ETH to ABC, then send 0.000008 ETH to ABC."
+The server only holds a key for the length of each request and never logs paths.
 
 `npm test` runs the whole loop on a local anvil chain: spend, ask for more, approve, decline.
 
@@ -41,8 +38,8 @@ It's one Node file with a Dockerfile, so Render, Railway, Fly or any container h
 
 | Variable | Value |
 | --- | --- |
-| `SESSION_KEY` | What the phone copies, `kagi:<account>:<key>` |
-| `MCP_TOKEN` | A random string. The endpoint becomes `/mcp/<MCP_TOKEN>` |
+| `SESSION_KEY` | Optional. A single key served at `/mcp/<MCP_TOKEN>`, as `kagi:<account>:<key>` |
+| `MCP_TOKEN` | With `SESSION_KEY`: a random string for that endpoint |
 | `RPC_URL` | Optional. Defaults to a public Sepolia RPC |
 | `CONTACTS` | Optional JSON of names to addresses. Defaults to `contacts.json` |
 

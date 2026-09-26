@@ -113,6 +113,8 @@ export const RELEASE_URL = `${REPO_URL}/releases/tag/v0.2.0`;
 export const APK_URL = `${REPO_URL}/releases/download/v0.2.0/kagi-1.0.0.apk`;
 export const FIRMWARE_SRC_URL = `${REPO_URL}/tree/main/firmware/wrist`;
 export const MCP_SRC_URL = `${REPO_URL}/tree/main/agent-mcp`;
+// The shared Kagi MCP server. Each person's connector link points here and carries their own key.
+export const MCP_URL = 'https://13-235-16-182.sslip.io';
 export const FIRMWARE = {
   version: '0.2.0',
   manifest: './firmware/manifest.json',

@@ -11,7 +11,7 @@ import { ManagerSign } from '../components/ManagerSign';
 import { Steps } from '../components/Steps';
 import { fmtEth, useChain } from '../store/chain';
 import * as evm from '../lib/evm';
-import { connectionString, newSessionKey, saveSessionKey, type SessionKey } from '../lib/session';
+import { connectionString, connectorLink, newSessionKey, saveSessionKey, type SessionKey } from '../lib/session';
 import { shortAddr } from '../lib/format';
 import { success, warn } from '../lib/haptics';
 import { colors, fonts, radius, space } from '../theme';
@@ -47,7 +47,7 @@ export default function NewAgentKey() {
   const [key, setKey] = useState<SessionKey | null>(null);
   const [plan, setPlan] = useState<{ cap: bigint; expiry: bigint; nonce: bigint; account: string; chainId: number } | null>(null);
   const [hash, setHash] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'link' | 'key' | null>(null);
   const [sentHash, setSentHash] = useState<string | null>(null);
   const [gasStep, setGasStep] = useState<'todo' | 'active' | 'done' | 'failed'>('todo');
   const [tick, setTick] = useState(0);
@@ -108,11 +108,10 @@ export default function NewAgentKey() {
     }
   };
 
-  const copy = async () => {
-    if (!key) return;
-    if (!plan) return;
-    await Clipboard.setStringAsync(connectionString(key, plan.account));
-    setCopied(true);
+  const copy = async (what: 'link' | 'key') => {
+    if (!key || !plan) return;
+    await Clipboard.setStringAsync(what === 'link' ? connectorLink(key, plan.account) : connectionString(key, plan.account));
+    setCopied(what);
     void success();
   };
 
@@ -229,9 +228,10 @@ export default function NewAgentKey() {
             </Txt>
           ) : null}
           <Txt size={15} color={colors.muted} lineHeight={22}>
-            Copy the session key and paste it into your agent, for example the Kagi MCP server. It can only spend its allowance. It is not your wallet key.
+            Copy the connector link and add it to ChatGPT, Claude, Codex or Cursor as an MCP server. It can only spend this allowance. It is not your wallet key, but keep it private.
           </Txt>
-          <Button label={copied ? 'Copied' : 'Copy session key'} variant="amber" onPress={() => void copy()} />
+          <Button label={copied === 'link' ? 'Copied' : 'Copy connector link'} variant="amber" onPress={() => void copy('link')} />
+          <Button label={copied === 'key' ? 'Copied' : 'Copy session key only'} variant="ghost" onPress={() => void copy('key')} />
         </View>
       ) : null}
     </Screen>
