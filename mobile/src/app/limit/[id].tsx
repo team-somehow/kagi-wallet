@@ -7,7 +7,7 @@ import { Txt } from '../../components/Txt';
 import { Button } from '../../components/Button';
 import { Fact } from '../../components/Fact';
 import { ManagerSign } from '../../components/ManagerSign';
-import { fmtAmount, fmtEth, useChain } from '../../store/chain';
+import { fmtAmount, fmtEth, interceptaFlag, useChain } from '../../store/chain';
 import * as evm from '../../lib/evm';
 import { evmDeclineMessage, phoneOnlySign } from '../../lib/frost';
 import { loadShard, rand } from '../../lib/shard';
@@ -112,8 +112,11 @@ export default function LimitRequestScreen() {
   const minutes = info ? Math.max(0, Math.round(Number(r.expiry - info.now) / 60)) : null;
   const extra = r.newCap - r.oldCap;
   // The agent server screens every recipient with Intercepta before its key signs. A flagged
-  // one comes here as a request for exactly that payment, with the reasons in the text.
-  const held = r.reason.startsWith('Intercepta held:');
+  // one comes here as a request for exactly that payment, with the reasons in the text. Paying
+  // it anyway is a bypass: it takes every device that holds the wallet key (phone and wrist,
+  // and the second stick over infrared once it has joined).
+  const flag = interceptaFlag(r.reason);
+  const held = flag !== null;
   const explorer = info?.explorer ?? 'https://sepolia.etherscan.io';
 
   return (
@@ -121,15 +124,19 @@ export default function LimitRequestScreen() {
       <TopBar title="Limit request" left={{ label: 'Close', onPress: () => router.back() }} />
       <View style={styles.gap}>
         <Txt size={26} weight="bold" lineHeight={32}>
-          {held ? `${r.name} wants to pay a flagged address` : `${r.name} wants a higher limit`}
+          {flag === 'blocked'
+            ? `Intercepta blocked a payment by ${r.name}`
+            : flag === 'held'
+              ? `${r.name} wants to pay a flagged address`
+              : `${r.name} wants a higher limit`}
         </Txt>
         {held ? (
           <View style={styles.flag}>
             <Txt size={13} weight="bold" color={colors.red}>
-              INTERCEPTA HELD THIS PAYMENT
+              {flag === 'blocked' ? 'INTERCEPTA BLOCKED THIS PAYMENT' : 'INTERCEPTA HELD THIS PAYMENT'}
             </Txt>
             <Txt size={15} lineHeight={22}>
-              {r.reason.replace('Intercepta held: ', '')}
+              {r.reason.replace(/^Intercepta (held|blocked): /, '')}
             </Txt>
           </View>
         ) : (
@@ -168,7 +175,7 @@ export default function LimitRequestScreen() {
         <View style={styles.note}>
           <Txt size={14} color={colors.amber} lineHeight={20}>
             {held
-              ? `Approve only if you trust this recipient. Approving adds ${fmtEth(extra)}, exactly this payment, and the agent sends it. Decline and nothing is sent.`
+              ? `Bypass only if you trust this recipient: it overrides Intercepta and needs every device that holds your wallet key. It adds ${fmtEth(extra)}, exactly this payment, and the agent sends it. Decline and nothing is sent.`
               : `This is extra future access. The agent can spend ${fmtEth(extra)} more on its own, not just the one waiting transfer.`}
           </Txt>
         </View>
@@ -181,8 +188,9 @@ export default function LimitRequestScreen() {
           ) : (
             <>
               <ManagerSign
-                action="Raise limit"
-                phoneDetail="Unlock your share with your fingerprint"
+                action={held ? 'Bypass Intercepta' : 'Raise limit'}
+                startLabel={held ? 'Bypass' : undefined}
+                phoneDetail={held ? 'Unlock your share with your fingerprint, then sign on every device' : 'Unlock your share with your fingerprint'}
                 payload={{
                   kind: 'evm_limit',
                   agent: r.name,

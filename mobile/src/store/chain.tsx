@@ -84,6 +84,16 @@ const ChainCtx = createContext<Ctx | null>(null);
 export const fmtEth = (wei: bigint) => `${formatEther(wei)} ETH`;
 export const fmtAmount = (wei: bigint) => wei < 10n ** 16n ? `${formatUnits(wei, 12)} µETH` : fmtEth(wei);
 
+/**
+ * The agent server screens every recipient with Intercepta. A flagged payment arrives as a
+ * limit request whose reason starts with one of these, so the owner can approve or bypass it.
+ */
+export function interceptaFlag(reason: string): 'held' | 'blocked' | null {
+  if (reason.startsWith('Intercepta blocked:')) return 'blocked';
+  if (reason.startsWith('Intercepta held:')) return 'held';
+  return null;
+}
+
 // A stable notification id per request, from its transaction hash.
 const alertId = (hash: string) => parseInt(hash.slice(2, 9), 16);
 
@@ -228,8 +238,17 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
       if (opened.current.has(r.id)) continue;
       opened.current.add(r.id);
       void buzz();
+      // The stick is on the owner's wrist even when the phone is in a pocket: buzz it too.
+      const flag = interceptaFlag(r.reason);
+      link.send({
+        t: 'alert',
+        level: flag ? 'red' : 'amber',
+        text: flag === 'blocked' ? 'Intercepta blocked' : flag === 'held' ? 'Intercepta held' : 'Limit request',
+      });
       if (AppState.currentState === 'active' && navRef.current) {
         router.push(`/limit/${r.id}`);
+      } else if (flag) {
+        bg.alert(nid, `Intercepta ${flag} a payment by ${r.name}`, `${r.reason.replace(/^Intercepta (held|blocked): /, '')} Tap to decline, or bypass with all your devices.`, `kagi://limit/${r.id}`);
       } else {
         bg.alert(nid, `${r.name} asks for a higher limit`, `Raise its total from ${fmtEth(r.oldCap)} to ${fmtEth(r.newCap)}. Tap to approve with your fingerprint and your stick.`, `kagi://limit/${r.id}`);
       }

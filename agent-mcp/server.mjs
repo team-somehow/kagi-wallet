@@ -222,10 +222,15 @@ function forKey(parsed) {
       risk = await screen(rcpt.address);
       log(`intercepta: ${risk.verdict}, ${risk.summary}`);
       if (risk.verdict === 'block') {
+        // Refused: the key doesn't sign. The owner still hears about it (their phone and stick
+        // alert), and only a bypass signed by every device that holds the wallet key pays it.
         return {
           status: 'blocked',
-          message: `Refused before signing: Intercepta flagged ${rcpt.address} (${risk.summary}). Nothing was sent and the owner was not asked.`,
+          message: `Refused before signing: Intercepta flagged ${rcpt.address} (${risk.summary}). Nothing was sent.`,
+          needed: value,
+          proposedCap: s.cap + value,
           intercepta: risk,
+          to: rcpt.address,
         };
       }
       if (risk.verdict === 'hold') {
@@ -390,8 +395,8 @@ function buildServer(current, setKey) {
         'request_id, which sends the payment once the owner approves. ' +
         (interceptaEnabled()
           ? 'Every recipient is screened by Intercepta before the key signs: status "blocked" means the payment was refused ' +
-            '(tell the user why, and do not retry or route around it); "waiting_for_owner" with held_by "intercepta" means the ' +
-            'owner must approve that payment. '
+            '(tell the user why, and do not retry or route around it; the owner was alerted and can bypass it on all their ' +
+            'devices); "waiting_for_owner" with held_by "intercepta" means the owner must approve that payment. '
           : '') +
         (multibaasEnabled() ? 'get_activity shows the wallet history: past payments, requests and approvals. ' : '') +
         'Never claim a payment was sent unless a tool ' +
@@ -478,6 +483,23 @@ function buildServer(current, setKey) {
     },
     guarded(async (a, { to, amount_eth }) => {
       const r = await a.transfer(to, amount_eth);
+      if (r.status === 'blocked') {
+        const short = `${r.to.slice(0, 6)}…${r.to.slice(-4)}`;
+        const why = `Intercepta blocked: ${r.intercepta.summary}. Bypass to pay ${amount_eth} ETH to ${short}?`;
+        const ask = await a.askForMore(r.proposedCap, why.slice(0, 200), { to, amount_eth, approved: true });
+        return reply({
+          status: 'blocked',
+          message: r.message,
+          intercepta: r.intercepta,
+          ...(ask.status === 'waiting_for_owner'
+            ? {
+                request_id: ask.request_id,
+                owner_alerted: true,
+                next: 'Tell the user it was refused and why. Their phone and stick were alerted; only they can bypass it, on all their devices. Do not retry or pay another way. Call wait_for_approval with this request_id only if the user says they will bypass it.',
+              }
+            : { owner_alerted: false }),
+        });
+      }
       if (r.status === 'held') {
         // Intercepta wants a person to decide. The reason travels with the on-chain request,
         // so the owner reads it on their phone before approving on the stick.

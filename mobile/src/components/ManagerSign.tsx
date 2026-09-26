@@ -64,6 +64,8 @@ type Phase = 'idle' | 'unlocking' | 'wrist' | 'ir_out' | 'stick' | 'ir_back' | '
 
 interface Props {
   action: string;
+  /** The button that starts signing. Defaults to "Unlock phone". */
+  startLabel?: string;
   phoneDetail: string;
   payload: SignPayload;
   onPhoneSigned?: () => void;
@@ -104,7 +106,7 @@ const REJECT_TEXT: Record<string, string> = {
  * from the raw bytes, and signs its half only when you press A. The phone checks
  * the wrist's half and the final signature before anything counts as signed.
  */
-export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onReject, onDone, autoStart }: Props) {
+export function ManagerSign({ action, startLabel, phoneDetail, payload, onPhoneSigned, onReject, onDone, autoStart }: Props) {
   const { state } = useStore();
   const [phase, setPhase] = useState<Phase>('idle');
   // With a second stick the wallet key is 3 of 3, and the wrist asks it over infrared.
@@ -475,7 +477,7 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
     <View style={styles.wrap}>
       {phase === 'idle' || phase === 'error' || phase === 'unlocking' ? (
         <Button
-          label={phase === 'error' ? 'Try again' : 'Unlock phone'}
+          label={phase === 'error' ? 'Try again' : startLabel ?? 'Unlock phone'}
           variant="amber"
           onPress={() => void run()}
           loading={phase === 'unlocking'}

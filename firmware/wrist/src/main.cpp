@@ -32,7 +32,7 @@
 #include "secrets.example.h"
 #endif
 
-static const char* FW = "0.3.2";
+static const char* FW = "0.3.3";
 
 // ---- look -----------------------------------------------------------------
 
@@ -1912,6 +1912,14 @@ static void handle(const String& line) {
       while (sent < sizeof row) { if (!Serial || millis() - started > 1000) return; size_t n = Serial.write(row + sent, sizeof row - sent); if (!n) delay(1); sent += n; }
     }
     return;
+  } else if (t == "alert") {
+    // The phone saw something that needs the owner (a limit request, or a payment Intercepta
+    // flagged) while it may be in a pocket: buzz, and say what on the home screen. Never
+    // interrupts a prompt the owner is already looking at.
+    bool red = String(in["level"] | "amber") == "red";
+    buzz(red ? 3 : 2);
+    if (mode == Mode::Home || mode == Mode::Revoked || mode == Mode::Result)
+      showResult(String(in["text"] | "Check your phone"), red ? C_RED : C_ACCENT, 4000, red ? Fx::Shake : Fx::None);
   } else if (t == "sound") {
     soundsEnabled = in["enabled"] | true;
     Preferences p; p.begin("root", false); p.putBool("sound", soundsEnabled); p.end();
