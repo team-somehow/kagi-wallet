@@ -77,7 +77,14 @@ static constexpr int PIN_A_EXT = 10;
 static m5::Button_Class btnA;
 static void pollButtons() {
   M5.update();
-  btnA.setRawState(millis(), M5.BtnA.isPressed() || digitalRead(PIN_A_EXT) == LOW);
+  bool g10 = digitalRead(PIN_A_EXT) == LOW;
+  btnA.setRawState(millis(), M5.BtnA.isPressed() || g10);
+  // Every change, on USB only: lets a bench check see the G10 wiring without the phone.
+  static bool was = false;
+  if (btnA.isPressed() != was) {
+    was = btnA.isPressed();
+    Serial.printf("{\"t\":\"btn\",\"a\":%d,\"g10\":%d,\"builtin\":%d}\n", was, g10, M5.BtnA.isPressed());
+  }
 }
 
 static uint32_t resultUntil = 0;
@@ -897,6 +904,8 @@ static void sendHello() {
   }
   d["battery"] = M5.Power.getBatteryLevel();
   d["onArm"] = onArm;
+  d["g10"] = digitalRead(PIN_A_EXT);  // 1 idle (pull-up), 0 while the button is down
+  d["a"] = btnA.isPressed();
   send(d);
 }
 
