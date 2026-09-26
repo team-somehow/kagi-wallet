@@ -70,13 +70,15 @@ export default function Spending() {
           onPress={() => void Linking.openURL('https://www.curvegrid.com/multibaas')}
           style={({ pressed }) => [styles.source, pressed && styles.pressed]}
         >
-          <Txt size={13} lineHeight={20} color={colors.faint}>
+          <Txt size={13} lineHeight={18} color={colors.faint} align="center">
             Indexed and totalled by
           </Txt>
-          <Image source={require('../../../assets/partners/curvegrid.png')} style={styles.curvegrid} resizeMode="contain" />
-          <Txt size={13} lineHeight={20} weight="medium" color={colors.muted}>
-            MultiBaas
-          </Txt>
+          <View style={styles.sourceRow}>
+            <Image source={require('../../../assets/partners/curvegrid.png')} style={styles.curvegrid} resizeMode="contain" />
+            <Txt size={14} lineHeight={20} weight="medium" color={colors.muted}>
+              MultiBaas
+            </Txt>
+          </View>
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.body} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}>
@@ -206,7 +208,8 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.panel, borderRadius: radius.m, padding: space.m, gap: space.s },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   intercepta: { flexDirection: 'row', alignItems: 'center', gap: space.s, marginTop: space.xs },
-  source: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 2, marginBottom: space.m },
-  curvegrid: { width: 78, height: 18, marginTop: 2 },
+  source: { alignItems: 'center', gap: 4, marginTop: 2, marginBottom: space.m },
+  sourceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.s },
+  curvegrid: { width: 91, height: 21, marginTop: 1 },
   pressed: { opacity: 0.6 },
 });
