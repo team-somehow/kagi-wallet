@@ -38,6 +38,8 @@ bool doneReady = false;
 int lastSeqSeen = -1;
 volatile int ackSeq = -1;
 bool ackEnabled = true;
+SendProgress sendCb = nullptr;
+RecvProgress recvCb = nullptr;
 
 uint8_t crc8(const uint8_t* d, size_t n) {
   uint8_t c = 0;
@@ -146,6 +148,7 @@ void handleFrame(const std::vector<uint8_t>& f) {
   if (seq == 0) assembling.clear();
   lastSeqSeen = seq;
   assembling.insert(assembling.end(), f.begin() + 2, f.begin() + 2 + n);
+  if (recvCb) recvCb(assembling.size(), false);
   if (last) {
     done = assembling;
     doneReady = true;
@@ -172,6 +175,7 @@ void pump() {
     handleFrame(f);
   } else if (n > 4) {
     st.framesBad++;
+    if (recvCb) recvCb(assembling.size(), true);
   }
 }
 
@@ -217,8 +221,12 @@ bool send(const uint8_t* data, size_t len, uint32_t timeoutMs) {
     size_t n = std::min(MAX_PAYLOAD, len - off);
     bool last = off + n >= len;
     bool acked = false;
+    if (sendCb) sendCb(off, len, false);
     for (int attempt = 0; attempt < 15 && !acked; attempt++) {
-      if (attempt) st.retries++;
+      if (attempt) {
+        st.retries++;
+        if (sendCb) sendCb(off, len, true);
+      }
       ackSeq = -1;
       sendFrame(T_DATA, seq, data + off, n, last);
       uint32_t t0 = millis();
@@ -238,8 +246,12 @@ bool send(const uint8_t* data, size_t len, uint32_t timeoutMs) {
     off += n;
     seq = (seq + 1) & 0x3f;
   } while (off < len);
+  if (sendCb) sendCb(len, len, false);
   return true;
 }
+
+void onSendProgress(SendProgress fn) { sendCb = fn; }
+void onRecvProgress(RecvProgress fn) { recvCb = fn; }
 
 bool poll(std::vector<uint8_t>& out) {
   pump();

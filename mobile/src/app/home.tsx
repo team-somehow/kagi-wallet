@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '../components/Screen';
 import { Txt } from '../components/Txt';
 import { Button } from '../components/Button';
@@ -11,7 +11,7 @@ import { useStore } from '../store/store';
 import { fmtEth, useChain, type ChainSession } from '../store/chain';
 import * as Clipboard from 'expo-clipboard';
 import * as evm from '../lib/evm';
-import { loadShard } from '../lib/shard';
+import { loadRoot, loadShard } from '../lib/shard';
 import { phoneKey } from '../lib/frost';
 import { shortAddr } from '../lib/format';
 import { success, tap, warn } from '../lib/haptics';
@@ -27,6 +27,12 @@ export default function Home() {
   const { state } = useStore();
   const { info, error, live, sessions, totals, activity, limits, refresh } = useChain();
   const [gasCopied, setGasCopied] = useState(false);
+  const [twoSticks, setTwoSticks] = useState<boolean | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      void loadRoot().then((r) => setTwoSticks(Boolean(r && r.parties === 3 && r.groupKey === state.address)));
+    }, [state.address]),
+  );
   const earlier = sessions.filter((x) => x.status !== 'active');
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
@@ -185,6 +191,17 @@ export default function Home() {
         </View>
       ) : null}
 
+      {info?.account && twoSticks !== null ? (
+        <Pressable onPress={() => router.push('/vault')} style={({ pressed }) => [styles.card, styles.sticks, pressed && styles.pressed]}>
+          <Txt size={16} weight="medium">
+            {twoSticks ? 'Protected by two sticks' : 'Add a second stick'}
+          </Txt>
+          <Txt size={13} color={colors.muted}>
+            {twoSticks ? 'Every approval needs the wrist and the second stick, by infrared.' : 'Then every approval needs both sticks. Your account stays the same.'}
+          </Txt>
+        </Pressable>
+      ) : null}
+
       {/* The gas wallet stays out of sight until it can no longer pay for what you do next. */}
       {info && info.gasBalance < LOW_GAS ? (
         <View style={[styles.card, styles.gasLow]}>
@@ -291,6 +308,7 @@ const styles = StyleSheet.create({
   request: { marginTop: space.l, padding: space.m, gap: 4, borderRadius: radius.m, backgroundColor: colors.panel, borderLeftWidth: 3, borderLeftColor: colors.amber },
   section: { marginTop: space.xl, gap: space.s },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sticks: { marginTop: space.l, gap: 4 },
   gasLow: { marginTop: space.l, borderLeftWidth: 3, borderLeftColor: colors.amber },
   card: { backgroundColor: colors.panel, borderRadius: radius.m, padding: space.m, gap: space.s },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

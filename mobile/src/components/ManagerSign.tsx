@@ -5,7 +5,9 @@ import { unlockShard } from '../lib/biometrics';
 import { success, warn } from '../lib/haptics';
 import { combine, evmGrantMessage, evmLimitMessage, evmMessage, grantCanonical, messageFor, nonces, txCanonical } from '../lib/frost';
 import { link, type Msg } from '../lib/link';
-import { loadShard, rand } from '../lib/shard';
+import { loadRoot, loadShard, rand } from '../lib/shard';
+import { combineRoot, partial, rootNonces, type RootShare } from '../lib/root';
+import { Trio, type Beam } from './Trio';
 import { uid } from '../store/mock';
 import { useStore } from '../store/store';
 import { Button } from './Button';
@@ -20,7 +22,7 @@ export type SignPayload =
   | { kind: 'evm_grant'; agent: string; chainId: number; account: string; nonce: bigint; agentAddress: string; cap: bigint; expiry: bigint }
   | { kind: 'evm_limit'; agent: string; chainId: number; account: string; nonce: bigint; agentAddress: string; oldCap: bigint; newCap: bigint; expiry: bigint };
 
-type Phase = 'idle' | 'unlocking' | 'wrist' | 'combining' | 'done' | 'error';
+type Phase = 'idle' | 'unlocking' | 'wrist' | 'ir_out' | 'stick' | 'ir_back' | 'combining' | 'done' | 'error';
 
 interface Props {
   action: string;
@@ -44,6 +46,12 @@ const REJECT_TEXT: Record<string, string> = {
   not_paired: 'The wrist has no shard. Pair it again from a fresh wallet.',
   busy: 'The wrist is showing another request. Finish that one first.',
   bad_calldata: 'The wrist could not read this transaction, so it refused.',
+  // With the second stick
+  ir_failed: 'The sticks could not see each other. Face them, 5 to 30 cm apart, and try again.',
+  vault_rejected: 'You said no on the second stick. Nothing was signed.',
+  vault_timeout: 'The second stick did not answer. Face the sticks and try again.',
+  root_not_3_of_3: 'The wrist is not set up with a second stick yet.',
+  needs_second_stick: 'This wallet needs both sticks now.',
 };
 
 /**
@@ -55,6 +63,18 @@ const REJECT_TEXT: Record<string, string> = {
 export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onReject, onDone, autoStart }: Props) {
   const { state } = useStore();
   const [phase, setPhase] = useState<Phase>('idle');
+  // With a second stick the wallet key is 3 of 3, and the wrist asks it over infrared.
+  const [three, setThree] = useState<RootShare | null>(null);
+  const [lostAt, setLostAt] = useState(0);
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    void loadRoot().then((r) => setThree(r && r.parties === 3 && r.groupKey === state.address ? r : null));
+  }, [state.address]);
+  useEffect(() => {
+    if (!lostAt) return;
+    const t = setInterval(() => setNow(Date.now()), 300);
+    return () => clearInterval(t);
+  }, [lostAt]);
   const [error, setError] = useState<string | null>(null);
   const [sig, setSig] = useState<string | null>(null);
   const pendingId = useRef<string | null>(null);
@@ -95,6 +115,9 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
               ? grantCanonical(payload.agent, payload.pubkey, payload.capUsdc, payload.hours)
               : txCanonical(payload.contract, payload.calldata),
           );
+    const root = await loadRoot();
+    if (root && root.parties === 3 && root.groupKey === shard.groupKey && payload.kind.startsWith('evm')) return runThree(root, m);
+
     const mine = nonces(rand);
     const id = uid();
     pendingId.current = id;
@@ -177,6 +200,68 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
     }
   };
 
+  // Phone, then wrist, then the second stick over infrared, then back. Every part is checked.
+  const runThree = async (root: RootShare, m: Uint8Array) => {
+    if (payload.kind === 'evm' && payload.data !== '0x') return fail('With two sticks, the wallet only signs plain transfers here.');
+    const n1 = rootNonces(rand);
+    const id = uid();
+    pendingId.current = id;
+    onPhoneSigned?.();
+    setLostAt(0);
+    setPhase('wrist');
+    const off = link.on((x: Msg) => {
+      if (x.t !== 'root_progress' || x.id !== id) return;
+      if (x.step === 'ir_to_vault') setPhase('ir_out');
+      if (x.step === 'vault_prompted') setPhase('stick');
+      if (x.step === 'ir_from_vault') setPhase('ir_back');
+      if (x.step === 'ir_miss') setLostAt(Date.now());
+    });
+    const answer = link.waitFor((x: Msg) => (x.t === 'root_share' || x.t === 'sign_reject') && x.id === id, 300000, 'the sticks');
+    const base = { chainId: String(payload.kind.startsWith('evm') ? (payload as { chainId: number }).chainId : 0), account: (payload as { account: string }).account, nonce: (payload as { nonce: bigint }).nonce.toString() };
+    const wire =
+      payload.kind === 'evm_limit'
+        ? { kind: 'evm_limit', agent: payload.agent, ...base, agentAddress: payload.agentAddress, oldCap: payload.oldCap.toString(), newCap: payload.newCap.toString(), expiry: payload.expiry.toString() }
+        : payload.kind === 'evm_grant'
+          ? { kind: 'evm_grant', agent: payload.agent, ...base, agentAddress: payload.agentAddress, cap: payload.cap.toString(), expiry: payload.expiry.toString() }
+          : payload.kind === 'evm'
+            ? { kind: 'evm', agent: payload.agent, ...base, to: payload.to, value: payload.value.toString() }
+            : null;
+    if (!wire || !link.send({ t: 'root_sign', id, ...wire, D: n1.D, E: n1.E })) {
+      off();
+      return fail('The wrist is not connected. Nothing was signed.');
+    }
+    let reply: Msg;
+    try {
+      reply = await answer;
+    } catch (e) {
+      off();
+      return fail(e instanceof Error ? e.message : 'No answer from the sticks.');
+    }
+    off();
+    pendingId.current = null;
+    if (reply.t === 'sign_reject') {
+      onReject?.(String(reply.reason) === 'vault_rejected' ? 'user' : String(reply.reason));
+      return fail(REJECT_TEXT[String(reply.reason)] ?? `Refused: ${String(reply.reason)}.`);
+    }
+    setPhase('combining');
+    await new Promise((r) => setTimeout(r, 30));
+    try {
+      const cs = [
+        { id: 1, D: n1.D, E: n1.E },
+        { id: 2, D: String(reply.D2), E: String(reply.E2) },
+        { id: 3, D: String(reply.D3), E: String(reply.E3) },
+      ];
+      const z1 = partial(root.share, root.groupKey, m, cs, 1, n1);
+      const signature = combineRoot(root, m, cs, { 1: z1, 2: String(reply.z2), 3: String(reply.z3) });
+      setSig(signature);
+      setPhase('done');
+      void success();
+      onDone(signature);
+    } catch (e) {
+      fail(e instanceof Error ? e.message : 'The signature did not verify.');
+    }
+  };
+
   const started = useRef(false);
   useEffect(() => {
     if (!autoStart || started.current || !status.ok) return;
@@ -190,13 +275,19 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
   const phoneState: Step['state'] =
     phase === 'idle' ? 'todo' : phase === 'unlocking' ? 'active' : phoneFailed ? 'failed' : 'done';
   const wristState: Step['state'] =
-    phase === 'wrist' || phase === 'combining' ? 'active' : phase === 'done' ? 'done' : wristFailed ? 'failed' : 'todo';
+    phase === 'wrist' || (phase === 'combining' && !three) ? 'active' : phase === 'done' || (three && ['ir_out', 'stick', 'ir_back', 'combining'].includes(phase)) ? 'done' : wristFailed ? 'failed' : 'todo';
+  const stickState: Step['state'] =
+    phase === 'ir_out' || phase === 'stick' || phase === 'ir_back' || phase === 'combining' ? 'active' : phase === 'done' ? 'done' : wristFailed ? 'failed' : 'todo';
+  const lost = lostAt > 0 && now - lostAt < 1500;
+  const beam: Beam = lost ? 'lost' : phase === 'ir_out' ? 'out' : phase === 'ir_back' ? 'back' : 'off';
 
   const phoneText =
     phoneFailed && error ? error : phase === 'idle' || phase === 'unlocking' ? phoneDetail : 'Unlocked from the secure keystore';
-  const wristText = wristFailed
+  const wristText = wristFailed && !three
     ? (error ?? 'Something went wrong.')
-    : phase === 'wrist'
+    : three && wristState === 'done' && phase !== 'done'
+      ? 'Signed its part and passed it on over infrared'
+      : phase === 'wrist'
       ? 'It buzzed. Check the amount on the wrist, then press A to sign or B to reject.'
       : phase === 'combining'
         ? 'Pressed. Checking both halves.'
@@ -206,13 +297,37 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
             ? `${status.text}.`
             : 'Press A on the wrist when it buzzes';
 
-  const steps: Step[] = [
-    { label: 'Phone shard', detail: phoneText, state: phoneState },
-    { label: 'Wrist shard', detail: wristText, state: wristState },
-  ];
+  const stickText = wristFailed
+    ? (error ?? 'Something went wrong.')
+    : lost
+      ? "Can't read the other stick. Face them, 5 to 30 cm apart."
+      : phase === 'ir_out'
+        ? 'Sending to the second stick over infrared'
+        : phase === 'stick'
+          ? 'Check the second stick, then hold A on it'
+          : phase === 'ir_back'
+            ? 'Its signature is coming back over infrared'
+            : phase === 'combining'
+              ? 'Checking all three parts'
+              : phase === 'done'
+                ? 'All three parts verified'
+                : 'Signs over infrared after the wrist';
+
+  const steps: Step[] = three
+    ? [
+        { label: 'Phone', detail: phoneText, state: phoneState },
+        { label: 'Wrist', detail: wristText, state: wristState },
+        { label: 'Second stick', detail: stickText, state: stickState },
+      ]
+    : [
+        { label: 'Phone shard', detail: phoneText, state: phoneState },
+        { label: 'Wrist shard', detail: wristText, state: wristState },
+      ];
+  const focus = phase === 'unlocking' ? 'phone' : phase === 'wrist' ? 'wrist' : phase === 'stick' ? 'stick' : null;
 
   return (
     <View style={styles.wrap}>
+      {three && phase !== 'idle' ? <Trio wrist={status.ok ? 'on' : 'searching'} stick="off" beam={beam} focus={focus} joined={phase === 'done'} /> : null}
       <Steps steps={steps} />
       {phase === 'idle' || phase === 'error' || phase === 'unlocking' ? (
         <Button
@@ -226,6 +341,11 @@ export function ManagerSign({ action, phoneDetail, payload, onPhoneSigned, onRej
       {phase === 'wrist' ? (
         <Txt size={14} color={colors.muted} align="center">
           Waiting for the wrist
+        </Txt>
+      ) : null}
+      {three && (phase === 'ir_out' || phase === 'stick' || phase === 'ir_back') ? (
+        <Txt size={14} color={lost ? colors.red : colors.muted} align="center">
+          {lost ? 'The sticks lost each other. It keeps trying.' : 'Keep the sticks facing each other'}
         </Txt>
       ) : null}
     </View>

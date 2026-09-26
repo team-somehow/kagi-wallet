@@ -42,7 +42,7 @@ static const int W = 240, H = 135;
 
 // ---- state ----------------------------------------------------------------
 
-enum class Mode { Unpaired, Pairing, Home, Prompt, Result, Revoked, ConfirmWipe, ConfirmWifi };
+enum class Mode { Unpaired, Pairing, Home, Prompt, Result, Revoked, ConfirmWipe, ConfirmWifi, Beam };
 
 struct Prompt {
   String id;
@@ -212,14 +212,28 @@ static char lastSource = 'u';  // 'u' USB serial, 'n' network: where the current
 // Wrist side of the root key.
 static uint8_t rshare[32], rgk[32], rX2new[32];
 static int rparties = 0;  // 0 none, 2 phone + wrist, 3 with the vault
+// The wallet key itself went through the reshare: after the commit it is 3 of 3, the old
+// 2-of-2 share is gone, and every approval goes phone -> wrist -> IR -> second stick.
+static bool rootIsManager = false;
+static bool mgr3 = false;
+
+// The infrared screen: what is moving, how far along, and whether frames are getting lost.
+struct IrUi {
+  String label;
+  bool sending = true;
+  size_t done = 0, total = 0;
+  uint32_t lastBad = 0, lastBeep = 0, lastDraw = 0, lastRecv = 0;
+  int bad = 0;
+};
+static IrUi irui;
 static uint8_t pendX[65], pendR[65], pendS[32], pendVaultPub[33];
 
 struct RootJob {
   bool active = false;
-  char type = 'G';  // 'G' root grant (72-byte compact), 'E' plain transaction (64-byte compact)
+  char type = 'G';  // 'G' root grant, 'A' agent key and 'L' limit raise on the wallet, 'E' plain send
   String id;
   uint8_t msg[32];
-  uint8_t compact[72];
+  uint8_t compact[88];
   uint8_t D[3][33], E[3][33];
   frost::Nonce n;
   uint32_t sentAt = 0;
@@ -305,6 +319,7 @@ static void loadShare() {
   prefs.begin("kagi", true);
   paired = prefs.isKey("share") && prefs.isKey("gk") && prefs.getBytes("share", share, 32) == 32 &&
            prefs.getBytes("gk", groupKey, 32) == 32;
+  mgr3 = paired && prefs.getBool("three", false);
   prefs.end();
 }
 
@@ -312,6 +327,7 @@ static void saveShare() {
   prefs.begin("kagi", false);
   prefs.putBytes("share", share, 32);
   prefs.putBytes("gk", groupKey, 32);
+  prefs.putBool("three", mgr3);
   prefs.end();
   paired = true;
 }
@@ -323,6 +339,20 @@ static void wipeShare() {
   memset(share, 0, 32);
   memset(groupKey, 0, 32);
   paired = false;
+  mgr3 = false;
+  // A root key made from the wallet key goes with it.
+  if (rootIsManager) {
+    Preferences p;
+    p.begin("root", false);
+    p.remove("rparties");
+    p.remove("rshare");
+    p.remove("rgk");
+    p.remove("radopt");
+    p.end();
+    rparties = 0;
+    rootIsManager = false;
+    memset(rshare, 0, 32);
+  }
 }
 
 // ---- drawing --------------------------------------------------------------
@@ -583,6 +613,45 @@ static void drawConfirm(const char* t, const String& line, const char* hold) {
   arrowsToA(92, hold);
 }
 
+// Two sticks facing each other, pulses of light between them, and how much has crossed.
+static void drawBeam() {
+  bool bad = irui.lastBad && millis() - irui.lastBad < 900;
+  uint16_t beam = bad ? C_RED : C_AMBER;
+  title(irui.label.c_str(), C_TEXT);
+  int y = 62;
+  // this stick on the left, the other on the right; the light flows from the sender
+  canvas.drawRoundRect(14, y - 22, 36, 44, 6, C_TEXT);
+  canvas.fillRect(20, y - 16, 24, 22, C_CELL);
+  canvas.fillCircle(50, y, 3, irui.sending ? beam : C_FAINT);
+  canvas.drawRoundRect(W - 50, y - 22, 36, 44, 6, C_MUTED);
+  canvas.fillRect(W - 44, y - 16, 24, 22, C_CELL);
+  canvas.fillCircle(W - 50, y, 3, irui.sending ? C_FAINT : beam);
+  int x0 = 58, x1 = W - 58;
+  float t = t01(bad ? 1400 : 700);
+  for (int i = 0; i < 5; i++) {
+    float ph = fmodf(t + i / 5.0f, 1.0f);
+    float at = irui.sending ? ph : 1 - ph;
+    int x = x0 + (int)((x1 - x0) * at);
+    int r = 6 + (int)(10 * sinf(ph * 3.14159f));
+    // arcs open toward where the light is going
+    if (irui.sending) canvas.drawArc(x, y, r, r - 2, 300, 60, beam);
+    else canvas.drawArc(x, y, r, r - 2, 120, 240, beam);
+  }
+  // progress
+  int bx = 22, bw = W - 44, by = 100;
+  canvas.drawRoundRect(bx, by, bw, 8, 4, C_FAINT);
+  float frac = irui.total ? (float)irui.done / (float)irui.total : 0;
+  if (!irui.total) frac = fmodf(t, 1.0f);  // receiving: length unknown until the end
+  int fw = std::max(6, (int)((bw - 4) * std::min(1.0f, frac)));
+  if (irui.total) canvas.fillRoundRect(bx + 2, by + 2, fw, 4, 2, beam);
+  else canvas.fillRoundRect(bx + 2 + (int)((bw - 30) * frac), by + 2, 26, 4, 2, beam);
+  canvas.setFont(&fonts::FreeSans9pt7b);
+  canvas.setTextDatum(bottom_center);
+  canvas.setTextColor(bad ? C_RED : C_MUTED);
+  String foot = bad ? "Can't read. Face the sticks." : irui.total ? String((int)(frac * 100)) + "%  keep them facing" : String((int)irui.done) + " bytes in";
+  canvas.drawString(foot, W / 2, H - 4);
+}
+
 static void drawVault();
 static bool isVaultRole();
 static void draw() {
@@ -605,13 +674,75 @@ static void draw() {
     case Mode::Revoked: drawRevoked(); break;
     case Mode::ConfirmWipe: drawConfirm("Erase this stick?", "The wallet here can't sign again.", "Hold A"); break;
     case Mode::ConfirmWifi: drawConfirm("Join network?", pendingNet.ssid.substring(0, 24), "Hold A"); break;
+    case Mode::Beam: drawBeam(); break;
   }
   canvas.pushSprite(0, 0);
 }
 
+// A frame did not get through: a low buzz, at most once a second, so it reads as a warning.
+static void rootProgress(const char* step) {
+  if (isVault || !rjob.id.length()) return;
+  JsonDocument d;
+  d["t"] = "root_progress";
+  d["id"] = rjob.id;
+  d["step"] = step;
+  send(d);
+}
+
+static void irMiss() {
+  irui.lastBad = millis();
+  irui.bad++;
+  if (millis() - irui.lastBeep > 1000) {
+    irui.lastBeep = millis();
+    beep(330, 70);
+    rootProgress("ir_miss");  // the phone shows it too
+  }
+}
+
+static void irSending(const char* label) {
+  irui = IrUi{};
+  irui.label = label;
+  irui.sending = true;
+  mode = Mode::Beam;
+  draw();
+}
+
+// Called by the IR layer between frames while we send.
+static void irOnSend(size_t done, size_t total, bool retry) {
+  if (mode != Mode::Beam) return;
+  irui.done = done;
+  irui.total = total;
+  if (retry) irMiss();
+  if (millis() - irui.lastDraw > 60 || done == total) {
+    irui.lastDraw = millis();
+    draw();
+  }
+}
+
+// Called by the IR layer as frames arrive. A message starting to arrive shows the beam.
+static void irOnRecv(size_t bytes, bool bad) {
+  bool inbound = isVault ? (mode != Mode::Prompt) : rjob.active;
+  if (!inbound) return;
+  if (mode != Mode::Beam) {
+    if (bad) return;  // stray infrared, a TV remote say: not ours to warn about
+    irui = IrUi{};
+    irui.label = isVault ? "From your wrist" : "From your 2nd stick";
+    irui.sending = false;
+    mode = Mode::Beam;
+    rootProgress("ir_from_vault");
+  }
+  irui.done = bytes;
+  irui.lastRecv = millis();
+  if (bad) irMiss();
+  if (millis() - irui.lastDraw > 60) {
+    irui.lastDraw = millis();
+    draw();
+  }
+}
+
 // Screens that move redraw on their own.
 static bool animating() {
-  if (mode == Mode::Unpaired || mode == Mode::Pairing || mode == Mode::Prompt) return true;
+  if (mode == Mode::Unpaired || mode == Mode::Pairing || mode == Mode::Prompt || mode == Mode::Beam) return true;
   if (mode == Mode::ConfirmWipe || mode == Mode::ConfirmWifi) return true;
   if (mode == Mode::Result) return millis() - modeSince < 1000;
   if (mode == Mode::Home) return millis() - modeSince < 800;
@@ -664,6 +795,7 @@ static void sendHello() {
   d["uptime"] = millis() / 1000;
   d["via"] = ble::connected() ? "ble" : relayUp ? "relay" : tcp.connected() ? "wifi" : "usb";
   d["role"] = isVault ? "vault" : "wrist";
+  if (!isVault) d["threeOfThree"] = mgr3;
   if (isVault) {
     d["devPub"] = hex(vdevPub, 33);
     d["fingerprint"] = fingerprint(vdevPub);
@@ -811,6 +943,8 @@ static void onSign(JsonDocument& in) {
   Prompt p;
   p.id = id;
   p.kind = in["kind"] | "";
+  // Once the wallet key is 3 of 3, the old 2-of-2 path is gone: the phone must use root_sign.
+  if (mgr3 && p.kind.startsWith("evm")) return reject(id, "needs_second_stick");
   if (!unhex(in["D"] | "", p.D1, 65) || !unhex(in["E"] | "", p.E1, 65)) return reject(id, "bad_request");
 
   // The wrist rebuilds the message itself from what it is about to display.
@@ -1034,6 +1168,7 @@ static void loadRoot() {
   } else {
     rparties = p.getUChar("rparties", 0);
     if (rparties && (p.getBytes("rshare", rshare, 32) != 32 || p.getBytes("rgk", rgk, 32) != 32)) rparties = 0;
+    rootIsManager = rparties && p.getBool("radopt", false);
   }
   p.end();
 }
@@ -1048,6 +1183,7 @@ static void saveRoot() {
     }
   } else {
     p.putUChar("rparties", rparties);
+    p.putBool("radopt", rootIsManager);
     if (rparties) {
       p.putBytes("rshare", rshare, 32);
       p.putBytes("rgk", rgk, 32);
@@ -1066,7 +1202,7 @@ static bool tailOf(const char* dec, uint8_t* out, size_t n) {
   return true;
 }
 
-static size_t compactLen(char type) { return type == 'E' ? 64 : 72; }
+static size_t compactLen(char type) { return type == 'E' ? 64 : type == 'L' ? 88 : 72; }
 
 // 'E': sha256("KAGI/evm" || chainid || account || nonce || to || value), the call format the
 // root treasury contract checks. Compact: chainId u32 | account 20 | nonce u32 | to 20 | value u128
@@ -1084,26 +1220,52 @@ static void rootEvmMsg(const uint8_t c[64], uint8_t out[32]) {
   frost::sha256(pre, sizeof pre, out);
 }
 
-static void rootMsgGrant(const uint8_t c[72], uint8_t out[32]);
+static void rootMsgGrant(const char* tag, const uint8_t c[72], uint8_t out[32]);
+static void rootMsgLimit(const uint8_t c[88], uint8_t out[32]);
 static void rootMsg(char type, const uint8_t* c, uint8_t out[32]) {
   if (type == 'E') rootEvmMsg(c, out);
-  else rootMsgGrant(c, out);
+  else if (type == 'L') rootMsgLimit(c, out);
+  else rootMsgGrant(type == 'A' ? "KAGI/grant" : "KAGI/rootgrant", c, out);
 }
 
-// sha256("KAGI/rootgrant" || chainid || account || nonce || agent || cap || expiry), 32-byte fields
-static void rootMsgGrant(const uint8_t c[72], uint8_t out[32]) {
-  static const char TAG[] = "KAGI/rootgrant";
-  const size_t T = sizeof TAG - 1;
-  uint8_t pre[sizeof TAG - 1 + 32 + 20 + 32 + 20 + 32 + 32];
+// sha256(tag || chainid || account || nonce || agent || cap || expiry), 32-byte fields.
+// 'G' uses "KAGI/rootgrant" (root treasury), 'A' uses "KAGI/grant" (a new agent key on the wallet).
+static void rootMsgGrant(const char* tag, const uint8_t c[72], uint8_t out[32]) {
+  const size_t T = strlen(tag);
+  uint8_t pre[32 + 32 + 20 + 32 + 20 + 32 + 32];
   memset(pre, 0, sizeof pre);
-  memcpy(pre, TAG, T);
+  memcpy(pre, tag, T);
   memcpy(pre + T + 28, c, 4);             // chainid
   memcpy(pre + T + 32, c + 4, 20);        // account
   memcpy(pre + T + 52 + 28, c + 24, 4);   // nonce
   memcpy(pre + T + 84, c + 28, 20);       // agent
   memcpy(pre + T + 104 + 16, c + 48, 16); // cap
   memcpy(pre + T + 136 + 24, c + 64, 8);  // expiry
+  frost::sha256(pre, T + 168, out);
+}
+
+// sha256("KAGI/limit" || chainid || account || nonce || agent || oldCap || newCap || expiry).
+// Compact: chainId u32 | account 20 | nonce u32 | agent 20 | oldCap u128 | newCap u128 | expiry u64
+static void rootMsgLimit(const uint8_t c[88], uint8_t out[32]) {
+  static const char TAG[] = "KAGI/limit";
+  const size_t T = sizeof TAG - 1;
+  uint8_t pre[sizeof TAG - 1 + 32 + 20 + 32 + 20 + 32 + 32 + 32];
+  memset(pre, 0, sizeof pre);
+  memcpy(pre, TAG, T);
+  memcpy(pre + T + 28, c, 4);             // chainid
+  memcpy(pre + T + 32, c + 4, 20);        // account
+  memcpy(pre + T + 52 + 28, c + 24, 4);   // nonce
+  memcpy(pre + T + 84, c + 28, 20);       // agent
+  memcpy(pre + T + 104 + 16, c + 48, 16); // oldCap
+  memcpy(pre + T + 136 + 16, c + 64, 16); // newCap
+  memcpy(pre + T + 168 + 24, c + 80, 8);  // expiry
   frost::sha256(pre, sizeof pre, out);
+}
+
+static double u128(const uint8_t* b) {
+  double v = 0;
+  for (int i = 0; i < 16; i++) v = v * 256 + b[i];
+  return v;
 }
 
 static void describeRoot(char type, const uint8_t* c, Prompt& p) {
@@ -1118,11 +1280,21 @@ static void describeRoot(char type, const uint8_t* c, Prompt& p) {
     p.line2 = isVault ? "A: sign as vault  B: no" : "from the root treasury";
     return;
   }
-  double cap = 0;
-  for (int i = 0; i < 16; i++) cap = cap * 256 + c[48 + i];
-  char eth[32];
-  snprintf(eth, sizeof eth, "%.6f ETH", cap / 1e18);
-  p.amount = eth;
+  if (type == 'A') {
+    p.title = isVault ? "2nd stick: new key" : "New agent key";
+    p.amount = ethStr(u128(c + 48) / 1e18);
+    p.line1 = "total allowance, key " + shortHex(hex(c + 28, 20), 4, 4);
+    p.line2 = isVault ? "A: sign  B: no" : "then the second stick";
+    return;
+  }
+  if (type == 'L') {
+    p.title = isVault ? "2nd stick: raise" : "Raise the total";
+    p.amount = ethStr(u128(c + 64) / 1e18);
+    p.line1 = "was " + ethStr(u128(c + 48) / 1e18) + ", key " + shortHex(hex(c + 28, 20), 4, 4);
+    p.line2 = isVault ? "A: sign  B: no" : "then the second stick";
+    return;
+  }
+  p.amount = ethStr(u128(c + 48) / 1e18);
   p.line1 = "raise cap, agent " + shortHex(hex(c + 28, 20), 4, 4);
   p.line2 = isVault ? "A: sign as vault  B: no" : "needs the vault next";
 }
@@ -1158,10 +1330,10 @@ static void onRootReshare(JsonDocument& in) {
   Prompt p;
   p.id = "root_reshare";
   p.kind = "root_reshare";
-  p.title = "Add vault";
+  p.title = rootIsManager ? "Add second stick" : "Add vault";
   p.amount = fingerprint(pendVaultPub);
-  p.line1 = "same code on the vault?";
-  p.line2 = "root key becomes 3 of 3";
+  p.line1 = rootIsManager ? "same code on the other stick?" : "same code on the vault?";
+  p.line2 = rootIsManager ? "then every approval needs both" : "root key becomes 3 of 3";
   showPrompt(p);
 }
 
@@ -1173,12 +1345,19 @@ static void onRootSign(JsonDocument& in) {
   p.id = id;
   p.kind = "root_sign";
   uint8_t* c = rjob.compact;
-  rjob.type = String(in["kind"] | "grant") == "evm" ? 'E' : 'G';
+  String kind = in["kind"] | "grant";
+  rjob.type = kind == "evm" ? 'E' : kind == "evm_grant" ? 'A' : kind == "evm_limit" ? 'L' : 'G';
   bool ok = tailOf(String(in["chainId"] | "").c_str(), c, 4) && unhex(in["account"] | "", c + 4, 20) &&
             tailOf(String(in["nonce"] | "").c_str(), c + 24, 4) && unhex(in["D"] | "", rjob.D[0], 33) &&
             unhex(in["E"] | "", rjob.E[0], 33);
   if (rjob.type == 'E')
     ok = ok && unhex(in["to"] | "", c + 28, 20) && tailOf(String(in["value"] | "").c_str(), c + 48, 16);
+  else if (rjob.type == 'L')
+    ok = ok && unhex(in["agentAddress"] | "", c + 28, 20) && tailOf(String(in["oldCap"] | "").c_str(), c + 48, 16) &&
+         tailOf(String(in["newCap"] | "").c_str(), c + 64, 16) && tailOf(String(in["expiry"] | "").c_str(), c + 80, 8);
+  else if (rjob.type == 'A')
+    ok = ok && unhex(in["agentAddress"] | "", c + 28, 20) && tailOf(String(in["cap"] | "").c_str(), c + 48, 16) &&
+         tailOf(String(in["expiry"] | "").c_str(), c + 64, 8);
   else
     ok = ok && unhex(in["agent"] | "", c + 28, 20) && tailOf(String(in["cap"] | "").c_str(), c + 48, 16) &&
          tailOf(String(in["expiry"] | "").c_str(), c + 64, 8);
@@ -1188,6 +1367,10 @@ static void onRootSign(JsonDocument& in) {
   rjob.id = id;
   p.title = "ROOT action";
   describeRoot(rjob.type, c, p);
+  // The phone knows the agent's name; the compact form only has its address.
+  String agentName = in["agent"] | "";
+  if (rjob.type == 'A' && agentName.length() && !agentName.startsWith("0x")) p.title = "New key for " + agentName;
+  if (rjob.type == 'L' && agentName.length() && !agentName.startsWith("0x")) p.title = "Raise " + agentName + "'s total";
   showPrompt(p);
 }
 
@@ -1204,7 +1387,7 @@ static void rootSignToVault() {
   frost::commit(rjob.n, rjob.D[1], rjob.E[1]);
   // 'S' | type | compact | D1 E1 D2 E2
   size_t cl = compactLen(rjob.type);
-  uint8_t pkt[2 + 72 + 4 * 33];
+  uint8_t pkt[2 + 88 + 4 * 33];
   pkt[0] = 'S';
   pkt[1] = rjob.type;
   memcpy(pkt + 2, rjob.compact, cl);
@@ -1214,7 +1397,7 @@ static void rootSignToVault() {
   memcpy(q + 66, rjob.D[1], 33);
   memcpy(q + 99, rjob.E[1], 33);
   size_t pktLen = 2 + cl + 132;
-  irShowWaiting("Point at the vault");
+  irSending(rootIsManager ? "To your 2nd stick" : "To the vault");
   JsonDocument st;
   st["t"] = "root_progress";
   st["id"] = rjob.id;
@@ -1223,12 +1406,14 @@ static void rootSignToVault() {
   if (!ir::send(pkt, pktLen, 60000)) {
     frost::wipe(rjob.n);
     reject(rjob.id, "ir_failed");
-    showResult("Vault not in sight", C_RED, 4000);
+    buzz(3);
+    showResult(rootIsManager ? "2nd stick not in sight" : "Vault not in sight", C_RED, 4000, Fx::Shake);
     return;
   }
   rjob.active = true;
   rjob.sentAt = millis();
-  irShowWaiting("Vault: press A");
+  chirp();
+  irShowWaiting(rootIsManager ? "2nd stick: hold A" : "Vault: press A");
   JsonDocument d;
   d["t"] = "root_progress";
   d["id"] = rjob.id;
@@ -1274,7 +1459,7 @@ static void vaultRequest(const std::vector<uint8_t>& m) {
   if (m.size() < 2) return;
   char type = (char)m[1];
   size_t cl = compactLen(type);
-  if ((type != 'E' && type != 'G') || m.size() != 2 + cl + 4 * 33) return;
+  if ((type != 'E' && type != 'G' && type != 'A' && type != 'L') || m.size() != 2 + cl + 4 * 33) return;
   if (!vJoined) {
     uint8_t r[2] = {'R', 1};
     ir::send(r, 2, 8000);
@@ -1309,8 +1494,9 @@ static void vaultApprove() {
   memcpy(pkt + 1, vjob.D[2], 33);
   memcpy(pkt + 34, vjob.E[2], 33);
   memcpy(pkt + 67, z3, 32);
-  irShowWaiting("Sending to wrist");
+  irSending("Back to your wrist");
   bool ok = ir::send(pkt, sizeof pkt, 60000);
+  if (!ok) buzz(3);
   showResult(ok ? "Signed" : "Wrist not in sight", ok ? C_TEXT : C_RED, 2600, ok ? Fx::Burst : Fx::Shake);
 }
 
@@ -1362,7 +1548,8 @@ static void onResharePiece(JsonDocument& in) {
     d["t"] = "reshare_vault";
     d["X3"] = hex(X3, 33);
     send(d);
-    showResult("Joined: root 3 of 3", C_TEXT, 5000);
+    showResult("Joined. 3 of 3", C_TEXT, 5000, Fx::Burst);
+    chime();
     windowUntil = millis() + 5000;  // radio goes off shortly
   } else {
     d["t"] = "reshare_progress";
@@ -1484,13 +1671,36 @@ static void handle(const String& line) {
   } else if (t == "dkg") onDkg(in);
   else if (t == "root_dkg") onRootDkg(in);
   else if (t == "root_reshare") onRootReshare(in);
-  else if (t == "root_commit") {
+  else if (t == "root_adopt") {
+    // Start the reshare from the wallet key itself, so the account's key stays the same.
+    JsonDocument d;
+    d["t"] = "root_adopted";
+    if (!paired) d["error"] = "not_paired";
+    else if (mgr3) d["error"] = "already_3_of_3";
+    else {
+      memcpy(rshare, share, 32);
+      memcpy(rgk, groupKey, 32);
+      rparties = 2;
+      rootIsManager = true;
+      saveRoot();
+      d["parties"] = 2;
+      d["groupKey"] = hex(rgk, 32);
+    }
+    send(d);
+  } else if (t == "root_commit") {
     if (rparties == 2) {
       memcpy(rshare, rX2new, 32);
       memset(rX2new, 0, 32);
       rparties = 3;
+      if (rootIsManager) {
+        // The old wallet share is replaced, so phone and wrist alone can no longer sign.
+        memcpy(share, rshare, 32);
+        mgr3 = true;
+        saveShare();
+      }
       saveRoot();
-      showResult("Root is 3 of 3", C_TEXT, 4000);
+      showResult(rootIsManager ? "Now 3 of 3" : "Root is 3 of 3", C_TEXT, 4000, Fx::Burst);
+      chime();
     }
     JsonDocument d;
     d["t"] = "root_committed";
@@ -2026,6 +2236,8 @@ void setup() {
   M5.Power.setExtOutput(true, m5::ext_none);
   delay(50);
   ir::begin();
+  ir::onSendProgress(irOnSend);
+  ir::onRecvProgress(irOnRecv);
   loadShare();
   loadRoot();
   // The wrist advertises all the time; the vault only while its window is open.
@@ -2069,6 +2281,11 @@ void loop() {
   // IR: report whole messages that arrive (the vault protocol builds on this).
   static std::vector<uint8_t> irMsg;
   bool irGot = ir::poll(irMsg);
+  // A message that started arriving and then stopped: say so, and go back.
+  if (mode == Mode::Beam && !irui.sending && !irGot && irui.lastRecv && millis() - irui.lastRecv > 6000) {
+    buzz(2);
+    showResult("Lost the other stick", C_RED, 3000, Fx::Shake);
+  }
   if (irGot && !irMsg.empty() && (irMsg[0] == 'S' || irMsg[0] == 'Z' || irMsg[0] == 'R')) {
     if (isVault && irMsg[0] == 'S') vaultRequest(irMsg);
     else if (!isVault && (irMsg[0] == 'Z' || irMsg[0] == 'R')) rootFromVault(irMsg);

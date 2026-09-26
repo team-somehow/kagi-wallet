@@ -59,7 +59,7 @@ export default function Demo() {
         <Txt size={15} weight="medium" color={colors.muted}>
           Chain
         </Txt>
-        <Button label="Vault and root key" variant="secondary" onPress={() => router.push('/vault')} />
+        <Button label="Add a second stick" variant="secondary" onPress={() => router.push('/vault')} />
       </View>
 
       <View style={styles.group}>
